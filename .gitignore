@@ -2,3 +2,6 @@
 *.png
 *.dat
 *.out
+*.mod
+*.o
+*.x
