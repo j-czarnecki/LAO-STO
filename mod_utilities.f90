@@ -59,6 +59,23 @@ COMPLEX*16 FUNCTION epsilon_xy(kx, ky)
     RETURN
 END FUNCTION epsilon_xy
 
+COMPLEX*16 FUNCTION pairing_1(ky)
+    REAL*8, INTENT(IN) :: ky
+    pairing_1 = EXP(-imag*ky*A_TILDE)
+    RETURN
+END FUNCTION pairing_1
+
+COMPLEX*16 FUNCTION pairing_2(kx, ky)
+    REAL*8, INTENT(IN) :: kx, ky
+    pairing_2 = EXP(imag*A_TILDE*(SQRT(3.)/2.*kx + ky/2.))
+    RETURN
+END FUNCTION pairing_2
+
+COMPLEX*16 FUNCTION pairing_3(kx, ky)
+    REAL*8, INTENT(IN) :: kx, ky
+    pairing_3 = EXP(imag*A_TILDE*(-SQRT(3.)/2.*kx + ky/2.))
+    RETURN
+END FUNCTION pairing_3
 
 REAL*8 FUNCTION meV_to_au(x)
     IMPLICIT NONE
@@ -66,6 +83,13 @@ REAL*8 FUNCTION meV_to_au(x)
     meV_to_au = x / 27211.
     RETURN 
 END FUNCTION meV_to_au
+
+REAL*8 FUNCTION fd_distribution(E, E_Fermi, T)
+    IMPLICIT NONE 
+    REAL*8 E, E_Fermi, T
+    fd_distribution = 1./(EXP((E - E_Fermi)/(k_B*T)) + 1.)
+    RETURN
+END FUNCTION fd_distribution
 
 REAL*8 FUNCTION nm_to_au(x)
     IMPLICIT NONE
