@@ -1,6 +1,7 @@
 MODULE mod_hamiltonians
 USE mod_utilities
 USE mod_parameters
+USE mod_reader
 IMPLICIT NONE 
 CONTAINS
 
@@ -335,16 +336,22 @@ SUBROUTINE COMPUTE_HUBBARD(Hamiltonian, Energies)
     IMPLICIT NONE 
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
     REAL*8, INTENT(IN) :: Energies(DIM)
-    INTEGER*4 :: i,j 
+    INTEGER*4 :: orb, lat, orb_prime
 
-    ! DO i = 1, ORBITALS
-    !     Hamiltonian(i,i) = Hamiltonian(i,i) + U_HUB*fd_distribution(Energies(TBA_DIM + i), 0., T)
-    !     DO j = 1, ORBITALS
-    !         IF (i .NE. j) THEN
-    !             Hamiltonian(i,i) = Hamiltonian(i,i) + V_HUB/2.
-    !         END IF
+
+    ! DO orb = 1, ORBITALS
+    !     DO lat = 0, SUBLATTICES - 1
+
+    !         !Spin up part
+    !         Hamiltonian(orb + lat*SUBLATTICES) = Hamiltonian(orb, lat*SUBLATTICES) + &
+    !         & U_HUB*
+
+
+
     !     END DO
     ! END DO
+
+    
 
 
 

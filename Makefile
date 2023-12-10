@@ -8,7 +8,8 @@ OBJS = 	main.o \
 		mod_hamiltonians.o \
 		mod_parameters.o \
 		mod_utilities.o \
-		mod_writers.o
+		mod_writers.o \
+		mod_reader.o
 
 $(TARGET): $(OBJS)
 	$(F90) -o $(TARGET) $(F90FLAGS) $^ $(LIBS)
@@ -25,16 +26,21 @@ clean:
 main.o:	mod_hamiltonians.o \
 		mod_parameters.o \
 		mod_utilities.o \
-		mod_writers.o
+		mod_writers.o \
+		mod_reader.o
 
-mod_utilities.o: mod_parameters.o
+mod_utilities.o: mod_parameters.o \
+				 mod_reader.o
 
 mod_parameters.o:
 
 mod_hamiltonians.o:	mod_utilities.o \
-					mod_parameters.o 
+					mod_parameters.o \
+					mod_reader.o
 
 mod_writers.o: mod_parameters.o
+
+mod_reader.o: mod_parameters.o
 
 
 
