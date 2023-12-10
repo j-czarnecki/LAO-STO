@@ -61,19 +61,19 @@ END FUNCTION epsilon_xy
 
 COMPLEX*16 FUNCTION pairing_1(ky)
     REAL*8, INTENT(IN) :: ky
-    pairing_1 = EXP(-imag*ky*A_TILDE)
+    pairing_1 = EXP(-imag*ky)
     RETURN
 END FUNCTION pairing_1
 
 COMPLEX*16 FUNCTION pairing_2(kx, ky)
     REAL*8, INTENT(IN) :: kx, ky
-    pairing_2 = EXP(imag*A_TILDE*(SQRT(3.)/2.*kx + ky/2.))
+    pairing_2 = EXP(imag*(SQRT(3.)/2.*kx + ky/2.))
     RETURN
 END FUNCTION pairing_2
 
 COMPLEX*16 FUNCTION pairing_3(kx, ky)
     REAL*8, INTENT(IN) :: kx, ky
-    pairing_3 = EXP(imag*A_TILDE*(-SQRT(3.)/2.*kx + ky/2.))
+    pairing_3 = EXP(imag*(-SQRT(3.)/2.*kx + ky/2.))
     RETURN
 END FUNCTION pairing_3
 

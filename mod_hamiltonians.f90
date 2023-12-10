@@ -8,7 +8,7 @@ CONTAINS
 SUBROUTINE COMPUTE_TBA_TERM(Hamiltonian, kx, ky)
     IMPLICIT NONE 
     REAL*8 :: kx, ky
-    COMPLEX*16 :: Hamiltonian(DIM,DIM) !Twice as big because of spin
+    COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM) !Twice as big because of spin
     !Only specifying upper triangle of matrix, since Hamiltonian is hermitian
     !spin up
     Hamiltonian(1,4) = epsilon_yz(kx, ky)
@@ -23,13 +23,13 @@ SUBROUTINE COMPUTE_TBA_TERM(Hamiltonian, kx, ky)
     kx = -kx
     ky = -ky
     !spin up
-    Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 4) = -epsilon_yz(kx, ky)
-    Hamiltonian(DIM_POSITIVE_K + 2, DIM_POSITIVE_K + 5) = -epsilon_zx(kx, ky)
-    Hamiltonian(DIM_POSITIVE_K + 3, DIM_POSITIVE_K + 6) = -epsilon_xy(kx, ky)
+    Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 4) = -CONJG(epsilon_yz(kx, ky))
+    Hamiltonian(DIM_POSITIVE_K + 2, DIM_POSITIVE_K + 5) = -CONJG(epsilon_zx(kx, ky))
+    Hamiltonian(DIM_POSITIVE_K + 3, DIM_POSITIVE_K + 6) = -CONJG(epsilon_xy(kx, ky))
     !spin down
-    Hamiltonian(DIM_POSITIVE_K + TBA_DIM + 1, DIM_POSITIVE_K + TBA_DIM + 4) = -epsilon_yz(kx, ky)
-    Hamiltonian(DIM_POSITIVE_K + TBA_DIM + 2, DIM_POSITIVE_K + TBA_DIM + 5) = -epsilon_zx(kx, ky)
-    Hamiltonian(DIM_POSITIVE_K + TBA_DIM + 3, DIM_POSITIVE_K + TBA_DIM + 6) = -epsilon_xy(kx, ky)
+    Hamiltonian(DIM_POSITIVE_K + TBA_DIM + 1, DIM_POSITIVE_K + TBA_DIM + 4) = -CONJG(epsilon_yz(kx, ky))
+    Hamiltonian(DIM_POSITIVE_K + TBA_DIM + 2, DIM_POSITIVE_K + TBA_DIM + 5) = -CONJG(epsilon_zx(kx, ky))
+    Hamiltonian(DIM_POSITIVE_K + TBA_DIM + 3, DIM_POSITIVE_K + TBA_DIM + 6) = -CONJG(epsilon_xy(kx, ky))
     kx = -kx
     ky = -ky
 
@@ -57,20 +57,20 @@ SUBROUTINE COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian)
 
     !Nambu space
     !Ti1 atoms
-    Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 2) = Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 2) - imag*lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 7, DIM_POSITIVE_K + 8) = Hamiltonian(DIM_POSITIVE_K + 7, DIM_POSITIVE_K + 8) + imag*lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 9) = Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 9) + lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 2, DIM_POSITIVE_K + 9) = Hamiltonian(DIM_POSITIVE_K + 2, DIM_POSITIVE_K + 9) - imag*lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 3, DIM_POSITIVE_K + 7) = Hamiltonian(DIM_POSITIVE_K + 3, DIM_POSITIVE_K + 7) - lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 3, DIM_POSITIVE_K + 8) = Hamiltonian(DIM_POSITIVE_K + 3, DIM_POSITIVE_K + 8) + imag*lambda_SOC/2.
+    Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 2) = Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 2) + imag*lambda_SOC/2.
+    Hamiltonian(DIM_POSITIVE_K + 7, DIM_POSITIVE_K + 8) = Hamiltonian(DIM_POSITIVE_K + 7, DIM_POSITIVE_K + 8) - imag*lambda_SOC/2.
+    Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 9) = Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 9) - lambda_SOC/2.
+    Hamiltonian(DIM_POSITIVE_K + 2, DIM_POSITIVE_K + 9) = Hamiltonian(DIM_POSITIVE_K + 2, DIM_POSITIVE_K + 9) + imag*lambda_SOC/2.
+    Hamiltonian(DIM_POSITIVE_K + 3, DIM_POSITIVE_K + 7) = Hamiltonian(DIM_POSITIVE_K + 3, DIM_POSITIVE_K + 7) + lambda_SOC/2.
+    Hamiltonian(DIM_POSITIVE_K + 3, DIM_POSITIVE_K + 8) = Hamiltonian(DIM_POSITIVE_K + 3, DIM_POSITIVE_K + 8) - imag*lambda_SOC/2.
 
     !Ti2 atoms
-    Hamiltonian(DIM_POSITIVE_K + 4, DIM_POSITIVE_K + 5) = Hamiltonian(DIM_POSITIVE_K + 4,DIM_POSITIVE_K + 5) - imag*lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 10, DIM_POSITIVE_K + 11) = Hamiltonian(DIM_POSITIVE_K + 10,DIM_POSITIVE_K + 11) + imag*lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 4, DIM_POSITIVE_K + 12) = Hamiltonian(DIM_POSITIVE_K + 4,DIM_POSITIVE_K + 2) + lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 5, DIM_POSITIVE_K + 12) = Hamiltonian(DIM_POSITIVE_K + 5,DIM_POSITIVE_K + 2) - imag*lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 6, DIM_POSITIVE_K + 10) = Hamiltonian(DIM_POSITIVE_K + 6,DIM_POSITIVE_K + 0) - lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 6, DIM_POSITIVE_K + 11) = Hamiltonian(DIM_POSITIVE_K + 6,DIM_POSITIVE_K + 1) + imag*lambda_SOC/2.
+    Hamiltonian(DIM_POSITIVE_K + 4, DIM_POSITIVE_K + 5) = Hamiltonian(DIM_POSITIVE_K + 4,DIM_POSITIVE_K + 5) + imag*lambda_SOC/2.
+    Hamiltonian(DIM_POSITIVE_K + 10, DIM_POSITIVE_K + 11) = Hamiltonian(DIM_POSITIVE_K + 10,DIM_POSITIVE_K + 11) - imag*lambda_SOC/2.
+    Hamiltonian(DIM_POSITIVE_K + 4, DIM_POSITIVE_K + 12) = Hamiltonian(DIM_POSITIVE_K + 4,DIM_POSITIVE_K + 2) - lambda_SOC/2.
+    Hamiltonian(DIM_POSITIVE_K + 5, DIM_POSITIVE_K + 12) = Hamiltonian(DIM_POSITIVE_K + 5,DIM_POSITIVE_K + 2) + imag*lambda_SOC/2.
+    Hamiltonian(DIM_POSITIVE_K + 6, DIM_POSITIVE_K + 10) = Hamiltonian(DIM_POSITIVE_K + 6,DIM_POSITIVE_K + 0) + lambda_SOC/2.
+    Hamiltonian(DIM_POSITIVE_K + 6, DIM_POSITIVE_K + 11) = Hamiltonian(DIM_POSITIVE_K + 6,DIM_POSITIVE_K + 1) - imag*lambda_SOC/2.
 
 END SUBROUTINE COMPUTE_ATOMIC_SOC_TERMS
 
@@ -174,20 +174,20 @@ SUBROUTINE COMPUTE_TI1_TI2(Hamiltonian,kx, ky)
     kx = -kx
     ky = -ky
     !Spin-up part
-    Hamiltonian(1 + DIM_POSITIVE_K, 2 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(1 + DIM_POSITIVE_K, 2 + ORBITALS +DIM_POSITIVE_K) - eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(- 2.*imag*EXP(imag*3./2.*ky)*SIN(SQRT(3.)/2.*kx))
-    Hamiltonian(1 + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(1 + DIM_POSITIVE_K, 3 + ORBITALS +DIM_POSITIVE_K) - eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(1 - EXP(imag/2.*(SQRT(3.)*kx + 3.*ky)))
-    Hamiltonian(2 + DIM_POSITIVE_K, 1 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(2 + DIM_POSITIVE_K, 1 + ORBITALS +DIM_POSITIVE_K) - eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(2*imag*EXP(imag*3./2.*ky)*SIN(SQRT(3.)/2.*kx))
-    Hamiltonian(2 + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(2 + DIM_POSITIVE_K, 3 + ORBITALS +DIM_POSITIVE_K) - eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(1 - EXP(-imag/2.*(SQRT(3.)*kx - 3.*ky)))
-    Hamiltonian(3 + DIM_POSITIVE_K, 1 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(3 + DIM_POSITIVE_K, 1 + ORBITALS +DIM_POSITIVE_K) - eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(- 1 + EXP(imag/2.*(SQRT(3.)*kx + 3.*ky)))
-    Hamiltonian(3 + DIM_POSITIVE_K, 2 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(3 + DIM_POSITIVE_K, 2 + ORBITALS +DIM_POSITIVE_K) - eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(- 1 + EXP(-imag/2.*(SQRT(3.)*kx - 3.*ky)))
+    Hamiltonian(1 + DIM_POSITIVE_K, 2 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(1 + DIM_POSITIVE_K, 2 + ORBITALS +DIM_POSITIVE_K) - CONJG(eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(- 2.*imag*EXP(imag*3./2.*ky)*SIN(SQRT(3.)/2.*kx)))
+    Hamiltonian(1 + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(1 + DIM_POSITIVE_K, 3 + ORBITALS +DIM_POSITIVE_K) - CONJG(eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(1 - EXP(imag/2.*(SQRT(3.)*kx + 3.*ky))))
+    Hamiltonian(2 + DIM_POSITIVE_K, 1 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(2 + DIM_POSITIVE_K, 1 + ORBITALS +DIM_POSITIVE_K) - CONJG(eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(2*imag*EXP(imag*3./2.*ky)*SIN(SQRT(3.)/2.*kx)))
+    Hamiltonian(2 + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(2 + DIM_POSITIVE_K, 3 + ORBITALS +DIM_POSITIVE_K) - CONJG(eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(1 - EXP(-imag/2.*(SQRT(3.)*kx - 3.*ky))))
+    Hamiltonian(3 + DIM_POSITIVE_K, 1 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(3 + DIM_POSITIVE_K, 1 + ORBITALS +DIM_POSITIVE_K) - CONJG(eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(- 1 + EXP(imag/2.*(SQRT(3.)*kx + 3.*ky))))
+    Hamiltonian(3 + DIM_POSITIVE_K, 2 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(3 + DIM_POSITIVE_K, 2 + ORBITALS +DIM_POSITIVE_K) - CONJG(eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(- 1 + EXP(-imag/2.*(SQRT(3.)*kx - 3.*ky))))
 
     !Spin-down part
-    Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, 2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, 2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(- 2.*imag*EXP(imag*3./2.*ky)*SIN(SQRT(3.)/2.*kx))
-    Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(1 - EXP(imag/2.*(SQRT(3.)*kx + 3.*ky)))
-    Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, 1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, 1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(2*imag*EXP(imag*3./2.*ky)*SIN(SQRT(3.)/2.*kx))
-    Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(1 - EXP(-imag/2.*(SQRT(3.)*kx - 3.*ky)))
-    Hamiltonian(3 + TBA_DIM + DIM_POSITIVE_K, 1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(3 + TBA_DIM + DIM_POSITIVE_K, 1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(- 1 + EXP(imag/2.*(SQRT(3.)*kx + 3.*ky)))
-    Hamiltonian(3 + TBA_DIM + DIM_POSITIVE_K, 2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(3 + TBA_DIM + DIM_POSITIVE_K, 2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(- 1 + EXP(-imag/2.*(SQRT(3.)*kx - 3.*ky)))
+    Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, 2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, 2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - CONJG(eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(- 2.*imag*EXP(imag*3./2.*ky)*SIN(SQRT(3.)/2.*kx)))
+    Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - CONJG(eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(1 - EXP(imag/2.*(SQRT(3.)*kx + 3.*ky))))
+    Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, 1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, 1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - CONJG(eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(2*imag*EXP(imag*3./2.*ky)*SIN(SQRT(3.)/2.*kx)))
+    Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - CONJG(eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(1 - EXP(-imag/2.*(SQRT(3.)*kx - 3.*ky))))
+    Hamiltonian(3 + TBA_DIM + DIM_POSITIVE_K, 1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(3 + TBA_DIM + DIM_POSITIVE_K, 1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - CONJG(eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(- 1 + EXP(imag/2.*(SQRT(3.)*kx + 3.*ky))))
+    Hamiltonian(3 + TBA_DIM + DIM_POSITIVE_K, 2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(3 + TBA_DIM + DIM_POSITIVE_K, 2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - CONJG(eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(- 1 + EXP(-imag/2.*(SQRT(3.)*kx - 3.*ky))))
     kx = -kx
     ky = -ky
 
@@ -227,22 +227,22 @@ SUBROUTINE COMPUTE_H_PI(Hamiltonian, kx, ky)
     k2 = -k2
     k3 = -k3
     !Spin up, Ti1
-    Hamiltonian(1 + DIM_POSITIVE_K, 2 + DIM_POSITIVE_K) = Hamiltonian(1 + DIM_POSITIVE_K,2 + DIM_POSITIVE_K) + eta_p*2*imag*V_pdp/SQRT(15.)*(SIN(k1) + SIN(k2) + 2*SIN(k3))
-    Hamiltonian(1 + DIM_POSITIVE_K, 3 + DIM_POSITIVE_K) = Hamiltonian(1 + DIM_POSITIVE_K,3 + DIM_POSITIVE_K) - eta_p*2*imag*V_pdp/SQRT(15.)*(SIN(k1) + 2*SIN(k2) + SIN(k3))
-    Hamiltonian(2 + DIM_POSITIVE_K, 3 + DIM_POSITIVE_K) = Hamiltonian(2 + DIM_POSITIVE_K,3 + DIM_POSITIVE_K) + eta_p*2*imag*V_pdp/SQRT(15.)*(2*SIN(k1) + SIN(k2) + SIN(k3))
+    Hamiltonian(1 + DIM_POSITIVE_K, 2 + DIM_POSITIVE_K) = Hamiltonian(1 + DIM_POSITIVE_K,2 + DIM_POSITIVE_K) + CONJG(eta_p*2*imag*V_pdp/SQRT(15.)*(SIN(k1) + SIN(k2) + 2*SIN(k3)))
+    Hamiltonian(1 + DIM_POSITIVE_K, 3 + DIM_POSITIVE_K) = Hamiltonian(1 + DIM_POSITIVE_K,3 + DIM_POSITIVE_K) - CONJG(eta_p*2*imag*V_pdp/SQRT(15.)*(SIN(k1) + 2*SIN(k2) + SIN(k3)))
+    Hamiltonian(2 + DIM_POSITIVE_K, 3 + DIM_POSITIVE_K) = Hamiltonian(2 + DIM_POSITIVE_K,3 + DIM_POSITIVE_K) + CONJG(eta_p*2*imag*V_pdp/SQRT(15.)*(2*SIN(k1) + SIN(k2) + SIN(k3)))
     !Spin up, Ti2
-    Hamiltonian(1 + ORBITALS + DIM_POSITIVE_K, 2 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(1 + ORBITALS + DIM_POSITIVE_K, 2 + ORBITALS + DIM_POSITIVE_K) + eta_p*2*imag*V_pdp/SQRT(15.)*(SIN(k1) + SIN(k2) + 2*SIN(k3))
-    Hamiltonian(1 + ORBITALS + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(1 + ORBITALS + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K) - eta_p*2*imag*V_pdp/SQRT(15.)*(SIN(k1) + 2*SIN(k2) + SIN(k3))
-    Hamiltonian(2 + ORBITALS + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(2 + ORBITALS + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K) + eta_p*2*imag*V_pdp/SQRT(15.)*(2*SIN(k1) + SIN(k2) + SIN(k3))
+    Hamiltonian(1 + ORBITALS + DIM_POSITIVE_K, 2 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(1 + ORBITALS + DIM_POSITIVE_K, 2 + ORBITALS + DIM_POSITIVE_K) + CONJG(eta_p*2*imag*V_pdp/SQRT(15.)*(SIN(k1) + SIN(k2) + 2*SIN(k3)))
+    Hamiltonian(1 + ORBITALS + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(1 + ORBITALS + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K) - CONJG(eta_p*2*imag*V_pdp/SQRT(15.)*(SIN(k1) + 2*SIN(k2) + SIN(k3)))
+    Hamiltonian(2 + ORBITALS + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(2 + ORBITALS + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K) + CONJG(eta_p*2*imag*V_pdp/SQRT(15.)*(2*SIN(k1) + SIN(k2) + SIN(k3)))
 
     !Spin down, Ti1
-    Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, 2 + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, 2 + TBA_DIM + DIM_POSITIVE_K) + eta_p*2*imag*V_pdp/SQRT(15.)*(SIN(k1) + SIN(k2) + 2*SIN(k3))
-    Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, 3 + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, 3 + TBA_DIM + DIM_POSITIVE_K) - eta_p*2*imag*V_pdp/SQRT(15.)*(SIN(k1) + 2*SIN(k2) + SIN(k3))
-    Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, 3 + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, 3 + TBA_DIM + DIM_POSITIVE_K) + eta_p*2*imag*V_pdp/SQRT(15.)*(2*SIN(k1) + SIN(k2) + SIN(k3))
+    Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, 2 + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, 2 + TBA_DIM + DIM_POSITIVE_K) + CONJG(eta_p*2*imag*V_pdp/SQRT(15.)*(SIN(k1) + SIN(k2) + 2*SIN(k3)))
+    Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, 3 + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, 3 + TBA_DIM + DIM_POSITIVE_K) - CONJG(eta_p*2*imag*V_pdp/SQRT(15.)*(SIN(k1) + 2*SIN(k2) + SIN(k3)))
+    Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, 3 + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, 3 + TBA_DIM + DIM_POSITIVE_K) + CONJG(eta_p*2*imag*V_pdp/SQRT(15.)*(2*SIN(k1) + SIN(k2) + SIN(k3)))
     !Spin down, Ti2
-    Hamiltonian(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) + eta_p*2*imag*V_pdp/SQRT(15.)*(SIN(k1) + SIN(k2) + 2*SIN(k3))
-    Hamiltonian(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - eta_p*2*imag*V_pdp/SQRT(15.)*(SIN(k1) + 2*SIN(k2) + SIN(k3))
-    Hamiltonian(2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) + eta_p*2*imag*V_pdp/SQRT(15.)*(2*SIN(k1) + SIN(k2) + SIN(k3))
+    Hamiltonian(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) + CONJG(eta_p*2*imag*V_pdp/SQRT(15.)*(SIN(k1) + SIN(k2) + 2*SIN(k3)))
+    Hamiltonian(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - CONJG(eta_p*2*imag*V_pdp/SQRT(15.)*(SIN(k1) + 2*SIN(k2) + SIN(k3)))
+    Hamiltonian(2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) + CONJG(eta_p*2*imag*V_pdp/SQRT(15.)*(2*SIN(k1) + SIN(k2) + SIN(k3)))
 
 
 END SUBROUTINE COMPUTE_H_PI
@@ -279,40 +279,54 @@ SUBROUTINE COMPUTE_H_SIGMA(Hamiltonian, kx, ky)
     k2 = -k2
     k3 = -k3
     !Spin up, Ti1
-    Hamiltonian(1 + DIM_POSITIVE_K, 2 + DIM_POSITIVE_K) = Hamiltonian(1 + DIM_POSITIVE_K, 2 + DIM_POSITIVE_K) - eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k1) + SIN(k2))
-    Hamiltonian(1 + DIM_POSITIVE_K, 3 + DIM_POSITIVE_K) = Hamiltonian(1 + DIM_POSITIVE_K, 3 + DIM_POSITIVE_K) + eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k1) + SIN(k2))
-    Hamiltonian(2 + DIM_POSITIVE_K, 3 + DIM_POSITIVE_K) = Hamiltonian(2 + DIM_POSITIVE_K, 3 + DIM_POSITIVE_K) - eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k2) + SIN(k3))
+    Hamiltonian(1 + DIM_POSITIVE_K, 2 + DIM_POSITIVE_K) = Hamiltonian(1 + DIM_POSITIVE_K, 2 + DIM_POSITIVE_K) - CONJG(eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k1) + SIN(k2)))
+    Hamiltonian(1 + DIM_POSITIVE_K, 3 + DIM_POSITIVE_K) = Hamiltonian(1 + DIM_POSITIVE_K, 3 + DIM_POSITIVE_K) + CONJG(eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k1) + SIN(k2)))
+    Hamiltonian(2 + DIM_POSITIVE_K, 3 + DIM_POSITIVE_K) = Hamiltonian(2 + DIM_POSITIVE_K, 3 + DIM_POSITIVE_K) - CONJG(eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k2) + SIN(k3)))
     !Spin up, Ti2
-    Hamiltonian(1 + ORBITALS + DIM_POSITIVE_K, 2 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(1 + ORBITALS + DIM_POSITIVE_K, 2 + ORBITALS + DIM_POSITIVE_K) - eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k1) + SIN(k2))
-    Hamiltonian(1 + ORBITALS + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(1 + ORBITALS + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K) + eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k1) + SIN(k2))
-    Hamiltonian(2 + ORBITALS + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(2 + ORBITALS + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K) - eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k2) + SIN(k3))
+    Hamiltonian(1 + ORBITALS + DIM_POSITIVE_K, 2 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(1 + ORBITALS + DIM_POSITIVE_K, 2 + ORBITALS + DIM_POSITIVE_K) - CONJG(eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k1) + SIN(k2)))
+    Hamiltonian(1 + ORBITALS + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(1 + ORBITALS + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K) + CONJG(eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k1) + SIN(k2)))
+    Hamiltonian(2 + ORBITALS + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(2 + ORBITALS + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K) - CONJG(eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k2) + SIN(k3)))
     !Spin down, Ti1
-    Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, 2 + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K,2 + TBA_DIM + DIM_POSITIVE_K) - eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k1) + SIN(k2))
-    Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, 3 + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K,3 + TBA_DIM + DIM_POSITIVE_K) + eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k1) + SIN(k2))
-    Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, 3 + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K,3 + TBA_DIM + DIM_POSITIVE_K) - eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k2) + SIN(k3))
+    Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, 2 + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K,2 + TBA_DIM + DIM_POSITIVE_K) - CONJG(eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k1) + SIN(k2)))
+    Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, 3 + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K,3 + TBA_DIM + DIM_POSITIVE_K) + CONJG(eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k1) + SIN(k2)))
+    Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, 3 + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K,3 + TBA_DIM + DIM_POSITIVE_K) - CONJG(eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k2) + SIN(k3)))
     !Spin down, Ti2
-    Hamiltonian(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k1) + SIN(k2))
-    Hamiltonian(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) + eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k1) + SIN(k2))
-    Hamiltonian(2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k2) + SIN(k3))
+    Hamiltonian(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - CONJG(eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k1) + SIN(k2)))
+    Hamiltonian(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) + CONJG(eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k1) + SIN(k2)))
+    Hamiltonian(2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - CONJG(eta_p*2*imag*SQRT(3.)*V_pds/SQRT(15.)*(SIN(k2) + SIN(k3)))
 
 END SUBROUTINE COMPUTE_H_SIGMA
 
 SUBROUTINE COMPUTE_SC(Hamiltonian, kx, ky, Delta)
     IMPLICIT NONE 
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
-    COMPLEX*16, INTENT(IN) :: Delta(ORBITALS, N_NEIGHBOURS)
+    COMPLEX*16, INTENT(IN) :: Delta(ORBITALS, N_NEIGHBOURS,2)
     REAL*8 :: kx, ky
-    INTEGER*4 :: i,j, lat
+    INTEGER*4 :: orb, lat, orb_prime
 
-    !No constant energy shift (gamma) implemented yet
-    DO lat = 0, ORBITALS - 1
-        DO i = 1, ORBITALS
-            Hamiltonian(lat*ORBITALS + TBA_DIM + i, lat*ORBITALS + DIM_POSITIVE_K + i) = Hamiltonian(lat*ORBITALS + TBA_DIM + i, lat*ORBITALS + DIM_POSITIVE_K + i) - J_SC*(Delta(i,1)*pairing_1(ky) + Delta(i,2)*pairing_2(kx,ky) + Delta(i,3)*pairing_3(kx,ky))
-            DO j = 1, ORBITALS
-                IF (j .NE. i) THEN
-                    Hamiltonian(lat*ORBITALS + TBA_DIM + i, lat*ORBITALS + DIM_POSITIVE_K + i) = Hamiltonian(lat*ORBITALS + TBA_DIM + i, lat*ORBITALS + DIM_POSITIVE_K + i) - J_SC_PRIME/2.*(Delta(j,1)*pairing_1(ky) + Delta(j,2)*pairing_2(kx,ky) + Delta(j,3)*pairing_3(kx,ky))
+
+    DO orb = 1, ORBITALS
+        DO lat = 0, SUBLATTICES - 1
+            !Inter - orbital interaction
+            !Up - down coupling
+            Hamiltonian(orb + lat*ORBITALS, orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM) = Hamiltonian(orb + lat*ORBITALS, orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM) + &
+            & J_SC * ( Delta(orb, 1, 1) * pairing_1(ky) + Delta(orb,2, 1) * pairing_2(kx,ky) + Delta(orb, 3, 1) * pairing_3(kx,ky) )
+            !Down - up coupling
+            Hamiltonian(orb + lat*ORBITALS + TBA_DIM, orb + lat*ORBITALS + DIM_POSITIVE_K) = Hamiltonian(orb + lat*ORBITALS + TBA_DIM, orb + lat*ORBITALS + DIM_POSITIVE_K) + &
+            & J_SC * ( Delta(orb, 1, 2) * pairing_1(ky) + Delta(orb,2, 2) * pairing_2(kx,ky) + Delta(orb,3, 2) * pairing_3(kx,ky) )
+            
+            !Intra - orbital interaction
+            DO orb_prime = 1, ORBITALS  
+                IF (orb .NE. orb_prime) THEN
+                    !Up - down coupling
+                    Hamiltonian(orb + lat*ORBITALS, orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM) = Hamiltonian(orb + lat*ORBITALS, orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM) + &
+                    & J_SC_PRIME/2. * ( Delta(orb_prime, 1, 1) * pairing_1(ky) + Delta(orb_prime, 2, 1) * pairing_2(kx,ky) + Delta(orb_prime,3, 1) * pairing_3(kx,ky) )
+                    !Down - up coupling
+                    Hamiltonian(orb + lat*ORBITALS + TBA_DIM, orb + lat*ORBITALS + DIM_POSITIVE_K) = Hamiltonian(orb + lat*ORBITALS + TBA_DIM, orb + lat*ORBITALS + DIM_POSITIVE_K) + &
+                    & J_SC_PRIME/2. * ( Delta(orb_prime, 1, 2) * pairing_1(ky) + Delta(orb_prime, 2, 2) * pairing_2(kx,ky) + Delta(orb_prime,3, 2) * pairing_3(kx,ky) )
                 END IF
             END DO
+
         END DO
     END DO
 END SUBROUTINE COMPUTE_SC

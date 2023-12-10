@@ -33,5 +33,6 @@ REAL*8, PARAMETER :: J_SC_PRIME = 0.0165 * 1e3 * meV2au
 REAL*8, PARAMETER :: U_HUB = 2 * 1e3 * meV2au
 REAL*8, PARAMETER :: V_HUB = 2 * 1e3 * meV2au
 
+REAL*8, PARAMETER :: PI = 4*ATAN(1.0d0)
 
 END MODULE mod_parameters 
