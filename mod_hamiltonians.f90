@@ -8,7 +8,7 @@ CONTAINS
 
 SUBROUTINE COMPUTE_TBA_TERM(Hamiltonian, kx, ky)
     IMPLICIT NONE 
-    REAL*8 :: kx, ky
+    REAL*8, INTENT(INOUT) :: kx, ky
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM) !Twice as big because of spin
     !Only specifying upper triangle of matrix, since Hamiltonian is hermitian
     !spin up
@@ -154,7 +154,7 @@ END SUBROUTINE COMPUTE_ELECTRIC_FIELD
 SUBROUTINE COMPUTE_TI1_TI2(Hamiltonian,kx, ky)
     IMPLICIT NONE 
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
-    REAL*8 :: kx, ky
+    REAL*8, INTENT(INOUT) :: kx, ky
     !Spin-up part
     Hamiltonian(1, 2 + ORBITALS) = Hamiltonian(1, 2 + ORBITALS) + eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(- 2.*imag*EXP(imag*3./2.*ky)*SIN(SQRT(3.)/2.*kx))
     Hamiltonian(1, 3 + ORBITALS) = Hamiltonian(1, 3 + ORBITALS) + eta_p*V_pdp*SQRT(2.)**(7./4.)/SQRT(15.)*(1 - EXP(imag/2.*(SQRT(3.)*kx + 3.*ky)))
@@ -198,7 +198,7 @@ END SUBROUTINE COMPUTE_TI1_TI2
 SUBROUTINE COMPUTE_H_PI(Hamiltonian, kx, ky)
     IMPLICIT NONE 
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
-    REAL*8 :: kx, ky
+    REAL*8, INTENT(INOUT) :: kx, ky
     REAL*8 :: k1, k2, k3
 
     k1 = -SQRT(3.)/2.*kx + 3./2.*ky 
@@ -251,7 +251,7 @@ END SUBROUTINE COMPUTE_H_PI
 SUBROUTINE COMPUTE_H_SIGMA(Hamiltonian, kx, ky)
     IMPLICIT NONE 
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
-    REAL*8 :: kx, ky
+    REAL*8, INTENT(INOUT) :: kx, ky
     REAL*8 :: k1, k2, k3
     k1 = -SQRT(3.)/2.*kx + 3./2.*ky 
     k2 = -SQRT(3.)/2.*kx - 3./2.*ky 
@@ -302,7 +302,7 @@ SUBROUTINE COMPUTE_SC(Hamiltonian, kx, ky, Delta)
     IMPLICIT NONE 
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
     COMPLEX*16, INTENT(IN) :: Delta(ORBITALS, N_NEIGHBOURS,2)
-    REAL*8 :: kx, ky
+    REAL*8, INTENT(IN) :: kx, ky
     INTEGER*4 :: orb, lat, orb_prime
 
 

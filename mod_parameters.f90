@@ -5,9 +5,8 @@ SAVE
 INTEGER*4, PARAMETER :: SUBLATTICES = 2
 INTEGER*4, PARAMETER :: ORBITALS = 3
 INTEGER*4, PARAMETER :: TBA_DIM = ORBITALS*SUBLATTICES
-INTEGER*4, PARAMETER :: DIM_POSITIVE_K = TBA_DIM*2  !Hamiltonian for positive k i.e half of the Nambu space
+INTEGER*4, PARAMETER :: DIM_POSITIVE_K = TBA_DIM*2  !Hamiltonian for positive k i.e half of the Nambu space, *2 due to spin
 INTEGER*4, PARAMETER :: DIM = DIM_POSITIVE_K*2    !*2 to transform to Nambu Space. 
-                                                !Hamiltonian is 12x12, *2 due to spin degree of freedom
 
 INTEGER*4, PARAMETER :: N_NEIGHBOURS = 3
 COMPLEX*16, PARAMETER :: imag = DCMPLX(0. , 1.)

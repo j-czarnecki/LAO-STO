@@ -63,7 +63,7 @@ PROGRAM MAIN
 
     DO sc_iter = 1, max_sc_iter
         PRINT*, "============= SC_ITER: ", sc_iter
-        PRINT*, "Delta 1,1", Delta(1,1,1)
+        PRINT*, "Gamma 1,1", Delta(1,1,1)*J_SC/meV2au
 
         counter = 0
         DO i = -k1_steps,k1_steps
@@ -77,6 +77,7 @@ PROGRAM MAIN
                 ky = (-i*dk1/3. + 2./3.*j*dk2) * A_TILDE
                 Energies(i,j,:) = 0.
                 Hamiltonian(:,:) = 0.
+                U_transformation(:,:) = 0.
                 CALL COMPUTE_TBA_TERM(Hamiltonian(:,:), kx, ky)
                 CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)
                 CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky)
@@ -131,16 +132,17 @@ PROGRAM MAIN
         END DO !End of k-loop
 
         PRINT*, "N sites ", counter
-        Delta_new = Delta_new * domega
+        Delta_new = Delta_new * domega ! * V/(2*PI)**2, becouse of changing sum to integral?
         Delta_new(:,:,2) = Delta_new(:,:,1) !For test: assuming that up-down coupling is the same as down-up
         !Here we should check whether convergence was reached
-        PRINT*, "New delta 1,1", Delta_new(1,1,1)
+        PRINT*, "New gamma 1,1", Delta_new(1,1,1)*J_SC/meV2au
+        PRINT*, "Change of gammas = ", Delta_new(1,1,1)*J_SC/meV2au - Delta(1,1,1)*J_SC/meV2au
         sc_flag = .TRUE.
         DO orb = 1, ORBITALS
             DO m = 1, 3
                 DO n = 1, 2
-                    IF ( (REAL(Delta_new(orb,m,n)) - REAL(Delta(orb,m,n)) > eps_convergence) .OR. &
-                    & (AIMAG(Delta_new(orb,m,n)) - AIMAG(Delta(orb,m,n)) > eps_convergence)) THEN
+                    IF ( (REAL(Delta_new(orb,m,n)) - REAL(Delta(orb,m,n))*J_SC > eps_convergence) .OR. &
+                    & (AIMAG(Delta_new(orb,m,n)) - AIMAG(Delta(orb,m,n))*J_SC > eps_convergence)) THEN
                         sc_flag = .FALSE.
                         EXIT !Maybe go to???
                     END IF
@@ -160,8 +162,8 @@ PROGRAM MAIN
 
     END DO !End of SC loop
 
-    CALL PRINT_ENERGIES(Energies(:,:,:), k1_steps, k2_steps, dk1, dk2, "Ek_sorted")
     CALL PRINT_DELTA(Delta(:,:,:), "Delta_SC")
+    CALL PRINT_ENERGIES(Energies(:,:,:), k1_steps, k2_steps, dk1, dk2, "Ek_sorted")
     OPEN(unit = 9, FILE= "./OutputData/E_kx0_slice.dat", FORM = "FORMATTED", ACTION = "WRITE")
     OPEN(unit = 10, FILE= "./OutputData/E_ky0_slice.dat", FORM = "FORMATTED", ACTION = "WRITE")
     DO n = 1, DIM

@@ -92,11 +92,11 @@ SUBROUTINE GET_INPUT(nmlfile)
     IF ((k1_steps .LE. 0) .OR. (k2_steps .LE. 0)) STOP "k_steps must be > 0"
 
     READ(9,NML=self_consistency)
-
+    eps_convergence = eps_convergence * meV2au
     !Calculating derived values
-    dk1 = k1_max / k1_steps
-    dk2 = k2_max / k2_steps
-    domega = ABS(dk1*dk2*SIN(PI/3.))
+    dk1 = K1_MAX / k1_steps
+    dk2 = K2_MAX / k2_steps
+    domega = ABS(dk1*dk2*SIN(PI/3.)) * 3. * SQRT(3.) * K1_MAX**2 / (2*PI)**2
     eta_p = v * SQRT(3.) / 3.905 * nm2au
 
 END SUBROUTINE GET_INPUT

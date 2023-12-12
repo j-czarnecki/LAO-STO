@@ -1,7 +1,7 @@
 TARGET = LAO_STO.x
 SHELL = /bin/sh
 F90 = ifort
-F90FLAGS = -O3
+F90FLAGS = -O3 -ipo
 LIBS = -llapack
 
 OBJS = 	main.o \
