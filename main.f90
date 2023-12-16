@@ -11,44 +11,24 @@ PROGRAM MAIN
     REAL*8, ALLOCATABLE :: Energies(:,:,:)
     COMPLEX*16, ALLOCATABLE :: Delta(:,:,:), Delta_new(:,:,:)
 
-    REAL*8 :: kx, ky!, domega
-
-    !REAL*8 :: dk1, dk2!, k1_max, k2_max !Suppose kx_max == ky_max and dk_x == dk_y
-    !INTEGER*4 :: k1_steps, k2_steps
+    REAL*8 :: kx, ky
 
     INTEGER*4 :: i,j,n, i_orb, lat, a,b,c, m, orb
-    INTEGER*4 :: sc_iter!, max_sc_iter
-    !REAL*8 :: sc_alpha
-    !REAL*8 :: eps_convergence
+    INTEGER*4 :: sc_iter
     LOGICAL :: sc_flag
 
     INTEGER*4 :: counter
 
     CALL GET_INPUT("./input.nml")
 
-    !max_sc_iter = 1
-
-    !k1_max = (2 * PI * 2./3.)/A_TILDE !Full Brillouin zone to integrate over
-    !k2_max = (2 * PI * 2./3.)/A_TILDE
-    ! kx_max = 2./A_TILDE
-    ! ky_max = 2./A_TILDE
-    !k1_steps = 500
-    !k2_steps = 500
-    !dk1 = k1_max / k1_steps
-    !dk2 = k2_max / k2_steps
-    !domega = ABS(dk1*dk2*SIN(PI/3.))
-
-    !sc_alpha = 0.2
-    !eps_convergence = 1e-5
-
     ALLOCATE(Hamiltonian(DIM,DIM))
     ALLOCATE(Hamiltonian_const(DIM,DIM))
     ALLOCATE(U_transformation(DIM,DIM))
-    ALLOCATE(Energies(-k1_steps:k1_steps, -k2_steps:k2_steps, DIM))
+    ALLOCATE(Energies(0:k1_steps, 0:k2_steps, DIM))
     ALLOCATE(Delta(ORBITALS, N_NEIGHBOURS,2))   !Third dimension for spin coupling: 1 - up-down coupling, 2 - down-up coupling
     ALLOCATE(Delta_new(ORBITALS, N_NEIGHBOURS,2))
 
-    Delta(:,:,:) = 0.
+    Delta(:,:,:) = 1e-3
     Delta_new(:,:,:) = 0.
     
     !Computing k-independent terms
@@ -57,18 +37,20 @@ PROGRAM MAIN
     CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian_const(:,:))
     DO n = 1, DIM_POSITIVE_K
         Hamiltonian_const(n,n) = Hamiltonian_const(n,n) - E_Fermi
-        Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) = Hamiltonian_const(n,n) + E_Fermi
+        Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) = Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) + E_Fermi
     END DO
-    !CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:,:)) !This is not needed, since ZHEEV takes only upper triangle
-
+    ! CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:,:)) !This is not needed, since ZHEEV takes only upper triangle
+    
+    OPEN(unit = 99, FILE= "./OutputData/Convergence.dat", FORM = "FORMATTED", ACTION = "WRITE")
     DO sc_iter = 1, max_sc_iter
-        PRINT*, "============= SC_ITER: ", sc_iter
-        PRINT*, "Gamma 1,1", Delta(1,1,1)*J_SC/meV2au
+        !PRINT*, "============= SC_ITER: ", sc_iter
 
         counter = 0
-        DO i = -k1_steps,k1_steps
+        DO i = 0, k1_steps
+        !DO i = -k1_steps,k1_steps
             !DO j = -ky_steps, ky_steps
-            DO j = -MIN(k1_steps - i, k1_steps), MIN(k1_steps + i, k1_steps) !This guarantees integrating over first Brillouin zone
+            !DO j = -MIN(k1_steps - i, k1_steps), MIN(k1_steps + i, k1_steps) !This guarantees integrating over first Brillouin zone
+            DO j = 0, k2_steps    
                 counter = counter + 1
                 ! kx = i*dkx*A_TILDE
                 ! ky = j*dky*A_TILDE
@@ -85,11 +67,10 @@ PROGRAM MAIN
 
                 CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Delta(:,:,:))
 
-                !CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:)) !This is not needed, since ZHEEV takes only upper triangle
+                ! CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:)) !This is not needed, since ZHEEV takes only upper triangle
 
-                Hamiltonian(:,:) = 1./2.*( Hamiltonian_const(:,:) + Hamiltonian(:,:) )
+                Hamiltonian(:,:) = 0.5*( Hamiltonian_const(:,:) + Hamiltonian(:,:) )
                 U_transformation(:,:) = Hamiltonian(:,:)
-                !CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:,:), Energies(i,j,:))
                 CALL DIAGONALIZE_HERMITIAN(U_transformation(:,:), Energies(i,j,:))
                 !After DIAGONALIZE HERMITIAN, U contains eigenvectors, so it corresponds to transformation matrix U                
                 
@@ -106,52 +87,64 @@ PROGRAM MAIN
                         !Energies are sorted from lowest to highest
                         !Holes
                         DO n = 1, DIM_POSITIVE_K
-                            ! Up- down pairing
-                            Delta_new(orb,1,1) = Delta_new(orb,1,1) + &
-                            & CONJG( CONJG(U_transformation(n, orb + lat*SUBLATTICES))*U_transformation(orb + lat*SUBLATTICES + TBA_DIM + DIM_POSITIVE_K, n)*( 1. - fd_distribution(Energies(i,j,n), 0d0 , T))*pairing_1(-ky) )
-                            Delta_new(orb,2,1) = Delta_new(orb,2,1) + &
-                            & CONJG( CONJG(U_transformation(n, orb + lat*SUBLATTICES))*U_transformation(orb + lat*SUBLATTICES + TBA_DIM + DIM_POSITIVE_K, n)*( 1. - fd_distribution(Energies(i,j,n), 0d0 , T))*pairing_2(-kx, -ky) )
-                            Delta_new(orb,3,1) = Delta_new(orb,3,1) + &
-                            & CONJG( CONJG(U_transformation(n, orb + lat*SUBLATTICES))*U_transformation(orb + lat*SUBLATTICES + TBA_DIM + DIM_POSITIVE_K, n)*( 1. - fd_distribution(Energies(i,j,n), 0d0 , T))*pairing_3(-kx, -ky) )
+                            !Up - down coupling
+                            Delta_new(orb,1,1) = Delta_new(orb,1,1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM, n)*(1. - fd_distribution(-Energies(i,j,n), 0d0, T))*pairing_1(ky)
+                            Delta_new(orb,2,1) = Delta_new(orb,2,1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM, n)*(1. - fd_distribution(-Energies(i,j,n), 0d0, T))*pairing_2(kx, ky)
+                            Delta_new(orb,3,1) = Delta_new(orb,3,1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM, n)*(1. - fd_distribution(-Energies(i,j,n), 0d0, T))*pairing_3(kx, ky)
+
+                            !Down - up coupling
+                            Delta_new(orb,1,2) = Delta_new(orb,1,2) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + lat*ORBITALS, n)*(1. - fd_distribution(-Energies(i,j,n), 0d0, T))*pairing_1(ky)
+                            Delta_new(orb,2,2) = Delta_new(orb,2,2) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + lat*ORBITALS, n)*(1. - fd_distribution(-Energies(i,j,n), 0d0, T))*pairing_2(kx, ky)
+                            Delta_new(orb,3,2) = Delta_new(orb,3,2) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + lat*ORBITALS, n)*(1. - fd_distribution(-Energies(i,j,n), 0d0, T))*pairing_3(kx, ky)
                         END DO
 
                         !Electrons
                         DO n = DIM_POSITIVE_K + 1, DIM
-                            ! Up- down pairing
-                            Delta_new(orb,1,1) = Delta_new(orb,1,1) + &
-                            & CONJG( CONJG(U_transformation(n, orb + lat*SUBLATTICES))*U_transformation(orb + lat*SUBLATTICES + TBA_DIM + DIM_POSITIVE_K, n)*fd_distribution(Energies(i,j,n), 0d0 , T)*pairing_1(-ky) )
-                            Delta_new(orb,2,1) = Delta_new(orb,2,1) + &
-                            & CONJG( CONJG(U_transformation(n, orb + lat*SUBLATTICES))*U_transformation(orb + lat*SUBLATTICES + TBA_DIM + DIM_POSITIVE_K, n)*fd_distribution(Energies(i,j,n), 0d0 , T)*pairing_2(-kx, -ky) )
-                            Delta_new(orb,3,1) = Delta_new(orb,3,1) + &
-                            & CONJG( CONJG(U_transformation(n, orb + lat*SUBLATTICES))*U_transformation(orb + lat*SUBLATTICES + TBA_DIM + DIM_POSITIVE_K, n)*fd_distribution(Energies(i,j,n), 0d0 , T)*pairing_3(-kx, -ky) )
+                            !Up - down coupling
+                            Delta_new(orb,1,1) = Delta_new(orb,1,1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM, n)*fd_distribution(Energies(i,j,n), 0d0, T)*pairing_1(ky)
+                            Delta_new(orb,2,1) = Delta_new(orb,2,1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM, n)*fd_distribution(Energies(i,j,n), 0d0, T)*pairing_2(kx, ky)
+                            Delta_new(orb,3,1) = Delta_new(orb,3,1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM, n)*fd_distribution(Energies(i,j,n), 0d0, T)*pairing_3(kx, ky)
+
+                            !Down - up coupling
+                            Delta_new(orb,1,2) = Delta_new(orb,1,2) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + lat*ORBITALS, n)*fd_distribution(Energies(i,j,n), 0d0, T)*pairing_1(ky)
+                            Delta_new(orb,2,2) = Delta_new(orb,2,2) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + lat*ORBITALS, n)*fd_distribution(Energies(i,j,n), 0d0, T)*pairing_2(kx, ky)
+                            Delta_new(orb,3,2) = Delta_new(orb,3,2) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + lat*ORBITALS, n)*fd_distribution(Energies(i,j,n), 0d0, T)*pairing_3(kx, ky)
                         END DO                        
                     END DO
                 END DO
-
             END DO
         END DO !End of k-loop
 
-        PRINT*, "N sites ", counter
-        Delta_new = Delta_new * domega ! * V/(2*PI)**2, becouse of changing sum to integral?
-        Delta_new(:,:,2) = Delta_new(:,:,1) !For test: assuming that up-down coupling is the same as down-up
+        !PRINT*, "N sites ", counter
+        Delta_new = Delta_new * domega ! * V/(2*PI)**2, because of changing sum to integral?
+        !Delta_new(:,:,1) = Delta_new(:,:,2) !For test: assuming that up-down coupling is the same as down-up
+        ! PRINT*, "Gamma 1,1", Delta(1,1,1)*J_SC/meV2au
+        ! PRINT*, "Abs Gamma 1,1", ABS(Delta(1,1,1))*J_SC/meV2au
+        ! PRINT*, "Gamma new 1,1", Delta_new(1,1,1)*J_SC/meV2au
+        ! PRINT*, "Abs Gamma new 1,1", ABS(Delta_new(1,1,1))*J_SC/meV2au
+
+        WRITE(99,'(I0, 4E15.5)') sc_iter, REAL(Delta(1,1,1)*J_SC/meV2au), AIMAG(Delta(1,1,1)*J_SC/meV2au), &
+        &                                 REAL(Delta_new(1,1,1)*J_SC/meV2au), AIMAG(Delta_new(1,1,1)*J_SC/meV2au)
+
+        
         !Here we should check whether convergence was reached
-        PRINT*, "New gamma 1,1", Delta_new(1,1,1)*J_SC/meV2au
-        PRINT*, "Change of gammas = ", Delta_new(1,1,1)*J_SC/meV2au - Delta(1,1,1)*J_SC/meV2au
         sc_flag = .TRUE.
         DO orb = 1, ORBITALS
             DO m = 1, 3
                 DO n = 1, 2
-                    IF ( (REAL(Delta_new(orb,m,n)) - REAL(Delta(orb,m,n))*J_SC > eps_convergence) .OR. &
-                    & (AIMAG(Delta_new(orb,m,n)) - AIMAG(Delta(orb,m,n))*J_SC > eps_convergence)) THEN
+                    ! IF ( ( ABS(REAL(Delta_new(orb,m,n) - Delta(orb,m,n))*J_SC) > eps_convergence ) .OR. &
+                    ! & ( ABS(AIMAG(Delta_new(orb,m,n) - Delta(orb,m,n))*J_SC) > eps_convergence ) ) THEN
+                    !PRINT*, ABS( (ABS(Delta_new(orb,m,n)) - ABS(Delta(orb,m,n)) )*J_SC )/meV2au, eps_convergence/meV2au
+                    IF(ABS( ( ABS(Delta_new(orb,m,n)) - ABS(Delta(orb,m,n)) )*J_SC )  > eps_convergence) THEN                   
                         sc_flag = .FALSE.
-                        EXIT !Maybe go to???
+                    EXIT !Maybe go to???
                     END IF
                 END DO
             END DO
         END DO
 
         IF (sc_flag) THEN 
-            PRINT*, "Convergence reached!"
+            !PRINT*, "Convergence reached!"
             EXIT
         END IF
 
@@ -161,6 +154,8 @@ PROGRAM MAIN
 
 
     END DO !End of SC loop
+    CLOSE(99)
+
 
     CALL PRINT_DELTA(Delta(:,:,:), "Delta_SC")
     CALL PRINT_ENERGIES(Energies(:,:,:), k1_steps, k2_steps, dk1, dk2, "Ek_sorted")
@@ -170,7 +165,7 @@ PROGRAM MAIN
         DO i = 0, k1_steps
             WRITE(10, *) i*dk1 / k1_max, au_to_meV(Energies(i,0,n))*1e-3
         END DO 
-        DO i = -k2_steps, 0
+        DO i = 0, k2_steps
             WRITE(9,*) i*dk2 / k2_max, au_to_meV(Energies(0, i, n))*1e-3
         END DO
 

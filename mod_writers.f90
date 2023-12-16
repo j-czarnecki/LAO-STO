@@ -39,8 +39,8 @@ SUBROUTINE PRINT_ENERGIES(Energies, k1_steps, k2_steps, dk1, dk2, filename)
 
     OPEN(unit = 9, FILE= "./OutputData/"//filename//".dat", FORM = "FORMATTED", ACTION = "WRITE")
     DO n = 1, DIM
-        DO i = -k1_steps,k1_steps
-            DO j = -MIN(k1_steps - i, k1_steps), MIN(k1_steps + i, k1_steps)
+        DO i = 0,k1_steps
+            DO j = 0, k2_steps
                 WRITE(9,*) i*dk1/SQRT(3.) * A_TILDE, (-i*dk1/3. + 2./3.*j*dk2) * A_TILDE, Energies(i, j, n)/meV2au*1e-3
             END DO
         END DO
