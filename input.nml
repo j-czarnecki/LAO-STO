@@ -1,5 +1,5 @@
 &physical_params
-    T = 0.01,
+    T = 0.0,
     t_D = 0.5e3,
     t_I = 0.04e3,
     lambda_SOC = 0.01e3,
@@ -7,19 +7,19 @@
     v = 0.2e3,
     V_pdp = 0.028e3,
     V_pds = -0.065e3,
-    J_SC = 0.165e3,
-    J_SC_PRIME = 0.0165e3,
+    J_SC = 0.175e3,
+    J_SC_PRIME = 0.0175e3,
     U_HUB = 2e4,
     V_HUB = 2e4,
-    E_Fermi = -0.5e3 /
+    E_Fermi = -1.3e3 /
 
 &discretization
-    k1_steps = 100,
-    k2_steps = 100 /
+    k1_steps = 500,
+    k2_steps = 500 /
 
 &self_consistency
-    max_sc_iter = 1,
-    sc_alpha = 0.1,
-    eps_convergence = 1e-6 /
+    max_sc_iter = 100,
+    sc_alpha = 0.4,
+    eps_convergence = 1e-5 /
 
 
