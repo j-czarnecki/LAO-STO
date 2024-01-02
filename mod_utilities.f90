@@ -28,6 +28,46 @@ SUBROUTINE DIAGONALIZE_HERMITIAN(Hamiltonian, Eigenvalues)
 END SUBROUTINE DIAGONALIZE_HERMITIAN
 
 
+SUBROUTINE DIAGONALIZE_GENERALIZED(Hamiltonian, Eigenvalues, U_transformation)
+    IMPLICIT NONE
+    COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
+    COMPLEX*16, INTENT(INOUT) :: U_transformation(DIM,DIM)
+    REAL*8, INTENT(OUT) :: Eigenvalues(DIM)
+    COMPLEX*16, ALLOCATABLE :: W(:)
+    COMPLEX*16, ALLOCATABLE :: VL(:,:)
+    COMPLEX*16, ALLOCATABLE :: WORK(:)
+    REAL*8, ALLOCATABLE :: RWORK(:)
+    INTEGER*4 :: LWORK
+    INTEGER*4 :: INFO
+
+    LWORK = 10*DIM
+
+    ALLOCATE(W(DIM))
+    ALLOCATE(VL(DIM,DIM))
+    ALLOCATE(WORK(LWORK))
+    ALLOCATE(RWORK(2*DIM))
+
+    W(:) = 0.
+    VL(:,:) = DCMPLX(0. , 0.)
+    WORK(:) = 0.
+    RWORK(:) = 0.
+
+    CALL ZGEEV('N', 'V', DIM, Hamiltonian, DIM, W, VL, DIM, U_transformation, DIM,&
+    & WORK, LWORK, RWORK, INFO)
+
+    IF (INFO .ne. 0) THEN 
+        PRINT*, 'ZHEEV INFO ', INFO
+        STOP
+    END IF 
+    Eigenvalues(:) = REAL(W(:))
+
+    DEALLOCATE(W)
+    DEALLOCATE(VL)
+    DEALLOCATE(WORK)
+    DEALLOCATE(RWORK)
+
+END SUBROUTINE DIAGONALIZE_GENERALIZED
+
 SUBROUTINE COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian)
     IMPLICIT NONE 
     COMPLEX*16 :: Hamiltonian(DIM,DIM)

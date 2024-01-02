@@ -38,8 +38,8 @@ REAL*8, PARAMETER :: A_TILDE =  SQRT(2./3.)*0.3905 * nm2au !length
 
 REAL*8, PARAMETER :: PI = 4*ATAN(1.0d0)
 
-REAL*8, PARAMETER :: K1_MAX = (2 * PI * 2./3.)/A_TILDE !Full Brillouin zone to integrate over
-REAL*8, PARAMETER :: K2_MAX = (2 * PI * 2./3.)/A_TILDE
+REAL*8, PARAMETER :: K1_MAX = (2. * PI * 2./3.)/A_TILDE !Full Brillouin zone to integrate over
+REAL*8, PARAMETER :: K2_MAX = (2. * PI * 2./3.)/A_TILDE
 
 
 

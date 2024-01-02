@@ -96,7 +96,7 @@ SUBROUTINE GET_INPUT(nmlfile)
     !Calculating derived values
     dk1 = K1_MAX / k1_steps
     dk2 = K2_MAX / k2_steps
-    domega = ABS(dk1*dk2*SIN(PI/3.)) !* 3. * SQRT(3.) * K1_MAX**2 / (2*PI)**2
+    domega = ABS(dk1*dk2*SIN(PI/3.))/(2*PI)**2
     eta_p = v * SQRT(3.) / 3.905 * nm2au
 
 END SUBROUTINE GET_INPUT
