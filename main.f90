@@ -9,7 +9,7 @@ PROGRAM MAIN
     IMPLICIT NONE 
 
     COMPLEX*16, ALLOCATABLE :: Hamiltonian(:,:), Hamiltonian_const(:,:), U_transformation(:,:)
-    REAL*8, ALLOCATABLE :: Energies(:,:,:)
+    REAL*8, ALLOCATABLE :: Energies(:)
     COMPLEX*16, ALLOCATABLE :: Delta(:,:,:), Delta_new(:,:,:)
     REAL*8, ALLOCATABLE :: Delta_broyden(:), Delta_new_broyden(:)
 
@@ -35,7 +35,7 @@ PROGRAM MAIN
     ALLOCATE(Hamiltonian(DIM,DIM))
     ALLOCATE(Hamiltonian_const(DIM,DIM))
     ALLOCATE(U_transformation(DIM,DIM))
-    ALLOCATE(Energies(0:k1_steps, 0:k2_steps, DIM))
+    ALLOCATE(Energies(DIM))
     ALLOCATE(Delta(ORBITALS, N_NEIGHBOURS,2))   !Third dimension for spin coupling: 1 - up-down coupling, 2 - down-up coupling
     ALLOCATE(Delta_new(ORBITALS, N_NEIGHBOURS,2))
     ALLOCATE(Delta_broyden(delta_real_elems))
@@ -45,9 +45,10 @@ PROGRAM MAIN
     Hamiltonian(:,:) = DCMPLX(0., 0.)
     Hamiltonian_const(:,:) = DCMPLX(0., 0.)
     U_transformation(:,:) = DCMPLX(0., 0.)
-    Energies(:,:,:) = 0.
+    Energies(:) = 0.
 
-    Delta(:,:,:) = DCMPLX(1e-3 , 1e-3)
+    !Delta(:,:,:) = DCMPLX(1e-5 , 1e-5)
+    Delta(:,:,:) = DCMPLX(0. , 0.)
     Delta_new(:,:,:) = DCMPLX(0. , 0.)
 
     Delta_broyden(:) = 0.
@@ -66,6 +67,7 @@ PROGRAM MAIN
     OPEN(unit = 99, FILE= "./OutputData/Convergence.dat", FORM = "FORMATTED", ACTION = "WRITE")
     DO sc_iter = 1, max_sc_iter
         !PRINT*, "============= SC_ITER: ", sc_iter
+        OPEN(unit = 9, FILE= "./OutputData/Ek.dat", FORM = "FORMATTED", ACTION = "WRITE")
 
         counter = 0
         DO i = 0, k1_steps
@@ -81,7 +83,7 @@ PROGRAM MAIN
                 ! ky = (-i*dk1/3. + 2./3.*j*dk2) * A_TILDE
                 kx = ( i*dk1*SQRT(3.)/2. ) * A_TILDE
                 ky = ( -i*dk1/2. + j*dk2 ) * A_TILDE
-                Energies(i,j,:) = 0.
+                Energies(:) = 0.
                 Hamiltonian(:,:) = DCMPLX(0. , 0.)
                 U_transformation(:,:) = DCMPLX(0. , 0.)
                 CALL COMPUTE_TBA_TERM(Hamiltonian(:,:), kx, ky)
@@ -96,14 +98,11 @@ PROGRAM MAIN
                 Hamiltonian(:,:) = 0.5*( Hamiltonian_const(:,:) + Hamiltonian(:,:) )
                 !U_transformation(:,:) = Hamiltonian(:,:)
                 !CALL DIAGONALIZE_HERMITIAN(U_transformation(:,:), Energies(i,j,:))
-                CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:,:), Energies(i,j,:), U_transformation(:,:))
+                CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:,:), Energies(:), U_transformation(:,:))
                 !After DIAGONALIZE HERMITIAN, U contains eigenvectors, so it corresponds to transformation matrix U                
-                
-                !CALL PRINT_HAMILTONIAN(REAL(Hamiltonian(:,:)), "H_real")
-                !CALL PRINT_HAMILTONIAN(AIMAG(Hamiltonian(:,:)), "H_imag")
-                ! CALL PRINT_HAMILTONIAN(REAL(U_transformation(:,:)), "U_transformation_real")
-                ! CALL PRINT_HAMILTONIAN(AIMAG(U_transformation(:,:)), "U_transformation_imag")
-                ! CALL PRINT_HAMILTONIAN(ABS(U_transformation(:,:))**2, "U_transformation_module")
+                DO n = 1, DIM
+                    WRITE(9, *) kx, ky, Energies(n)
+                END DO
 
                 !Self - consistent delta calculation
                 DO orb = 1, ORBITALS
@@ -113,32 +112,32 @@ PROGRAM MAIN
                         !Electrons
                         DO n = 1, DIM_POSITIVE_K
                             !Up - down coupling
-                            Delta_new(orb,1,1) = Delta_new(orb,1,1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM, n)*fd_distribution(Energies(i,j,n), 0d0, T)*pairing_1(ky)
-                            Delta_new(orb,2,1) = Delta_new(orb,2,1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM, n)*fd_distribution(Energies(i,j,n), 0d0, T)*pairing_2(kx, ky)
-                            Delta_new(orb,3,1) = Delta_new(orb,3,1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM, n)*fd_distribution(Energies(i,j,n), 0d0, T)*pairing_3(kx, ky)
+                            Delta_new(orb,1,1) = Delta_new(orb,1,1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM, n)*fd_distribution(Energies(n), 0d0, T)*pairing_1(ky)
+                            Delta_new(orb,2,1) = Delta_new(orb,2,1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM, n)*fd_distribution(Energies(n), 0d0, T)*pairing_2(kx, ky)
+                            Delta_new(orb,3,1) = Delta_new(orb,3,1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM, n)*fd_distribution(Energies(n), 0d0, T)*pairing_3(kx, ky)
 
                             !Down - up coupling
-                            Delta_new(orb,1,2) = Delta_new(orb,1,2) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + lat*ORBITALS, n)*fd_distribution(Energies(i,j,n), 0d0, T)*pairing_1(ky)
-                            Delta_new(orb,2,2) = Delta_new(orb,2,2) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + lat*ORBITALS, n)*fd_distribution(Energies(i,j,n), 0d0, T)*pairing_2(kx, ky)
-                            Delta_new(orb,3,2) = Delta_new(orb,3,2) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + lat*ORBITALS, n)*fd_distribution(Energies(i,j,n), 0d0, T)*pairing_3(kx, ky)
+                            Delta_new(orb,1,2) = Delta_new(orb,1,2) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + lat*ORBITALS, n)*fd_distribution(Energies(n), 0d0, T)*pairing_1(ky)
+                            Delta_new(orb,2,2) = Delta_new(orb,2,2) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + lat*ORBITALS, n)*fd_distribution(Energies(n), 0d0, T)*pairing_2(kx, ky)
+                            Delta_new(orb,3,2) = Delta_new(orb,3,2) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + lat*ORBITALS, n)*fd_distribution(Energies(n), 0d0, T)*pairing_3(kx, ky)
                             !PRINT*, fd_distribution(Energies(i,j,n), 0d0, T)
-                            filling = filling + fd_distribution(Energies(i,j,n), 0d0, T)
+                            filling = filling + fd_distribution(Energies(n), 0d0, T)
                             filling_total = filling_total + 1
                         END DO
 
                         !Holes
                         DO n = DIM_POSITIVE_K + 1, DIM
                             !Up - down coupling
-                            Delta_new(orb,1,1) = Delta_new(orb,1,1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM, n)*(1. - fd_distribution(-Energies(i,j,n), 0d0, T))*pairing_1(ky)
-                            Delta_new(orb,2,1) = Delta_new(orb,2,1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM, n)*(1. - fd_distribution(-Energies(i,j,n), 0d0, T))*pairing_2(kx, ky)
-                            Delta_new(orb,3,1) = Delta_new(orb,3,1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM, n)*(1. - fd_distribution(-Energies(i,j,n), 0d0, T))*pairing_3(kx, ky)
+                            Delta_new(orb,1,1) = Delta_new(orb,1,1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_1(ky)
+                            Delta_new(orb,2,1) = Delta_new(orb,2,1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_2(kx, ky)
+                            Delta_new(orb,3,1) = Delta_new(orb,3,1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_3(kx, ky)
 
                             !Down - up coupling
-                            Delta_new(orb,1,2) = Delta_new(orb,1,2) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + lat*ORBITALS, n)*(1. - fd_distribution(-Energies(i,j,n), 0d0, T))*pairing_1(ky)
-                            Delta_new(orb,2,2) = Delta_new(orb,2,2) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + lat*ORBITALS, n)*(1. - fd_distribution(-Energies(i,j,n), 0d0, T))*pairing_2(kx, ky)
-                            Delta_new(orb,3,2) = Delta_new(orb,3,2) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + lat*ORBITALS, n)*(1. - fd_distribution(-Energies(i,j,n), 0d0, T))*pairing_3(kx, ky)
+                            Delta_new(orb,1,2) = Delta_new(orb,1,2) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + lat*ORBITALS, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_1(ky)
+                            Delta_new(orb,2,2) = Delta_new(orb,2,2) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + lat*ORBITALS, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_2(kx, ky)
+                            Delta_new(orb,3,2) = Delta_new(orb,3,2) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + lat*ORBITALS, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_3(kx, ky)
                             !PRINT*, 1. - fd_distribution(-Energies(i,j,n), 0d0, T)
-                            filling = filling + (1. - fd_distribution(Energies(i,j,n), 0d0, T))
+                            filling = filling + (1. - fd_distribution(Energies(n), 0d0, T))
                             filling_total = filling_total + 1
                         END DO                        
                     END DO
@@ -146,11 +145,13 @@ PROGRAM MAIN
 
 
             END DO
+            WRITE(9,*)
+            WRITE(9,*)
         END DO !End of k-loop
+        CLOSE(9)
 
 
-
-        !PRINT*, "Filling/filling_total ", filling/filling_total
+        PRINT*, "Filling/filling_total ", filling/filling_total
         filling = 0
         filling_total = 0
         !PRINT*, "N sites ", counter
@@ -224,22 +225,6 @@ PROGRAM MAIN
 
 
     CALL PRINT_DELTA(Delta(:,:,:), "Delta_SC")
-    CALL PRINT_ENERGIES(Energies(:,:,:), k1_steps, k2_steps, dk1, dk2, "Ek_sorted")
-    OPEN(unit = 9, FILE= "./OutputData/E_kx0_slice.dat", FORM = "FORMATTED", ACTION = "WRITE")
-    OPEN(unit = 10, FILE= "./OutputData/E_ky0_slice.dat", FORM = "FORMATTED", ACTION = "WRITE")
-    DO n = 1, DIM
-        DO i = 0, k1_steps
-            WRITE(10, *) i*dk1 * A_TILDE / PI , au_to_meV(Energies(i,0,n))*1e-3
-            WRITE(9,*) i*dk2 * A_TILDE / PI, au_to_meV(Energies(0, i, n))*1e-3
-        END DO 
-
-        WRITE(9,*)
-        WRITE(9,*)
-        WRITE(10,*)
-        WRITE(10,*)
-    END DO
-    CLOSE(9)
-    CLOSE(10)
 
     !Just for memory deallocation
     !CALL mix_broyden(delta_real_elems, Delta_new_broyden(:), Delta_broyden(:), sc_alpha, sc_iter, 1, .TRUE.)
