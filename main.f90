@@ -47,8 +47,8 @@ PROGRAM MAIN
     U_transformation(:,:) = DCMPLX(0., 0.)
     Energies(:) = 0.
 
-    !Delta(:,:,:) = DCMPLX(1e-5 , 1e-5)
-    Delta(:,:,:) = DCMPLX(0. , 0.)
+    Delta(:,:,:) = DCMPLX(1e-3 , 1e-3)
+    !Delta(:,:,:) = DCMPLX(0. , 0.)
     Delta_new(:,:,:) = DCMPLX(0. , 0.)
 
     Delta_broyden(:) = 0.
@@ -151,7 +151,7 @@ PROGRAM MAIN
         CLOSE(9)
 
 
-        PRINT*, "Filling/filling_total ", filling/filling_total
+        !PRINT*, "Filling/filling_total ", filling/filling_total
         filling = 0
         filling_total = 0
         !PRINT*, "N sites ", counter
