@@ -50,12 +50,12 @@ def run_single_Ef(E_Fermi):
 
 def run_slurm(E_Fermi):
     job_header = f"#!/bin/bash\n\
-    #SBATCH --job-name=LAO_STO              # Job name\n\
-    #SBATCH --partition tera-cpu       # we specify to run the process on gpu nodes\n\
-    #SBATCH --ntasks-per-node=1        # Maximum number of tasks on each node\n\
-    #SBATCH --time=72:00:00            # Wall time limit (days-hrs:min:sec)\n\
-    #SBATCH --mem-per-cpu=8GB          # Memory (i.e. RAM) per processor\n\
-    #SBATCH --output=\"output.out\"    # Path to the standard output and error files relative to the working directory\n"
+#SBATCH --job-name=LAO_STO              # Job name\n\
+#SBATCH --partition tera-cpu       # we specify to run the process on gpu nodes\n\
+#SBATCH --ntasks-per-node=1        # Maximum number of tasks on each node\n\
+#SBATCH --time=72:00:00            # Wall time limit (days-hrs:min:sec)\n\
+#SBATCH --mem-per-cpu=8GB          # Memory (i.e. RAM) per processor\n\
+#SBATCH --output=\"output.out\"    # Path to the standard output and error files relative to the working directory\n"
 
 
     path = os.path.join(os.getcwd(), f'RUN_Ef_' + str(E_Fermi))
