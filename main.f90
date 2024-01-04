@@ -67,7 +67,6 @@ PROGRAM MAIN
     OPEN(unit = 99, FILE= "./OutputData/Convergence.dat", FORM = "FORMATTED", ACTION = "WRITE")
     DO sc_iter = 1, max_sc_iter
         !PRINT*, "============= SC_ITER: ", sc_iter
-        OPEN(unit = 9, FILE= "./OutputData/Ek.dat", FORM = "FORMATTED", ACTION = "WRITE")
 
         counter = 0
         DO i = 0, k1_steps
@@ -100,9 +99,6 @@ PROGRAM MAIN
                 !CALL DIAGONALIZE_HERMITIAN(U_transformation(:,:), Energies(i,j,:))
                 CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:,:), Energies(:), U_transformation(:,:))
                 !After DIAGONALIZE HERMITIAN, U contains eigenvectors, so it corresponds to transformation matrix U                
-                DO n = 1, DIM
-                    WRITE(9, *) kx, ky, Energies(n)
-                END DO
 
                 !Self - consistent delta calculation
                 DO orb = 1, ORBITALS
@@ -145,10 +141,7 @@ PROGRAM MAIN
 
 
             END DO
-            WRITE(9,*)
-            WRITE(9,*)
         END DO !End of k-loop
-        CLOSE(9)
 
 
         !PRINT*, "Filling/filling_total ", filling/filling_total
@@ -189,33 +182,33 @@ PROGRAM MAIN
 
         !Broyden mixing
         !Flatten arrays for Broyden mixing
-        ! broyden_index = 1
-        ! DO orb = 1, ORBITALS
-        !     DO m = 1, 3
-        !         DO n = 1, 2
-        !             Delta_broyden(broyden_index) = REAL(Delta(orb,m,n))
-        !             Delta_broyden(INT(delta_real_elems/2) + broyden_index) = AIMAG(Delta(orb,m,n))
-        !             Delta_new_broyden(broyden_index) = REAL(Delta_new(orb,m,n))
-        !             Delta_new_broyden(INT(delta_real_elems/2) + broyden_index) = AIMAG(Delta_new(orb,m,n))
-        !             broyden_index = broyden_index + 1
-        !         END DO
-        !     END DO
-        ! END DO
+        broyden_index = 1
+        DO orb = 1, ORBITALS
+            DO m = 1, 3
+                DO n = 1, 2
+                    Delta_broyden(broyden_index) = REAL(Delta(orb,m,n))
+                    Delta_broyden(INT(delta_real_elems/2) + broyden_index) = AIMAG(Delta(orb,m,n))
+                    Delta_new_broyden(broyden_index) = REAL(Delta_new(orb,m,n))
+                    Delta_new_broyden(INT(delta_real_elems/2) + broyden_index) = AIMAG(Delta_new(orb,m,n))
+                    broyden_index = broyden_index + 1
+                END DO
+            END DO
+        END DO
 
-        ! CALL mix_broyden(delta_real_elems, Delta_new_broyden(:), Delta_broyden(:), sc_alpha, sc_iter, 1, .FALSE.)        
+        CALL mix_broyden(delta_real_elems, Delta_new_broyden(:), Delta_broyden(:), sc_alpha, sc_iter, 4, .FALSE.)        
         
-        ! broyden_index = 1
-        ! DO orb = 1, ORBITALS
-        !     DO m = 1, 3
-        !         DO n = 1, 2
-        !             Delta(orb,m,n) = DCMPLX(Delta_broyden(broyden_index), Delta_broyden(INT(delta_real_elems/2) + broyden_index))
-        !             broyden_index = broyden_index + 1
-        !         END DO
-        !     END DO
-        ! END DO
+        broyden_index = 1
+        DO orb = 1, ORBITALS
+            DO m = 1, 3
+                DO n = 1, 2
+                    Delta(orb,m,n) = DCMPLX(Delta_broyden(broyden_index), Delta_broyden(INT(delta_real_elems/2) + broyden_index))
+                    broyden_index = broyden_index + 1
+                END DO
+            END DO
+        END DO
 
         !Linear mixing
-        Delta(:,:,:) = (1. - sc_alpha)*Delta(:,:,:) + sc_alpha*Delta_new(:,:,:)
+        !Delta(:,:,:) = (1. - sc_alpha)*Delta(:,:,:) + sc_alpha*Delta_new(:,:,:)
 
         Delta_new(:,:,:) = DCMPLX(0. , 0.)
 
