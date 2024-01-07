@@ -14,12 +14,13 @@
     E_Fermi = -0.9e3 /
 
 &discretization
-    k1_steps = 500,
-    k2_steps = 500 /
+    k1_steps = 2000,
+    k2_steps = 2000 /
 
 &self_consistency
-    max_sc_iter = 1,
+    gamma_start = 1.,
+    max_sc_iter = 50,
     sc_alpha = 0.4,
-    eps_convergence = 1e-5 /
+    eps_convergence = 1e-7 /
 
 

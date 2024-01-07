@@ -2,7 +2,7 @@ TARGET = LAO_STO.x
 SHELL = /bin/sh
 F90 = ifort
 F90FLAGS = -O3 -ipo
-LIBS = -llapack
+LIBS = -llapack -lblas
 
 OBJS = 	main.o \
 		mod_hamiltonians.o \

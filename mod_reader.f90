@@ -19,6 +19,7 @@ REAL*8 :: J_SC_PRIME = 0.
 REAL*8 :: U_HUB = 0.
 REAL*8 :: V_HUB = 0.
 REAL*8 :: E_Fermi = 0.
+REAL*8 :: gamma_start = 0.
 
 !Discretization
 INTEGER*4 :: k1_steps = 0
@@ -57,6 +58,7 @@ NAMELIST /discretization/ &
 & k2_steps                
 
 NAMELIST /self_consistency/ &
+& gamma_start,              &
 & max_sc_iter,              &
 & sc_alpha,                 &
 & eps_convergence
@@ -92,11 +94,12 @@ SUBROUTINE GET_INPUT(nmlfile)
     IF ((k1_steps .LE. 0) .OR. (k2_steps .LE. 0)) STOP "k_steps must be > 0"
 
     READ(9,NML=self_consistency)
+    gamma_start = gamma_start * meV2au
     eps_convergence = eps_convergence * meV2au
     !Calculating derived values
     dk1 = K1_MAX / k1_steps
     dk2 = K2_MAX / k2_steps
-    domega = ABS(dk1*dk2*SIN(PI/3.))/(2*PI)**2
+    domega = ABS(dk1*dk2*SIN(2*PI/3.))/(2*PI)**2
     eta_p = v * SQRT(3.) / 3.905 * nm2au
 
 END SUBROUTINE GET_INPUT

@@ -50,26 +50,26 @@ SUBROUTINE PRINT_ENERGIES(Energies, k1_steps, k2_steps, dk1, dk2, filename)
     CLOSE(9)
 END SUBROUTINE
 
-SUBROUTINE PRINT_DELTA(Delta, filename)
-    COMPLEX*16, INTENT(IN) :: Delta(ORBITALS, 3, 2)
+SUBROUTINE PRINT_GAMMA(Gamma_SC, filename)
+    COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_NEIGHBOURS, 2)
     CHARACTER(LEN=*), INTENT(IN) :: filename
     CHARACTER(LEN=20) :: output_format
 
-    INTEGER*4 :: orb, i, j
+    INTEGER*4 :: orb, j,spin
     output_format = '(3I5, 2E15.5)'
 
     OPEN(unit = 9, FILE= "./OutputData/"//filename//".dat", FORM = "FORMATTED", ACTION = "WRITE")
-    DO j = 1, 2
-        DO orb = 1, ORBITALS
-            DO i = 1, 3
-                WRITE(9, output_format) j, orb, i, REAL(Delta(orb,i,j)), AIMAG(Delta(orb,i,j))
+    DO spin =1, 2
+        DO j = 1, N_NEIGHBOURS
+            DO orb = 1, ORBITALS
+                WRITE(9, output_format) spin, j, orb, REAL(Gamma_SC(orb,j, spin)), AIMAG(Gamma_SC(orb,j, spin))
             END DO
+            WRITE(9,*)
+            WRITE(9,*)
         END DO
-        WRITE(9,*)
-        WRITE(9,*)
     END DO
     CLOSE(9)
-END SUBROUTINE PRINT_DELTA
+END SUBROUTINE PRINT_GAMMA
 
 
 
