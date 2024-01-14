@@ -3,26 +3,23 @@ USE mod_parameters
 IMPLICIT NONE
 CONTAINS
 
-SUBROUTINE PRINT_HAMILTONIAN(Hamiltonian, filename)
-    REAL*8, INTENT(IN) :: Hamiltonian(DIM,DIM)
-    CHARACTER(LEN=*), INTENT(IN) :: filename
+SUBROUTINE PRINT_HAMILTONIAN(Hamiltonian)
+    COMPLEX*16, INTENT(IN) :: Hamiltonian(DIM,DIM)
     CHARACTER(LEN=20) :: output_format
     INTEGER*4 :: i
     
     WRITE(output_format, '(A, I0, A)') '(',DIM,'E15.5)'
     output_format = TRIM(output_format)
 
-    IF(LEN(filename) .NE. 0) THEN
-        OPEN(unit = 9, FILE= "./OutputData/"//filename//".dat", FORM = "FORMATTED", ACTION = "WRITE")
-        DO i = 1, DIM
-            WRITE(9, output_format) Hamiltonian(i,:)
-        END DO
-        CLOSE(9)
-    ELSE
-        DO i = 1, DIM
-            WRITE(*, output_format) Hamiltonian(i,:)
-        END DO        
-    END IF
+    OPEN(unit = 9, FILE= "./OutputData/H_real.dat", FORM = "FORMATTED", ACTION = "WRITE")
+    OPEN(unit = 10, FILE= "./OutputData/H_imag.dat", FORM = "FORMATTED", ACTION = "WRITE")
+    DO i = 1, DIM
+        WRITE(9, output_format) REAL(Hamiltonian(i,:))
+        WRITE(10, output_format) AIMAG(Hamiltonian(i,:))
+    END DO
+    CLOSE(9)
+    CLOSE(10)
+
 
 END SUBROUTINE PRINT_HAMILTONIAN
 
@@ -51,18 +48,21 @@ SUBROUTINE PRINT_ENERGIES(Energies, k1_steps, k2_steps, dk1, dk2, filename)
 END SUBROUTINE
 
 SUBROUTINE PRINT_GAMMA(Gamma_SC, filename)
-    COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_NEIGHBOURS, 2)
+    COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_NEIGHBOURS, 2,SUBLATTICES)
     CHARACTER(LEN=*), INTENT(IN) :: filename
     CHARACTER(LEN=20) :: output_format
 
-    INTEGER*4 :: orb, j,spin
+    INTEGER*4 :: orb, j,spin, lat
     output_format = '(3I5, 2E15.5)'
 
+    !Printing SC gammas in [meV]
     OPEN(unit = 9, FILE= "./OutputData/"//filename//".dat", FORM = "FORMATTED", ACTION = "WRITE")
     DO spin =1, 2
         DO j = 1, N_NEIGHBOURS
-            DO orb = 1, ORBITALS
-                WRITE(9, output_format) spin, j, orb, REAL(Gamma_SC(orb,j, spin)), AIMAG(Gamma_SC(orb,j, spin))
+            DO lat = 1, SUBLATTICES
+                DO orb = 1, ORBITALS
+                    WRITE(9, output_format) spin, j, lat, orb, REAL(Gamma_SC(orb,j, spin,lat))/meV2au, AIMAG(Gamma_SC(orb,j, spin,lat))/meV2au
+                END DO
             END DO
             WRITE(9,*)
             WRITE(9,*)
