@@ -298,37 +298,28 @@ SUBROUTINE COMPUTE_H_SIGMA(Hamiltonian, kx, ky)
 
 END SUBROUTINE COMPUTE_H_SIGMA
 
-SUBROUTINE COMPUTE_SC(Hamiltonian, kx, ky, Delta)
+SUBROUTINE COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC)
     IMPLICIT NONE 
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
-    COMPLEX*16, INTENT(IN) :: Delta(ORBITALS, N_NEIGHBOURS,2)
+    COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_NEIGHBOURS,2,SUBLATTICES)
     REAL*8, INTENT(IN) :: kx, ky
     INTEGER*4 :: orb, lat, orb_prime
 
-
     DO orb = 1, ORBITALS
-        DO lat = 0, SUBLATTICES - 1
-            !Inter - orbital interaction
-            !Up - down coupling
-            Hamiltonian(orb + lat*ORBITALS, orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM) = Hamiltonian(orb + lat*ORBITALS, orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM) + &
-            & J_SC * ( Delta(orb, 1, 1) * pairing_1(ky) + Delta(orb,2, 1) * pairing_2(kx,ky) + Delta(orb, 3, 1) * pairing_3(kx,ky) )
-            !Down - up coupling
-            Hamiltonian(orb + lat*ORBITALS + TBA_DIM, orb + lat*ORBITALS + DIM_POSITIVE_K) = Hamiltonian(orb + lat*ORBITALS + TBA_DIM, orb + lat*ORBITALS + DIM_POSITIVE_K) + &
-            & J_SC * ( Delta(orb, 1, 2) * pairing_1(ky) + Delta(orb,2, 2) * pairing_2(kx,ky) + Delta(orb,3, 2) * pairing_3(kx,ky) )
-            
-            !Intra - orbital interaction
-            DO orb_prime = 1, ORBITALS  
-                IF (orb .NE. orb_prime) THEN
-                    !Up - down coupling
-                    Hamiltonian(orb + lat*ORBITALS, orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM) = Hamiltonian(orb + lat*ORBITALS, orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM) + &
-                    & J_SC_PRIME/2. * ( Delta(orb_prime, 1, 1) * pairing_1(ky) + Delta(orb_prime, 2, 1) * pairing_2(kx,ky) + Delta(orb_prime,3, 1) * pairing_3(kx,ky) )
-                    !Down - up coupling
-                    Hamiltonian(orb + lat*ORBITALS + TBA_DIM, orb + lat*ORBITALS + DIM_POSITIVE_K) = Hamiltonian(orb + lat*ORBITALS + TBA_DIM, orb + lat*ORBITALS + DIM_POSITIVE_K) + &
-                    & J_SC_PRIME/2. * ( Delta(orb_prime, 1, 2) * pairing_1(ky) + Delta(orb_prime, 2, 2) * pairing_2(kx,ky) + Delta(orb_prime,3, 2) * pairing_3(kx,ky) )
-                END IF
-            END DO
+        !Up - down Ti1 - Ti2 coupling
+        Hamiltonian(orb, orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM) = Hamiltonian(orb, orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM) + &
+        & Gamma_SC(orb,1,2,1) * pairing_1(ky) + Gamma_SC(orb,2,2,1) * pairing_2(kx,ky) + Gamma_SC(orb,3,2,1) * pairing_3(kx,ky)
+        !Up - down Ti2 - Ti1 coupling
+        Hamiltonian(orb + ORBITALS, orb + DIM_POSITIVE_K + TBA_DIM) = Hamiltonian(orb + ORBITALS, orb + DIM_POSITIVE_K + TBA_DIM) + &
+        & Gamma_SC(orb,1,2,2) * CONJG(pairing_1(ky)) + Gamma_SC(orb,2,2,2) * CONJG(pairing_2(kx,ky)) + Gamma_SC(orb,3,2,2) * CONJG(pairing_3(kx,ky))
 
-        END DO
+        !Down - up Ti1 - Ti2 coupling
+        Hamiltonian(orb + TBA_DIM, orb + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(orb + TBA_DIM, orb + ORBITALS + DIM_POSITIVE_K) + &
+        & Gamma_SC(orb,1,1,1) * pairing_1(ky) + Gamma_SC(orb,2,1,1) * pairing_2(kx,ky) + Gamma_SC(orb,3,1,1) * pairing_3(kx,ky)
+        !Down - up Ti2 - Ti1 coupling
+        Hamiltonian(orb + ORBITALS + TBA_DIM, orb + DIM_POSITIVE_K) = Hamiltonian(orb + ORBITALS + TBA_DIM, orb + DIM_POSITIVE_K) + &
+        & Gamma_SC(orb,1,1,2) * CONJG(pairing_1(ky)) + Gamma_SC(orb,2,1,2) * CONJG(pairing_2(kx,ky)) + Gamma_SC(orb,3,1,2) * CONJG(pairing_3(kx,ky))
+
     END DO
 END SUBROUTINE COMPUTE_SC
 

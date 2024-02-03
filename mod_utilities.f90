@@ -105,21 +105,21 @@ END FUNCTION epsilon_xy
 !dir$ attributes forceinline :: pairing_1
 PURE COMPLEX*16 FUNCTION pairing_1(ky)
     REAL*8, INTENT(IN) :: ky
-    pairing_1 = EXP(-imag*ky)
+    pairing_1 = EXP(imag*ky)
     RETURN
 END FUNCTION pairing_1
 
 !dir$ attributes forceinline :: pairing_2
 PURE COMPLEX*16 FUNCTION pairing_2(kx, ky)
     REAL*8, INTENT(IN) :: kx, ky
-    pairing_2 = EXP(imag*(SQRT(3.)/2.*kx + ky/2.))
+    pairing_2 = EXP(-imag*(SQRT(3.)/2.*kx + ky/2.))
     RETURN
 END FUNCTION pairing_2
 
 !dir$ attributes forceinline :: pairing_3
 PURE COMPLEX*16 FUNCTION pairing_3(kx, ky)
     REAL*8, INTENT(IN) :: kx, ky
-    pairing_3 = EXP(imag*(-SQRT(3.)/2.*kx + ky/2.))
+    pairing_3 = EXP(-imag*(-SQRT(3.)/2.*kx + ky/2.))
     RETURN
 END FUNCTION pairing_3
 
@@ -127,7 +127,17 @@ END FUNCTION pairing_3
 PURE REAL*8 FUNCTION fd_distribution(E, E_Fermi, T)
     IMPLICIT NONE 
     REAL*8, INTENT(IN) :: E, E_Fermi, T
-    fd_distribution = 1./(EXP((E - E_Fermi)/(k_B*T)) + 1.)
+    IF (T .ne. 0) THEN
+        fd_distribution = 1./(EXP((E - E_Fermi)/(k_B*T)) + 1.)
+    ELSE
+        IF (E > E_Fermi) THEN
+            fd_distribution = 0.
+        ELSE IF (E == E_Fermi) THEN
+            fd_distribution = 0.5
+        ELSE IF (E < E_Fermi) THEN
+            fd_distribution = 1.
+        END IF
+    END IF
     RETURN
 END FUNCTION fd_distribution
 

@@ -7,19 +7,20 @@
     v = 0.2e3,
     V_pdp = 0.028e3,
     V_pds = -0.065e3,
-    J_SC = 0.175e3,
-    J_SC_PRIME = 0.0175e3,
+    J_SC = 0.5e3,
+    J_SC_PRIME = 0e3,
     U_HUB = 2e4,
     V_HUB = 2e4,
-    E_Fermi = -1.3e3 /
+    E_Fermi = -0.9e3 /
 
 &discretization
-    k1_steps = 500,
-    k2_steps = 500 /
+    k1_steps = 1000,
+    k2_steps = 1000 /
 
 &self_consistency
-    max_sc_iter = 100,
-    sc_alpha = 0.4,
-    eps_convergence = 1e-5 /
+    gamma_start = 1.,
+    max_sc_iter = 50,
+    sc_alpha = 0.2,
+    eps_convergence = 1e-4 /
 
 
