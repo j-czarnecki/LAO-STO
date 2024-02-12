@@ -11,14 +11,14 @@
     J_SC_PRIME = 0e3,
     U_HUB = 2e4,
     V_HUB = 2e4,
-    E_Fermi = -0.9e3 /
+    E_Fermi = 0.0e3 /
 
 &discretization
-    k1_steps = 1000,
-    k2_steps = 1000 /
+    k1_steps = 10,
+    k2_steps = 10 /
 
 &self_consistency
-    gamma_start = 1.,
+    gamma_start = 0.,
     max_sc_iter = 50,
     sc_alpha = 0.2,
     eps_convergence = 1e-4 /

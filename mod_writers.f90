@@ -53,7 +53,7 @@ SUBROUTINE PRINT_GAMMA(Gamma_SC, filename)
     CHARACTER(LEN=20) :: output_format
 
     INTEGER*4 :: orb, j,spin, lat
-    output_format = '(3I5, 2E15.5)'
+    output_format = '(4I5, 2E15.5)'
 
     !Printing SC gammas in [meV]
     OPEN(unit = 9, FILE= "./OutputData/"//filename//".dat", FORM = "FORMATTED", ACTION = "WRITE")

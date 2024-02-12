@@ -303,7 +303,7 @@ SUBROUTINE COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC)
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
     COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_NEIGHBOURS,2,SUBLATTICES)
     REAL*8, INTENT(IN) :: kx, ky
-    INTEGER*4 :: orb, lat, orb_prime
+    INTEGER*4 :: orb
 
     DO orb = 1, ORBITALS
         !Up - down Ti1 - Ti2 coupling
