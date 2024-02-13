@@ -88,6 +88,8 @@ PROGRAM MAIN
     DO sc_iter = 1, max_sc_iter
         PRINT*, "============= SC_ITER: ", sc_iter
         !PRINT*, "Gamma = ", Gamma_SC(1,1,1,1)/meV2au
+        Delta_new(:,:,:,:) = DCMPLX(0. , 0.)
+        Charge_dens(:) = 0.
         counter = 0
 
         !Those loops are only for slicing and future parallelization
@@ -96,102 +98,8 @@ PROGRAM MAIN
             DO j = 0, k2_steps-1    
                 counter = counter + 1
                 PRINT*, counter
-                ! k1 = i*dk1
-                ! k2 = j*dk2
-                !CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), k1, k2, Delta_local(:,:,:,:), Charge_dens_local(:))
+                
                 CALL ROMBERG_Y(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), i*dk1, (i + 1)*dk1, j*dk2, (j + 1)*dk2, Delta_local(:,:,:,:), Charge_dens_local(:))
-
-                ! !#########################################################################################################
-                ! !Setup and diagonalization of matrices in order to calculate superconducting parameters and charge density 
-                ! !#########################################################################################################
-
-                ! !Transform from graphene reciprocal lattice to kx and ky
-                ! kx = ( i*dk1*SQRT(3.)/2. ) * A_TILDE
-                ! ky = ( -i*dk1/2. + j*dk2 ) * A_TILDE
-                ! Energies(:) = 0.
-                ! Hamiltonian(:,:) = DCMPLX(0. , 0.)
-                ! U_transformation(:,:) = DCMPLX(0. , 0.)
-                ! CALL COMPUTE_TBA_TERM(Hamiltonian(:,:), kx, ky)
-                ! CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-                ! CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-                ! CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-
-                ! CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
-
-                ! CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:)) !This is not needed, since ZHEEV takes only upper triangle
-
-                ! Hamiltonian(:,:) = 0.5*( Hamiltonian_const(:,:) + Hamiltonian(:,:) )
-                ! !U_transformation(:,:) = Hamiltonian(:,:)
-                ! !CALL DIAGONALIZE_HERMITIAN(U_transformation(:,:), Energies(i,j,:))
-                ! !CALL PRINT_HAMILTONIAN(Hamiltonian(:,:))
-
-                ! CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:,:), Energies(:), U_transformation(:,:))
-                ! !After DIAGONALIZE HERMITIAN, U contains eigenvectors, so it corresponds to transformation matrix U                
-
-                ! !Here it has to be set to zero, to avoid artifacts from previous iteration / chunk
-                ! Delta_local(:,:,:,:) = DCMPLX(0. , 0.)
-                ! !Self - consistent delta calculation
-                ! DO orb = 1, ORBITALS
-                !     DO lat = 0, SUBLATTICES - 1
-                !         !Electrons
-                !         DO n = 1, DIM_POSITIVE_K
-                !             !Up - down Ti1 - Ti2 delta
-                !             Delta_local(orb,1,1,1) = Delta_local(orb,1,1,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K, n))*U_transformation(orb + ORBITALS + TBA_DIM, n)*fd_distribution(Energies(n), 0d0, T)*pairing_1(ky)
-                !             Delta_local(orb,2,1,1) = Delta_local(orb,2,1,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K, n))*U_transformation(orb + ORBITALS + TBA_DIM, n)*fd_distribution(Energies(n), 0d0, T)*pairing_2(kx,ky)
-                !             Delta_local(orb,3,1,1) = Delta_local(orb,3,1,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K, n))*U_transformation(orb + ORBITALS + TBA_DIM, n)*fd_distribution(Energies(n), 0d0, T)*pairing_3(kx,ky)
-
-                !             !Up - down Ti2 - Ti1 delta
-                !             Delta_local(orb,1,1,2) = Delta_local(orb,1,1,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + TBA_DIM, n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_1(ky))
-                !             Delta_local(orb,2,1,2) = Delta_local(orb,2,1,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + TBA_DIM, n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_2(kx,ky))
-                !             Delta_local(orb,3,1,2) = Delta_local(orb,3,1,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + TBA_DIM, n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_3(kx,ky))
-
-                !             !Down - up Ti1 - Ti2 delta
-                !             Delta_local(orb,1,2,1) = Delta_local(orb,1,2,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + ORBITALS, n)*fd_distribution(Energies(n), 0d0, T)*pairing_1(ky)
-                !             Delta_local(orb,2,2,1) = Delta_local(orb,2,2,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + ORBITALS, n)*fd_distribution(Energies(n), 0d0, T)*pairing_2(kx,ky)
-                !             Delta_local(orb,3,2,1) = Delta_local(orb,3,2,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + ORBITALS, n)*fd_distribution(Energies(n), 0d0, T)*pairing_3(kx,ky)
-                            
-                !             !Down - up Ti2 - Ti1 delta
-                !             Delta_local(orb,1,2,2) = Delta_local(orb,1,2,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb, n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_1(ky))
-                !             Delta_local(orb,2,2,2) = Delta_local(orb,2,2,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb, n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_2(kx,ky))
-                !             Delta_local(orb,3,2,2) = Delta_local(orb,3,2,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb, n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_3(kx,ky))
-                !         END DO
-
-                !         !Holes
-                !         DO n = DIM_POSITIVE_K + 1, DIM
-                !             !Up - down Ti1 - Ti2 delta
-                !             Delta_local(orb,1,1,1) = Delta_local(orb,1,1,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K, n))*U_transformation(orb + ORBITALS + TBA_DIM, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_1(ky)
-                !             Delta_local(orb,2,1,1) = Delta_local(orb,2,1,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K, n))*U_transformation(orb + ORBITALS + TBA_DIM, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_2(kx,ky)
-                !             Delta_local(orb,3,1,1) = Delta_local(orb,3,1,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K, n))*U_transformation(orb + ORBITALS + TBA_DIM, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_3(kx,ky)
-
-                !             !Up - down Ti2 - Ti1 delta
-                !             Delta_local(orb,1,1,2) = Delta_local(orb,1,1,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + TBA_DIM, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_1(ky))
-                !             Delta_local(orb,2,1,2) = Delta_local(orb,2,1,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + TBA_DIM, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_2(kx,ky))
-                !             Delta_local(orb,3,1,2) = Delta_local(orb,3,1,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + TBA_DIM, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_3(kx,ky))
-
-                !             !Down - up Ti1 - Ti2 delta
-                !             Delta_local(orb,1,2,1) = Delta_local(orb,1,2,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + ORBITALS, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_1(ky)
-                !             Delta_local(orb,2,2,1) = Delta_local(orb,2,2,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + ORBITALS, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_2(kx,ky)
-                !             Delta_local(orb,3,2,1) = Delta_local(orb,3,2,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + ORBITALS, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_3(kx,ky)
-                            
-                !             !Down - up Ti2 - Ti1 delta
-                !             Delta_local(orb,1,2,2) = Delta_local(orb,1,2,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_1(ky))
-                !             Delta_local(orb,2,2,2) = Delta_local(orb,2,2,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_2(kx,ky))
-                !             Delta_local(orb,3,2,2) = Delta_local(orb,3,2,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_3(kx,ky))
-
-                !         END DO                        
-                !     END DO
-                ! END DO
-
-
-                ! !Here it has to be set to zero, to avoid artifacts from previous iteration / chunk
-                ! Charge_dens_local(:) = 0.
-                ! !Charge density calculation
-                ! DO m = 1, DIM_POSITIVE_K
-                !     DO n = 1, DIM_POSITIVE_K
-                !         Charge_dens_local(m) = Charge_dens_local(m) + ABS(U_transformation(m,n))**2 * fd_distribution(Energies(n), 0d0, T) + &
-                !         & ABS(U_transformation(m, DIM_POSITIVE_K + n))**2 * (1. - fd_distribution(-Energies(DIM_POSITIVE_K + n), 0d0, T))
-                !     END DO
-                ! END DO
 
                 !This has to be atomic operations, since Delta_new and Charge_dens would be global variables for all threads
                 Delta_new(:,:,:,:) = Delta_new(:,:,:,:) + Delta_local(:,:,:,:)
@@ -224,7 +132,7 @@ PROGRAM MAIN
         END DO
 
         !PRINT*, "Gamma new = ", Gamma_SC_new(1,1,1,1)/meV2au
-        PRINT*, "Filling ", SUM(Charge_dens(:))/(domega*k1_steps*k2_steps) / DIM_POSITIVE_K
+        PRINT*, "Filling ", SUM(Charge_dens(:))/(K1_MAX*K2_MAX) / DIM_POSITIVE_K 
 
         WRITE(99,'(I0, 4E15.5)') sc_iter, REAL(Gamma_SC(1,1,1,1)/meV2au), AIMAG(Gamma_SC(1,1,1,1)/meV2au), &
         &                                 REAL(Gamma_SC_new(1,1,1,1)/meV2au), AIMAG(Gamma_SC_new(1,1,1,1)/meV2au)

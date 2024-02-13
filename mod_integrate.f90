@@ -15,9 +15,9 @@ SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2
     REAL*8, INTENT(OUT) :: Charge_dens_local(DIM_POSITIVE_K)
 
     !Parameters for Romberg integration
-    REAL*8, PARAMETER :: EPS = 1e-3
-    INTEGER*4, PARAMETER :: JMAX = 20
-    INTEGER*4, PARAMETER :: K = 5
+    REAL*8, PARAMETER :: EPS = 1e-2
+    INTEGER*4, PARAMETER :: JMAX = 8
+    INTEGER*4, PARAMETER :: K = 4
 
     COMPLEX*16 :: stepsize(JMAX + 1)
     COMPLEX*16 :: Delta_iterations(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES, JMAX + 1)
@@ -151,9 +151,9 @@ SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2
 
 
     !Parameters for Romberg integration
-    REAL*8, PARAMETER :: EPS = 1e-3
-    INTEGER*4, PARAMETER :: JMAX = 20
-    INTEGER*4, PARAMETER :: K = 5
+    REAL*8, PARAMETER :: EPS = 1e-2
+    INTEGER*4, PARAMETER :: JMAX = 8
+    INTEGER*4, PARAMETER :: K = 4
 
     COMPLEX*16 :: stepsize(JMAX + 1)
     COMPLEX*16 :: Delta_iterations(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES, JMAX + 1)
