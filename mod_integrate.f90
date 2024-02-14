@@ -7,21 +7,22 @@ CONTAINS
 !Adapted from "Numerical Recipes in Fortran Second Edition" 
 !William H. Press, Saul A. Teukolsky, W. T. Vetterling, B. P. Flannery
 
-SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2_chunk_min, k2_chunk_max, Delta_local, Charge_dens_local)
+SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2_chunk_min, k2_chunk_max, &
+                    & Delta_local, Charge_dens_local, romb_eps_x, interpolation_deg_x, max_grid_refinements_x, &
+                    & romb_eps_y, interpolation_deg_y, max_grid_refinements_y)
+
     COMPLEX*16, INTENT(IN) :: Hamiltonian_const(DIM, DIM)
     REAL*8, INTENT(IN) :: k1_chunk_min, k1_chunk_max, k2_chunk_min, k2_chunk_max
     COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES)
+    REAL*8, INTENT(IN) :: romb_eps_x, romb_eps_y
+    INTEGER*4, INTENT(IN) :: interpolation_deg_x, interpolation_deg_y, max_grid_refinements_x, max_grid_refinements_y
     COMPLEX*16, INTENT(OUT) :: Delta_local(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES)
     REAL*8, INTENT(OUT) :: Charge_dens_local(DIM_POSITIVE_K)
-
     !Parameters for Romberg integration
-    REAL*8, PARAMETER :: EPS = 1e-2
-    INTEGER*4, PARAMETER :: JMAX = 8
-    INTEGER*4, PARAMETER :: K = 4
 
-    COMPLEX*16 :: stepsize(JMAX + 1)
-    COMPLEX*16 :: Delta_iterations(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES, JMAX + 1)
-    REAL*8 :: Charge_dens_iterations(DIM_POSITIVE_K, JMAX + 1)
+    COMPLEX*16 :: stepsize(max_grid_refinements_y + 1)
+    COMPLEX*16 :: Delta_iterations(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES, max_grid_refinements_y + 1)
+    REAL*8 :: Charge_dens_iterations(DIM_POSITIVE_K, max_grid_refinements_y + 1)
     COMPLEX*16 :: Delta_sum(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES)
     REAL*8 :: Charge_dens_sum(DIM_POSITIVE_K)
     COMPLEX*16 :: result_error, result, sum
@@ -37,20 +38,20 @@ SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2
     convergence = .FALSE.
     !stepsize(1) = k2_chunk_max - k2_chunk_min
     stepsize(1) = 1.
-    DO j = 1, JMAX
+    DO j = 1, max_grid_refinements_y
         !TRAPZD IMPLEMENTATION HERE
         !First approximation of the integral is taking only boundary values
         IF(j == 1) THEN
             !Calculation for lower bound of chunk
             CALL ROMBERG_X(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), k1_chunk_min, k1_chunk_max, k2_chunk_max,&
-                &  Delta_local(:,:,:,:), Charge_dens_local(:))
+                &  Delta_local(:,:,:,:), Charge_dens_local(:), romb_eps_x, interpolation_deg_x, max_grid_refinements_x)
             Delta_iterations(:,:,:,:,j) = Delta_local(:,:,:,:)
             Charge_dens_iterations(:,j) = Charge_dens_local(:)
 
             
             !Calculation for upper bound of chunk
             CALL ROMBERG_X(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), k1_chunk_min, k1_chunk_max, k2_chunk_min,&
-                &  Delta_local(:,:,:,:), Charge_dens_local(:))
+                &  Delta_local(:,:,:,:), Charge_dens_local(:), romb_eps_x, interpolation_deg_x, max_grid_refinements_x)
             Delta_iterations(:,:,:,:,j) = Delta_iterations(:,:,:,:,j) + Delta_local(:,:,:,:)
             Charge_dens_iterations(:,j) = Charge_dens_iterations(:,j) + Charge_dens_local(:)
 
@@ -70,7 +71,7 @@ SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2
             DO n = 1, i
                 !Here we pass k1_trap as actual k1 point
                 CALL ROMBERG_X(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), k1_chunk_min, k1_chunk_max, k2_trap,&
-                    &  Delta_local(:,:,:,:), Charge_dens_local(:))
+                    &  Delta_local(:,:,:,:), Charge_dens_local(:), romb_eps_x, interpolation_deg_x, max_grid_refinements_x)
                 Delta_sum(:,:,:,:) = Delta_sum(:,:,:,:) + Delta_local(:,:,:,:)
                 Charge_dens_sum(:) = Charge_dens_sum(:) + Charge_dens_local(:)    
                 ! Delta_iterations(:,:,:,:,j) =  Delta_iterations(:,:,:,:,j) + Delta_local(:,:,:,:)
@@ -92,7 +93,7 @@ SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-            IF (j >= K) THEN
+            IF (j >= interpolation_deg_y) THEN
                 !For all components of Delta_iterations and Charge_dens_iterations
                 !Check whether integral when dk1 ---> 0 can be approximated
                 !With relative error no bigger than EPS
@@ -102,9 +103,10 @@ SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2
                     DO orb = 1, ORBITALS
                         DO n = 1, N_NEIGHBOURS
                             DO lat = 1, SUBLATTICES
-                                CALL POLINT(stepsize((j - K + 1):j), Delta_iterations(orb,n,spin,lat,(j - K + 1):j), K, DCMPLX(0. , 0.), result, result_error)
+                                CALL POLINT(stepsize((j - interpolation_deg_y + 1):j), Delta_iterations(orb,n,spin,lat,(j - interpolation_deg_y + 1):j), &
+                                            & interpolation_deg_y, DCMPLX(0. , 0.), result, result_error)
                                 Delta_local(orb,n,spin,lat) = result
-                                IF (ABS(result_error) > EPS*ABS(result)) THEN
+                                IF (ABS(result_error) > romb_eps_y*ABS(result)) THEN
                                     convergence = .FALSE.
                                 END IF
                             END DO
@@ -114,9 +116,10 @@ SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2
 
                 !Chaecking Charge_dens convergence
                 DO n = 1, DIM_POSITIVE_K
-                    CALL POLINT(stepsize((j - K + 1):j), DCMPLX(Charge_dens_iterations(n,(j - K + 1):j), 0.), K, DCMPLX(0. , 0.), result, result_error)
+                    CALL POLINT(stepsize((j - interpolation_deg_y + 1):j), DCMPLX(Charge_dens_iterations(n,(j - interpolation_deg_y + 1):j), 0.), &
+                                & interpolation_deg_y, DCMPLX(0. , 0.), result, result_error)
                     Charge_dens_local(n) = REAL(result)
-                    IF (ABS(result_error) > EPS*ABS(result)) THEN
+                    IF (ABS(result_error) > romb_eps_y*ABS(result)) THEN
                         convergence = .FALSE.
                     END IF
                 END DO
@@ -141,23 +144,21 @@ END SUBROUTINE ROMBERG_Y
 
 
 
-SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2_actual, Delta_local, Charge_dens_local)
+SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2_actual, Delta_local, Charge_dens_local, &
+                    & romb_eps_x, interpolation_deg_x, max_grid_refinements_x)
     COMPLEX*16, INTENT(IN) :: Hamiltonian_const(DIM, DIM)
     REAL*8, INTENT(IN) :: k1_chunk_min, k1_chunk_max, k2_actual
     COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES)
+    REAL*8, INTENT(IN) :: romb_eps_x
+    INTEGER*4, INTENT(IN) :: interpolation_deg_x, max_grid_refinements_x
+
 
     COMPLEX*16, INTENT(OUT) :: Delta_local(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES)
     REAL*8, INTENT(OUT) :: Charge_dens_local(DIM_POSITIVE_K)
 
-
-    !Parameters for Romberg integration
-    REAL*8, PARAMETER :: EPS = 1e-2
-    INTEGER*4, PARAMETER :: JMAX = 8
-    INTEGER*4, PARAMETER :: K = 4
-
-    COMPLEX*16 :: stepsize(JMAX + 1)
-    COMPLEX*16 :: Delta_iterations(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES, JMAX + 1)
-    REAL*8 :: Charge_dens_iterations(DIM_POSITIVE_K, JMAX + 1)
+    COMPLEX*16 :: stepsize(max_grid_refinements_x + 1)
+    COMPLEX*16 :: Delta_iterations(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES, max_grid_refinements_x + 1)
+    REAL*8 :: Charge_dens_iterations(DIM_POSITIVE_K, max_grid_refinements_x + 1)
     COMPLEX*16 :: Delta_sum(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES)
     REAL*8 :: Charge_dens_sum(DIM_POSITIVE_K)
     COMPLEX*16 :: result_error, result, sum
@@ -174,7 +175,7 @@ SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2
     stepsize(1) = 1.
 
 
-    DO j = 1, JMAX
+    DO j = 1, max_grid_refinements_x
         !TRAPZD IMPLEMENTATION HERE
         !First approximation of the integral is taking only boundary values
         IF(j == 1) THEN
@@ -228,7 +229,7 @@ SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-            IF (j >= K) THEN
+            IF (j >= interpolation_deg_x) THEN
                 !For all components of Delta_iterations and Charge_dens_iterations
                 !Check whether integral when dk1 ---> 0 can be approximated
                 !With relative error no bigger than EPS
@@ -238,9 +239,10 @@ SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2
                     DO orb = 1, ORBITALS
                         DO n = 1, N_NEIGHBOURS
                             DO lat = 1, SUBLATTICES
-                                CALL POLINT(stepsize((j - K + 1):j), Delta_iterations(orb,n,spin,lat,(j - K + 1):j), K, DCMPLX(0. , 0.), result, result_error)
+                                CALL POLINT(stepsize((j - interpolation_deg_x + 1):j), Delta_iterations(orb,n,spin,lat,(j - interpolation_deg_x + 1):j), &
+                                            & interpolation_deg_x, DCMPLX(0. , 0.), result, result_error)
                                 Delta_local(orb,n,spin,lat) = result
-                                IF (ABS(result_error) > EPS*ABS(result)) THEN
+                                IF (ABS(result_error) > romb_eps_x*ABS(result)) THEN
                                     convergence = .FALSE.
                                 END IF
                             END DO
@@ -250,9 +252,10 @@ SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2
 
                 !Chaecking Charge_dens convergence
                 DO n = 1, DIM_POSITIVE_K
-                    CALL POLINT(stepsize((j - K + 1):j), DCMPLX(Charge_dens_iterations(n,(j - K + 1):j), 0.), K, DCMPLX(0. , 0.), result, result_error)
+                    CALL POLINT(stepsize((j - interpolation_deg_x + 1):j), DCMPLX(Charge_dens_iterations(n,(j - interpolation_deg_x + 1):j), 0.), &
+                                & interpolation_deg_x, DCMPLX(0. , 0.), result, result_error)
                     Charge_dens_local(n) = REAL(result)
-                    IF (ABS(result_error) > EPS*ABS(result)) THEN
+                    IF (ABS(result_error) > romb_eps_x*ABS(result)) THEN
                         convergence = .FALSE.
                     END IF
                 END DO

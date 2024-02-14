@@ -32,6 +32,14 @@ INTEGER*4 :: max_sc_iter = 0
 REAL*8 :: sc_alpha = 0.
 REAL*8 :: eps_convergence = 0.
 
+!Romberg integration
+REAL*8 :: romb_eps_x
+INTEGER*4 :: interpolation_deg_x
+INTEGER*4 :: max_grid_refinements_x
+REAL*8 :: romb_eps_y
+INTEGER*4 :: interpolation_deg_y
+INTEGER*4 :: max_grid_refinements_y
+
 
 !Derived
 REAL*8 eta_p
@@ -63,6 +71,13 @@ NAMELIST /self_consistency/ &
 & sc_alpha,                 &
 & eps_convergence
 
+NAMELIST /romberg_integration/ &
+& romb_eps_x,                 &
+& interpolation_deg_x,        &
+& max_grid_refinements_x,     &
+& romb_eps_y,                 &
+& interpolation_deg_y,        &
+& max_grid_refinements_y
 
 CONTAINS
 SUBROUTINE GET_INPUT(nmlfile)
@@ -101,6 +116,8 @@ SUBROUTINE GET_INPUT(nmlfile)
     dk2 = K2_MAX / k2_steps
     domega = ABS(dk1*dk2*SIN(2*PI/3.))/(SIN(2*PI/3.)*K1_MAX*K2_MAX)
     eta_p = v * SQRT(3.) / 3.905 * nm2au
+
+    READ(9, NML=romberg_integration)
 
 END SUBROUTINE GET_INPUT
 

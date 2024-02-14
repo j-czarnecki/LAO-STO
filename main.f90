@@ -99,14 +99,18 @@ PROGRAM MAIN
                 counter = counter + 1
                 PRINT*, counter
                 
-                CALL ROMBERG_Y(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), i*dk1, (i + 1)*dk1, j*dk2, (j + 1)*dk2, Delta_local(:,:,:,:), Charge_dens_local(:))
+                CALL ROMBERG_Y(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), i*dk1, (i + 1)*dk1, j*dk2, (j + 1)*dk2, &
+                & Delta_local(:,:,:,:), Charge_dens_local(:), romb_eps_x, interpolation_deg_x, max_grid_refinements_x, &
+                & romb_eps_y, interpolation_deg_y, max_grid_refinements_y)
 
                 !This has to be atomic operations, since Delta_new and Charge_dens would be global variables for all threads
                 Delta_new(:,:,:,:) = Delta_new(:,:,:,:) + Delta_local(:,:,:,:)
                 Charge_dens(:) = Charge_dens(:) + Charge_dens_local(:)
             END DO
         END DO !End of k-loop
-
+        !Due to change of sum to integral one has to divide by Brillouin zone volume
+        Delta_new(:,:,:,:) = Delta_new(:,:,:,:)/(K1_MAX*K2_MAX)
+        Charge_dens(:) = Charge_dens(:)/(K1_MAX*K2_MAX)
 
         !#########################################################################################################################
         !This is a critical section - only one thread can execute that and all thread should have ended their job up to that point
@@ -132,7 +136,7 @@ PROGRAM MAIN
         END DO
 
         !PRINT*, "Gamma new = ", Gamma_SC_new(1,1,1,1)/meV2au
-        PRINT*, "Filling ", SUM(Charge_dens(:))/(K1_MAX*K2_MAX) / DIM_POSITIVE_K 
+        PRINT*, "Filling ", SUM(Charge_dens(:)) / DIM_POSITIVE_K 
 
         WRITE(99,'(I0, 4E15.5)') sc_iter, REAL(Gamma_SC(1,1,1,1)/meV2au), AIMAG(Gamma_SC(1,1,1,1)/meV2au), &
         &                                 REAL(Gamma_SC_new(1,1,1,1)/meV2au), AIMAG(Gamma_SC_new(1,1,1,1)/meV2au)
@@ -203,7 +207,7 @@ PROGRAM MAIN
     CLOSE(99)
 
     !Printing results after the simulation is done
-    CALL PRINT_GAMMA(Gamma_SC(:,:,:,:), "Gamma_SC")
+    CALL PRINT_GAMMA(Gamma_SC(:,:,:,:), "Gamma_SC_final")
     !Just for memory deallocation, the .TRUE. flag is crucial
     CALL mix_broyden(delta_real_elems, Delta_new_broyden(:), Delta_broyden(:), sc_alpha, sc_iter, 4, .TRUE.)
 

@@ -1,8 +1,11 @@
 import multiprocessing
 import subprocess
-import f90nml
 import os
 import sys
+if os.path.exists('/net/home/pwojcik/.local/lib/python2.7/site-packages'):
+    sys.path.insert(0, '/net/home/pwojcik/.local/lib/python2.7/site-packages')
+import f90nml
+
 
 
 def LAO_STO_default_nml():
