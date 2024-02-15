@@ -86,7 +86,7 @@ PROGRAM MAIN
     
     OPEN(unit = 99, FILE= "./OutputData/Convergence.dat", FORM = "FORMATTED", ACTION = "WRITE")
     DO sc_iter = 1, max_sc_iter
-        PRINT*, "============= SC_ITER: ", sc_iter
+        !PRINT*, "============= SC_ITER: ", sc_iter
         !PRINT*, "Gamma = ", Gamma_SC(1,1,1,1)/meV2au
         Delta_new(:,:,:,:) = DCMPLX(0. , 0.)
         Charge_dens(:) = 0.
@@ -97,7 +97,7 @@ PROGRAM MAIN
         DO i = 0, k1_steps-1
             DO j = 0, k2_steps-1    
                 counter = counter + 1
-                PRINT*, counter
+                !PRINT*, counter
                 
                 CALL ROMBERG_Y(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), i*dk1, (i + 1)*dk1, j*dk2, (j + 1)*dk2, &
                 & Delta_local(:,:,:,:), Charge_dens_local(:), romb_eps_x, interpolation_deg_x, max_grid_refinements_x, &
@@ -136,7 +136,7 @@ PROGRAM MAIN
         END DO
 
         !PRINT*, "Gamma new = ", Gamma_SC_new(1,1,1,1)/meV2au
-        PRINT*, "Filling ", SUM(Charge_dens(:)) / DIM_POSITIVE_K 
+        !PRINT*, "Filling ", SUM(Charge_dens(:)) / DIM_POSITIVE_K 
 
         WRITE(99,'(I0, 4E15.5)') sc_iter, REAL(Gamma_SC(1,1,1,1)/meV2au), AIMAG(Gamma_SC(1,1,1,1)/meV2au), &
         &                                 REAL(Gamma_SC_new(1,1,1,1)/meV2au), AIMAG(Gamma_SC_new(1,1,1,1)/meV2au)

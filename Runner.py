@@ -30,7 +30,14 @@ def LAO_STO_default_nml():
                                 &self_consistency \
                                     max_sc_iter = 1000, \
                                     sc_alpha = 0.2, \
-                                    eps_convergence = 1e-7 /')
+                                    eps_convergence = 1e-7 / \
+                                &romberg_integration \
+                                    romb_eps_x = 1e-6, \
+                                    interpolation_deg_x = 4, \
+                                    max_grid_refinements_x = 10, \
+                                    romb_eps_y = 1e-6, \
+                                    interpolation_deg_y = 4, \
+                                    max_grid_refinements_y = 10 /')
     return params_nml
 
 def run_single_Ef(E_Fermi):
