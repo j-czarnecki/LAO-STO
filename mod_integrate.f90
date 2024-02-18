@@ -25,7 +25,7 @@ SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2
     REAL*8 :: Charge_dens_iterations(DIM_POSITIVE_K, max_grid_refinements_y + 1)
     COMPLEX*16 :: Delta_sum(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES)
     REAL*8 :: Charge_dens_sum(DIM_POSITIVE_K)
-    COMPLEX*16 :: result_error, result, sum
+    COMPLEX*16 :: result_error, result
     INTEGER*4 :: n,i,j, spin, orb, lat
     REAL*8 :: dk2_trap, k2_trap
     LOGICAL :: convergence
@@ -161,7 +161,7 @@ SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2
     REAL*8 :: Charge_dens_iterations(DIM_POSITIVE_K, max_grid_refinements_x + 1)
     COMPLEX*16 :: Delta_sum(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES)
     REAL*8 :: Charge_dens_sum(DIM_POSITIVE_K)
-    COMPLEX*16 :: result_error, result, sum
+    COMPLEX*16 :: result_error, result
     INTEGER*4 :: n,i,j, spin, orb, lat
     REAL*8 :: dk1_trap, k1_trap
     LOGICAL :: convergence
@@ -274,69 +274,6 @@ SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2
 
 END SUBROUTINE ROMBERG_X
 
-!See section 4.3
-!Romberg integration
-SUBROUTINE QROMB(func, x_min, x_max, result)
-    COMPLEX*16, INTENT(IN) :: x_min, x_max
-    COMPLEX*16, EXTERNAL :: func 
-    COMPLEX*16, INTENT(OUT) :: result
-
-    REAL*8, PARAMETER :: EPS = 1e-6
-    INTEGER*4, PARAMETER :: JMAX = 20
-    INTEGER*4, PARAMETER :: K = 5
-
-    COMPLEX*16 :: stepsize(JMAX + 1), integral(JMAX + 1)
-    COMPLEX*16 :: result_error
-    INTEGER*4 :: j
-
-    stepsize(1) = 1.
-    !Maximum number of splittings to half
-    DO j = 1, JMAX
-        CALL TRAPZD(func, x_min, x_max, integral(j), j)
-        IF (j >= K) THEN
-            !Really smart - based on previous iterations we want to extrapolate value of integral when stepsize would be 0.
-            !Passing last K steps
-            CALL POLINT(stepsize(j - K + 1), integral(j - K + 1), K, DCMPLX(0. , 0.), result, result_error)
-            IF (ABS(result_error) < EPS*ABS(result)) RETURN
-        END IF
-        integral(j + 1) = integral(j)
-        stepsize(j+1) = 0.25*stepsize(j)    !This is crucial
-    END DO
-
-END SUBROUTINE QROMB
-
-
-
-!See Section 4.2
-!Extended trapezoidal rule
-SUBROUTINE TRAPZD(func, x_min, x_max, result, n)
-    COMPLEX*16, INTENT(IN) :: x_max, x_min
-    INTEGER*4, INTENT(IN) :: n
-    COMPLEX*16, INTENT(OUT) :: result
-    COMPLEX*16, EXTERNAL :: func
-
-    INTEGER*4 :: i,j
-    COMPLEX*16 :: dx, x, sum
-
-    !First approximation of integral
-    IF (n == 1) THEN
-        result = 0.5*(x_max - x_min)*(func(x_min) + func(x_max))
-    ELSE
-        i = 2**(n-2)
-        dx = (x_max  - x_min)/i
-        x = x_min + 0.5*dx
-        sum = 0.
-        DO j = 1, i
-            sum = sum + func(x)
-            x = x + dx
-        END DO
-        result = 0.5*(result + (x_max - x_min)*sum/i)
-    END IF
-
-END SUBROUTINE TRAPZD
-
-
-
 !See Section 3.1
 SUBROUTINE POLINT(X, Y, deg, x_target, y_approx, dy)
     INTEGER*4, INTENT(IN) :: deg
@@ -388,6 +325,71 @@ SUBROUTINE POLINT(X, Y, deg, x_target, y_approx, dy)
     END DO
 
 END SUBROUTINE
+
+! !See section 4.3
+! !Romberg integration
+! SUBROUTINE QROMB(func, x_min, x_max, result)
+!     COMPLEX*16, INTENT(IN) :: x_min, x_max
+!     COMPLEX*16, EXTERNAL :: func 
+!     COMPLEX*16, INTENT(OUT) :: result
+
+!     REAL*8, PARAMETER :: EPS = 1e-6
+!     INTEGER*4, PARAMETER :: JMAX = 20
+!     INTEGER*4, PARAMETER :: K = 5
+
+!     COMPLEX*16 :: stepsize(JMAX + 1), integral(JMAX + 1)
+!     COMPLEX*16 :: result_error
+!     INTEGER*4 :: j
+
+!     stepsize(1) = 1.
+!     !Maximum number of splittings to half
+!     DO j = 1, JMAX
+!         CALL TRAPZD(func, x_min, x_max, integral(j), j)
+!         IF (j >= K) THEN
+!             !Really smart - based on previous iterations we want to extrapolate value of integral when stepsize would be 0.
+!             !Passing last K steps
+!             CALL POLINT(stepsize(j - K + 1), integral(j - K + 1), K, DCMPLX(0. , 0.), result, result_error)
+!             IF (ABS(result_error) < EPS*ABS(result)) RETURN
+!         END IF
+!         integral(j + 1) = integral(j)
+!         stepsize(j+1) = 0.25*stepsize(j)    !This is crucial
+!     END DO
+
+! END SUBROUTINE QROMB
+
+
+
+! !See Section 4.2
+! !Extended trapezoidal rule
+! SUBROUTINE TRAPZD(func, x_min, x_max, result, n)
+!     COMPLEX*16, INTENT(IN) :: x_max, x_min
+!     INTEGER*4, INTENT(IN) :: n
+!     COMPLEX*16, INTENT(OUT) :: result
+!     COMPLEX*16, EXTERNAL :: func
+
+!     INTEGER*4 :: i,j
+!     COMPLEX*16 :: dx, x, sum
+
+!     !First approximation of integral
+!     IF (n == 1) THEN
+!         result = 0.5*(x_max - x_min)*(func(x_min) + func(x_max))
+!     ELSE
+!         i = 2**(n-2)
+!         dx = (x_max  - x_min)/i
+!         x = x_min + 0.5*dx
+!         sum = 0.
+!         DO j = 1, i
+!             sum = sum + func(x)
+!             x = x + dx
+!         END DO
+!         result = 0.5*(result + (x_max - x_min)*sum/i)
+!     END IF
+
+! END SUBROUTINE TRAPZD
+
+
+
+
 
 
 

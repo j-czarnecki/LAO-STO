@@ -17,10 +17,7 @@ PROGRAM MAIN
     COMPLEX*16, ALLOCATABLE :: Gamma_SC(:,:,:,:), Gamma_SC_new(:,:,:,:)
     REAL*8, ALLOCATABLE :: Charge_dens(:), Charge_dens_local(:)
 
-    REAL*8 :: kx, ky
-    REAL*8 :: k1, k2
-
-    INTEGER*4 :: i,j,n, lat, m, orb, orb_prime,spin
+    INTEGER*4 :: i,j,n, lat, orb, orb_prime,spin
     INTEGER*4 :: sc_iter
     LOGICAL :: sc_flag
 
@@ -32,7 +29,7 @@ PROGRAM MAIN
     !2 because spin up-down and down-up,
     !2 because of complex number
     !SUBLATTICES because of Ti1-Ti2 coupling and Ti2 - Ti1 coupling (stored in this order)
-    delta_real_elems = ORBITALS*3*2*2*SUBLATTICES
+    delta_real_elems = ORBITALS*3*2*2!*SUBLATTICES !SUBLATTICES should be excluded in absence of magnetic field
 
     CALL GET_INPUT("./input.nml")
 
@@ -147,7 +144,7 @@ PROGRAM MAIN
         DO spin = 1, 2
             DO orb = 1, ORBITALS
                 DO n = 1, N_NEIGHBOURS
-                    DO lat = 1, SUBLATTICES
+                    DO lat = 1, 1 !to 1 in absence of magnetic field to SUBLATTICES if else
                         !It should be considered whether reative or absolute error must be checked
                         IF(ABS( ABS(Gamma_SC_new(orb,n,spin,lat)) - ABS(Gamma_SC(orb,n,spin,lat)) )  > eps_convergence) THEN                   
                             sc_flag = .FALSE.
@@ -169,7 +166,7 @@ PROGRAM MAIN
         DO spin = 1, 2
             DO orb = 1, ORBITALS
                 DO n = 1, N_NEIGHBOURS
-                    DO lat = 1, SUBLATTICES
+                    DO lat = 1, 1 !to 1 in absence of magnetic field to SUBLATTICES if else
                         Delta_broyden(broyden_index) = REAL(Gamma_SC(orb,n,spin,lat))
                         Delta_broyden(INT(delta_real_elems/2) + broyden_index) = AIMAG(Gamma_SC(orb,n,spin,lat))
                         Delta_new_broyden(broyden_index) = REAL(Gamma_SC_new(orb,n,spin,lat))
@@ -186,7 +183,7 @@ PROGRAM MAIN
         DO spin = 1, 2
             DO orb = 1, ORBITALS
                 DO n = 1, N_NEIGHBOURS
-                    DO lat = 1, SUBLATTICES
+                    DO lat = 1, 1 !to 1 in absence of magnetic field to SUBLATTICES if else
                         Gamma_SC(orb,n,spin,lat) = DCMPLX(Delta_broyden(broyden_index), Delta_broyden(INT(delta_real_elems/2) + broyden_index))
                         broyden_index = broyden_index + 1
                     END DO
@@ -198,16 +195,20 @@ PROGRAM MAIN
         !Linear mixing
         !Gamma_SC(:,:,:) = (1. - sc_alpha)*Gamma_SC(:,:,:) + sc_alpha*Gamma_SC_new(:,:,:)
 
+        Gamma_SC(:,:,:,2) = CONJG(Gamma_SC(:,:,:,1)) !This is valid in asbence of magnetic field
         Delta_new(:,:,:,:) = DCMPLX(0. , 0.)
         Gamma_SC_new(:,:,:,:) = DCMPLX(0., 0.)
         !To check the state of the simulation
         CALL PRINT_GAMMA(Gamma_SC(:,:,:,:), "Gamma_SC_iter")
-
+        CALL PRINT_CHARGE(Charge_dens(:), "Chargen_dens_iter")
     END DO !End of SC loop
     CLOSE(99)
 
     !Printing results after the simulation is done
     CALL PRINT_GAMMA(Gamma_SC(:,:,:,:), "Gamma_SC_final")
+    CALL PRINT_CHARGE(Charge_dens(:), "Chargen_dens_final")
+
+
     !Just for memory deallocation, the .TRUE. flag is crucial
     CALL mix_broyden(delta_real_elems, Delta_new_broyden(:), Delta_broyden(:), sc_alpha, sc_iter, 4, .TRUE.)
 

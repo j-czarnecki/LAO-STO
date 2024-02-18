@@ -11,23 +11,23 @@
     J_SC_PRIME = 0e3,
     U_HUB = 2e4,
     V_HUB = 2e4,
-    E_Fermi = 1.0e3 /
+    E_Fermi = -0.0e3 /
 
 &discretization
     k1_steps = 10,
     k2_steps = 10 /
 
 &self_consistency
-    gamma_start = 2.,
+    gamma_start = 1.,
     max_sc_iter = 50,
     sc_alpha = 0.2,
-    eps_convergence = 1e-4 /
+    eps_convergence = 1e-3 /
 
 &romberg_integration
-    romb_eps_x = 1e-6,
+    romb_eps_x = 1e-3,
     interpolation_deg_x = 4,
     max_grid_refinements_x = 10,
-    romb_eps_y = 1e-6,
+    romb_eps_y = 1e-3,
     interpolation_deg_y = 4,
     max_grid_refinements_y = 10 /
 

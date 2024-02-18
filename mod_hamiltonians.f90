@@ -323,16 +323,16 @@ SUBROUTINE COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC)
     END DO
 END SUBROUTINE COMPUTE_SC
 
-SUBROUTINE COMPUTE_HUBBARD(Hamiltonian, Energies)
-    IMPLICIT NONE 
-    COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
-    REAL*8, INTENT(IN) :: Energies(DIM)
-    INTEGER*4 :: orb, lat, orb_prime
+! SUBROUTINE COMPUTE_HUBBARD(Hamiltonian, Energies)
+!     IMPLICIT NONE 
+!     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
+!     REAL*8, INTENT(IN) :: Energies(DIM)
+!     INTEGER*4 :: orb, lat, orb_prime
     
 
 
 
 
-END SUBROUTINE COMPUTE_HUBBARD
+! END SUBROUTINE COMPUTE_HUBBARD
 
 END MODULE mod_hamiltonians

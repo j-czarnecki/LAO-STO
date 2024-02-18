@@ -57,6 +57,7 @@ SUBROUTINE PRINT_GAMMA(Gamma_SC, filename)
 
     !Printing SC gammas in [meV]
     OPEN(unit = 9, FILE= "./OutputData/"//filename//".dat", FORM = "FORMATTED", ACTION = "WRITE")
+    WRITE(9,*) "#spin neighbour lattice orbital Re(Gamma) Im(Gamma)"
     DO spin =1, 2
         DO j = 1, N_NEIGHBOURS
             DO lat = 1, SUBLATTICES
@@ -70,6 +71,28 @@ SUBROUTINE PRINT_GAMMA(Gamma_SC, filename)
     END DO
     CLOSE(9)
 END SUBROUTINE PRINT_GAMMA
+
+SUBROUTINE PRINT_CHARGE(Charge_dens, filename)
+    REAL*8, INTENT(IN) :: Charge_dens(DIM_POSITIVE_K)
+    CHARACTER(LEN=*), INTENT(IN) :: filename
+    CHARACTER(LEN=20) :: output_format
+    INTEGER*4 :: spin, lat, orb, n
+
+    output_format = '(3I5, 1E15.5)'
+    n = 1
+
+    OPEN(unit = 9, FILE= "./OutputData/"//filename//".dat", FORM = "FORMATTED", ACTION = "WRITE")
+    WRITE(9,*) "#spin lattice orbital Charge"
+    DO spin = 1, 2
+        DO lat = 1, SUBLATTICES
+            DO orb = 1, ORBITALS
+                WRITE(9, output_format) spin, lat, orb, Charge_dens(n)
+                n = n + 1
+            END DO
+        END DO
+    END DO
+    CLOSE(9)
+END SUBROUTINE PRINT_CHARGE
 
 
 

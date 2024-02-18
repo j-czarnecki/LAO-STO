@@ -25,10 +25,10 @@ $(TARGET): $(OBJS)
 all: $(TARGET)
 
 gnu: F90 = gfortran
-gnu: F90FLAGS = -O3 -Wall -Wextra -ffree-line-length-none
+gnu: F90FLAGS = -O3 -Wall -Wextra -ffree-line-length-none -DTRACE_DEBUG
 gnu: $(TARGET)
 
-debug: F90FLAGS = -O0 -g -check bounds -debug all
+debug: F90FLAGS = -O0 -g -check bounds -debug all -DTRACE_DEBUG
 debug: $(TARGET)
 
 clean:
