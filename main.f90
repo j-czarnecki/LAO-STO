@@ -17,6 +17,8 @@ PROGRAM MAIN
     COMPLEX*16, ALLOCATABLE :: Gamma_SC(:,:,:,:), Gamma_SC_new(:,:,:,:)
     REAL*8, ALLOCATABLE :: Charge_dens(:), Charge_dens_local(:)
 
+    REAL*8 :: gamma_error, gamma_max_error
+
     INTEGER*4 :: i,j,n, lat, orb, orb_prime,spin
     INTEGER*4 :: sc_iter
     LOGICAL :: sc_flag
@@ -83,7 +85,7 @@ PROGRAM MAIN
     
     OPEN(unit = 99, FILE= "./OutputData/Convergence.dat", FORM = "FORMATTED", ACTION = "WRITE")
     DO sc_iter = 1, max_sc_iter
-        !PRINT*, "============= SC_ITER: ", sc_iter
+        PRINT*, "============= SC_ITER: ", sc_iter
         !PRINT*, "Gamma = ", Gamma_SC(1,1,1,1)/meV2au
         Delta_new(:,:,:,:) = DCMPLX(0. , 0.)
         Charge_dens(:) = 0.
@@ -94,7 +96,7 @@ PROGRAM MAIN
         DO i = 0, k1_steps-1
             DO j = 0, k2_steps-1    
                 counter = counter + 1
-                !PRINT*, counter
+                PRINT*, counter
                 
                 CALL ROMBERG_Y(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), i*dk1, (i + 1)*dk1, j*dk2, (j + 1)*dk2, &
                 & Delta_local(:,:,:,:), Charge_dens_local(:), romb_eps_x, interpolation_deg_x, max_grid_refinements_x, &
@@ -134,10 +136,6 @@ PROGRAM MAIN
 
         !PRINT*, "Gamma new = ", Gamma_SC_new(1,1,1,1)/meV2au
         !PRINT*, "Filling ", SUM(Charge_dens(:)) / DIM_POSITIVE_K 
-
-        WRITE(99,'(I0, 4E15.5)') sc_iter, REAL(Gamma_SC(1,1,1,1)/meV2au), AIMAG(Gamma_SC(1,1,1,1)/meV2au), &
-        &                                 REAL(Gamma_SC_new(1,1,1,1)/meV2au), AIMAG(Gamma_SC_new(1,1,1,1)/meV2au)
-
         
         !Here we check whether convergence was reached
         sc_flag = .TRUE.
@@ -145,11 +143,17 @@ PROGRAM MAIN
             DO orb = 1, ORBITALS
                 DO n = 1, N_NEIGHBOURS
                     DO lat = 1, 1 !to 1 in absence of magnetic field to SUBLATTICES if else
-                        !It should be considered whether reative or absolute error must be checked
-                        IF(ABS( ABS(Gamma_SC_new(orb,n,spin,lat)) - ABS(Gamma_SC(orb,n,spin,lat)) )  > eps_convergence) THEN                   
+                        !It should be considered whether relative or absolute error must be checked
+                        gamma_error = ABS( ABS(Gamma_SC_new(orb,n,spin,lat)) - ABS(Gamma_SC(orb,n,spin,lat)) )
+                        !Gamma convergence checking
+                        IF(gamma_error > eps_convergence) THEN                   
                             sc_flag = .FALSE.
-                            EXIT !Maybe go to???
+                            !EXIT !Maybe go to???
                         END IF
+                        
+                        !Find biggest error in current iteration
+                        IF (gamma_error > gamma_max_error) gamma_max_error = gamma_error
+
                     END DO
                 END DO
             END DO
@@ -160,47 +164,63 @@ PROGRAM MAIN
             EXIT
         END IF
 
-        !Broyden mixing
-        !Flatten arrays for Broyden mixing
-        broyden_index = 1
-        DO spin = 1, 2
-            DO orb = 1, ORBITALS
-                DO n = 1, N_NEIGHBOURS
-                    DO lat = 1, 1 !to 1 in absence of magnetic field to SUBLATTICES if else
-                        Delta_broyden(broyden_index) = REAL(Gamma_SC(orb,n,spin,lat))
-                        Delta_broyden(INT(delta_real_elems/2) + broyden_index) = AIMAG(Gamma_SC(orb,n,spin,lat))
-                        Delta_new_broyden(broyden_index) = REAL(Gamma_SC_new(orb,n,spin,lat))
-                        Delta_new_broyden(INT(delta_real_elems/2) + broyden_index) = AIMAG(Gamma_SC_new(orb,n,spin,lat))
-                        broyden_index = broyden_index + 1
+        WRITE(99,'(I0, 5E15.5)') sc_iter, REAL(Gamma_SC(1,1,1,1)/meV2au), AIMAG(Gamma_SC(1,1,1,1)/meV2au), &
+        &                                 REAL(Gamma_SC_new(1,1,1,1)/meV2au), AIMAG(Gamma_SC_new(1,1,1,1)/meV2au), &
+        &                                 gamma_max_error
+        PRINT*, "Gamma max error ", gamma_max_error
+
+        !In the beginning of convergence use Broyden method to quickly find minimum
+        ! IF (gamma_max_error  > 1e-3) THEN 
+            PRINT*, "Broyden mixing"
+            !Broyden mixing
+            !Flatten arrays for Broyden mixing
+            broyden_index = 1
+            DO spin = 1, 2
+                DO orb = 1, ORBITALS
+                    DO n = 1, N_NEIGHBOURS
+                        DO lat = 1, 1 !to 1 in absence of magnetic field to SUBLATTICES if else
+                            Delta_broyden(broyden_index) = REAL(Gamma_SC(orb,n,spin,lat))
+                            Delta_broyden(INT(delta_real_elems/2) + broyden_index) = AIMAG(Gamma_SC(orb,n,spin,lat))
+                            Delta_new_broyden(broyden_index) = REAL(Gamma_SC_new(orb,n,spin,lat))
+                            Delta_new_broyden(INT(delta_real_elems/2) + broyden_index) = AIMAG(Gamma_SC_new(orb,n,spin,lat))
+                            broyden_index = broyden_index + 1
+                        END DO
                     END DO
                 END DO
             END DO
-        END DO
 
-        CALL mix_broyden(delta_real_elems, Delta_new_broyden(:), Delta_broyden(:), sc_alpha, sc_iter, 4, .FALSE.)        
+            PRINT*, "Filled table for broyden mixing, calling mix_broyden"
+            CALL mix_broyden(delta_real_elems, Delta_new_broyden(:), Delta_broyden(:), sc_alpha, sc_iter, 4, .FALSE.)        
 
-        broyden_index = 1
-        DO spin = 1, 2
-            DO orb = 1, ORBITALS
-                DO n = 1, N_NEIGHBOURS
-                    DO lat = 1, 1 !to 1 in absence of magnetic field to SUBLATTICES if else
-                        Gamma_SC(orb,n,spin,lat) = DCMPLX(Delta_broyden(broyden_index), Delta_broyden(INT(delta_real_elems/2) + broyden_index))
-                        broyden_index = broyden_index + 1
+            PRINT*, "Finished mix_broyden, rewriting to Gamma"
+            broyden_index = 1
+            DO spin = 1, 2
+                DO orb = 1, ORBITALS
+                    DO n = 1, N_NEIGHBOURS
+                        DO lat = 1, 1 !to 1 in absence of magnetic field to SUBLATTICES if else
+                            Gamma_SC(orb,n,spin,lat) = DCMPLX(Delta_broyden(broyden_index), Delta_broyden(INT(delta_real_elems/2) + broyden_index))
+                            broyden_index = broyden_index + 1
+                        END DO
                     END DO
                 END DO
             END DO
-        END DO
+        !In the last phase of convergence use linear mixing to avoid spare oscillations
+        ! ELSE
+        !     PRINT*, "Linear mixing"
+        !     !Linear mixing
+        !     Gamma_SC(:,:,:,:) = (1. - sc_alpha)*Gamma_SC(:,:,:,:) + sc_alpha*Gamma_SC_new(:,:,:,:)
+        ! END IF
 
-
-        !Linear mixing
-        !Gamma_SC(:,:,:) = (1. - sc_alpha)*Gamma_SC(:,:,:) + sc_alpha*Gamma_SC_new(:,:,:)
 
         Gamma_SC(:,:,:,2) = CONJG(Gamma_SC(:,:,:,1)) !This is valid in asbence of magnetic field
         Delta_new(:,:,:,:) = DCMPLX(0. , 0.)
         Gamma_SC_new(:,:,:,:) = DCMPLX(0., 0.)
+        gamma_max_error = 0.
+
         !To check the state of the simulation
         CALL PRINT_GAMMA(Gamma_SC(:,:,:,:), "Gamma_SC_iter")
         CALL PRINT_CHARGE(Charge_dens(:), "Chargen_dens_iter")
+
     END DO !End of SC loop
     CLOSE(99)
 

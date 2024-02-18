@@ -323,16 +323,26 @@ SUBROUTINE COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC)
     END DO
 END SUBROUTINE COMPUTE_SC
 
-! SUBROUTINE COMPUTE_HUBBARD(Hamiltonian, Energies)
-!     IMPLICIT NONE 
-!     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
-!     REAL*8, INTENT(IN) :: Energies(DIM)
-!     INTEGER*4 :: orb, lat, orb_prime
+SUBROUTINE COMPUTE_HUBBARD(Hamiltonian, Charge_dens)
+    IMPLICIT NONE 
+    COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
+    REAL*8, INTENT(IN) :: Charge_dens(DIM_POSITIVE_K)
+    INTEGER*4 :: orb, lat, orb_prime, spin
     
-
-
-
-
-! END SUBROUTINE COMPUTE_HUBBARD
+    DO spin = 0, 1
+        DO lat = 0, SUBLATTICES - 1
+            DO orb = 1, ORBITALS
+                Hamiltonian(spin*TBA_DIM + lat*ORBITALS + orb, spin*TBA_DIM + lat*ORBITALS + orb) = Hamiltonian(spin*TBA_DIM + lat*ORBITALS + orb, spin*TBA_DIM + lat*ORBITALS + orb) + &
+                & U_HUB*Charge_dens(MOD(spin, 1)*TBA_DIM + lat*ORBITALS + orb) !Modulo should give opposite spin
+                DO orb_prime = 1, ORBITALS
+                    IF (orb .NE. orb_prime) THEN
+                        Hamiltonian(spin*TBA_DIM + lat*ORBITALS + orb, spin*TBA_DIM + lat*ORBITALS + orb) = Hamiltonian(spin*TBA_DIM + lat*ORBITALS + orb, spin*TBA_DIM + lat*ORBITALS + orb) + &
+                        & V_HUB*(Charge_dens(lat*ORBITALS + orb_prime) + Charge_dens(TBA_DIM + lat*ORBITALS + orb_prime)) !total charge dens in orbital
+                    END IF
+                END DO
+            END DO
+        END DO
+    END DO
+END SUBROUTINE COMPUTE_HUBBARD
 
 END MODULE mod_hamiltonians

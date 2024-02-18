@@ -81,7 +81,7 @@ def run_slurm_param_value(paramValuePairs):
         print(f'../LAO_STO.x', file = job_file)
 
     #queue slurm job
-    simulate = subprocess.run(["sbatch", "job.sh"])
+    #simulate = subprocess.run(["sbatch", "job.sh"])
     os.chdir(f'../')
 
 if __name__ == '__main__':

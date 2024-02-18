@@ -7,11 +7,11 @@
     v = 0.2e3,
     V_pdp = 0.028e3,
     V_pds = -0.065e3,
-    J_SC = 5.0e3,
-    J_SC_PRIME = 0e3,
+    J_SC = 0.2e3,
+    J_SC_PRIME = 0.02e3,
     U_HUB = 2e4,
     V_HUB = 2e4,
-    E_Fermi = -0.0e3 /
+    E_Fermi = -1.0e3 /
 
 &discretization
     k1_steps = 10,
