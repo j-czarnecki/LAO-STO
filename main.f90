@@ -62,8 +62,12 @@ PROGRAM MAIN
 
     Delta_local(:,:,:,:) = DCMPLX(0. , 0.)
     Delta_new(:,:,:,:) = DCMPLX(0. , 0.)
+
+    !Breaking spin up-down down-up symmetry
     Gamma_SC(:,:,1,:) = DCMPLX(gamma_start, 0.)
     Gamma_SC(:,:,2,:) = DCMPLX(-gamma_start, 0.)
+
+
     !Gamma_SC(:,:,:) = DCMPLX(0., 0.)
     Gamma_SC_new(:,:,:,:) = DCMPLX(0., 0.)
 
@@ -85,7 +89,7 @@ PROGRAM MAIN
     
     OPEN(unit = 99, FILE= "./OutputData/Convergence.dat", FORM = "FORMATTED", ACTION = "WRITE")
     DO sc_iter = 1, max_sc_iter
-        PRINT*, "============= SC_ITER: ", sc_iter
+        !PRINT*, "============= SC_ITER: ", sc_iter
         !PRINT*, "Gamma = ", Gamma_SC(1,1,1,1)/meV2au
         Delta_new(:,:,:,:) = DCMPLX(0. , 0.)
         Charge_dens(:) = 0.
@@ -96,7 +100,7 @@ PROGRAM MAIN
         DO i = 0, k1_steps-1
             DO j = 0, k2_steps-1    
                 counter = counter + 1
-                PRINT*, counter
+                !PRINT*, counter
                 
                 CALL ROMBERG_Y(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), i*dk1, (i + 1)*dk1, j*dk2, (j + 1)*dk2, &
                 & Delta_local(:,:,:,:), Charge_dens_local(:), romb_eps_x, interpolation_deg_x, max_grid_refinements_x, &
@@ -167,11 +171,11 @@ PROGRAM MAIN
         WRITE(99,'(I0, 5E15.5)') sc_iter, REAL(Gamma_SC(1,1,1,1)/meV2au), AIMAG(Gamma_SC(1,1,1,1)/meV2au), &
         &                                 REAL(Gamma_SC_new(1,1,1,1)/meV2au), AIMAG(Gamma_SC_new(1,1,1,1)/meV2au), &
         &                                 gamma_max_error
-        PRINT*, "Gamma max error ", gamma_max_error
+        !PRINT*, "Gamma max error ", gamma_max_error
 
         !In the beginning of convergence use Broyden method to quickly find minimum
         ! IF (gamma_max_error  > 1e-3) THEN 
-            PRINT*, "Broyden mixing"
+            !PRINT*, "Broyden mixing"
             !Broyden mixing
             !Flatten arrays for Broyden mixing
             broyden_index = 1
@@ -189,10 +193,10 @@ PROGRAM MAIN
                 END DO
             END DO
 
-            PRINT*, "Filled table for broyden mixing, calling mix_broyden"
+            !PRINT*, "Filled table for broyden mixing, calling mix_broyden"
             CALL mix_broyden(delta_real_elems, Delta_new_broyden(:), Delta_broyden(:), sc_alpha, sc_iter, 4, .FALSE.)        
 
-            PRINT*, "Finished mix_broyden, rewriting to Gamma"
+            !PRINT*, "Finished mix_broyden, rewriting to Gamma"
             broyden_index = 1
             DO spin = 1, 2
                 DO orb = 1, ORBITALS

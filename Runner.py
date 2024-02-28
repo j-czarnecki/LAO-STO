@@ -28,8 +28,8 @@ def LAO_STO_default_nml():
                                     V_pds = -0.065e3, \
                                     J_SC = 0.175e3, \
                                     J_SC_PRIME = 0.0175e3, \
-                                    U_HUB = 2e4, \
-                                    V_HUB = 2e4, \
+                                    U_HUB = 2e3, \
+                                    V_HUB = 2e3, \
                                     E_Fermi = -0.1e3 / \
                                 &discretization \
                                     k1_steps = 10, \
@@ -89,24 +89,34 @@ if __name__ == '__main__':
     #Fermi energy setting
     nml_name = 'physical_params'
     param_name = 'E_Fermi'
-    Ef_min = -1.1e3
-    Ef_max = -1.0e3
-    Ef_steps = 4
+    Ef_min = -1.05e3
+    Ef_max = -0.8e3
+    Ef_steps = 50
     dE = abs(Ef_max - Ef_min)/Ef_steps
     Fermi_table = [(nml_name, param_name, Ef_min + i*dE) for i in range(Ef_steps + 1)]
 
-    #J_SC setting
+    #U_HUB setting
     nml_name = 'physical_params'
-    param_name = 'J_SC'
-    J_SC_min = 0.
-    J_SC_max = 0.2e3
-    J_SC_steps = 4
-    dJ = abs(J_SC_max - J_SC_min)/J_SC_steps
-    J_SC_table = [(nml_name, param_name, J_SC_min + i*dJ) for i in range(J_SC_steps + 1)]
+    param_name = 'U_HUB'
+    U_HUB_min = 0.
+    U_HUB_max = 2e3
+    U_HUB_steps = 5
+    dU = abs(U_HUB_max - U_HUB_min)/U_HUB_steps
+    U_HUB_table = [(nml_name, param_name, U_HUB_min + i*dU) for i in range(U_HUB_steps + 1)]
     
+    #V_HUB setting
+    nml_name = 'physical_params'
+    param_name = 'V_HUB'
+    V_HUB_min = 0.
+    V_HUB_max = 2e3
+    V_HUB_steps = 5
+    dV = abs(V_HUB_max - V_HUB_min)/V_HUB_steps
+    V_HUB_table = [(nml_name, param_name, V_HUB_min + i*dV) for i in range(V_HUB_steps + 1)]
+
+
     for Ef in Fermi_table:
-        for J_SC in J_SC_table:
-            paramsList = [Ef] + [J_SC]
+        for i in range(len(U_HUB_table)):
+            paramsList = [Ef] + [U_HUB_table[i]] + [V_HUB_table[i]] 
             run_slurm_param_value(paramsList)
 
     # try:

@@ -11,8 +11,8 @@ SUBROUTINE PRINT_HAMILTONIAN(Hamiltonian)
     WRITE(output_format, '(A, I0, A)') '(',DIM,'E15.5)'
     output_format = TRIM(output_format)
 
-    OPEN(unit = 9, FILE= "./OutputData/H_real.dat", FORM = "FORMATTED", ACTION = "WRITE")
-    OPEN(unit = 10, FILE= "./OutputData/H_imag.dat", FORM = "FORMATTED", ACTION = "WRITE")
+    OPEN(unit = 9, FILE= "./Test/H_real.dat", FORM = "FORMATTED", ACTION = "WRITE")
+    OPEN(unit = 10, FILE= "./Test/H_imag.dat", FORM = "FORMATTED", ACTION = "WRITE")
     DO i = 1, DIM
         WRITE(9, output_format) REAL(Hamiltonian(i,:))
         WRITE(10, output_format) AIMAG(Hamiltonian(i,:))

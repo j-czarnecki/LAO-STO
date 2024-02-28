@@ -4,6 +4,8 @@ F90 = ifort
 F90FLAGS = -O3 -ipo
 LIBS = -llapack -lblas
 
+TEST_TARGET = TEST_LAO_STO.x
+
 OBJS = 	main.o \
 		mod_hamiltonians.o \
 		mod_parameters.o \
@@ -14,7 +16,18 @@ OBJS = 	main.o \
 		mod_compute_hamiltonians.o \
 		mod_integrate.o
 
-.PHONY: all debug clean
+TEST_OBJS = tests.o \
+			mod_hamiltonians.o \
+			mod_parameters.o \
+			mod_utilities.o \
+			mod_writers.o \
+			mod_reader.o \
+			mod_broydenV2.o \
+			mod_compute_hamiltonians.o \
+			mod_integrate.o
+
+
+.PHONY: all debug clean test gnu
 
 $(TARGET): $(OBJS)
 	$(F90) -o $(TARGET) $(F90FLAGS) $^ $(LIBS)
@@ -22,19 +35,30 @@ $(TARGET): $(OBJS)
 %.o : %.f90
 	$(F90) $(F90FLAGS) -c $< -o $@
 
+$(TEST_TARGET): $(TEST_OBJS)
+	$(F90) -o $(TEST_TARGET) $(F90FLAGS) $^ $(LIBS)
+
+%.o : %.f90
+	$(F90) $(F90FLAGS) -c $< -o $@
+
+
 all: $(TARGET)
 
 gnu: F90 = gfortran
-gnu: F90FLAGS = -O3 -Wall -Wextra -ffree-line-length-none -DTRACE_DEBUG
+gnu: F90FLAGS = -O3 -Wall -Wextra -ffree-line-length-none
 gnu: $(TARGET)
 
-debug: F90FLAGS = -O0 -g -check bounds -debug all -DTRACE_DEBUG
+debug: F90FLAGS = -O0 -g -check bounds -debug all
 debug: $(TARGET)
 
+test: F90FLAGS = -O0 -g -check bounds -debug all
+test: $(TEST_TARGET)
+
+
 clean:
-	rm -f $(OBJS)
+	rm -f *.o
 	rm -f *.mod
-	rm -f $(TARGET)
+	rm -f *.x
 
 main.o:	mod_hamiltonians.o \
 		mod_parameters.o \
@@ -44,6 +68,10 @@ main.o:	mod_hamiltonians.o \
 		mod_broydenV2.o \
 		mod_compute_hamiltonians.o \
 		mod_integrate.o
+
+tests.o:	mod_hamiltonians.o \
+			mod_parameters.o \
+			mod_writers.o
 
 mod_utilities.o: mod_parameters.o \
 				 mod_reader.o

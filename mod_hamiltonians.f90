@@ -333,7 +333,7 @@ SUBROUTINE COMPUTE_HUBBARD(Hamiltonian, Charge_dens)
         DO lat = 0, SUBLATTICES - 1
             DO orb = 1, ORBITALS
                 Hamiltonian(spin*TBA_DIM + lat*ORBITALS + orb, spin*TBA_DIM + lat*ORBITALS + orb) = Hamiltonian(spin*TBA_DIM + lat*ORBITALS + orb, spin*TBA_DIM + lat*ORBITALS + orb) + &
-                & U_HUB*Charge_dens(MOD(spin, 1)*TBA_DIM + lat*ORBITALS + orb) !Modulo should give opposite spin
+                & U_HUB*Charge_dens(MOD(spin + 1, 2)*TBA_DIM + lat*ORBITALS + orb) !Modulo should give opposite spin
                 DO orb_prime = 1, ORBITALS
                     IF (orb .NE. orb_prime) THEN
                         Hamiltonian(spin*TBA_DIM + lat*ORBITALS + orb, spin*TBA_DIM + lat*ORBITALS + orb) = Hamiltonian(spin*TBA_DIM + lat*ORBITALS + orb, spin*TBA_DIM + lat*ORBITALS + orb) + &
@@ -343,6 +343,23 @@ SUBROUTINE COMPUTE_HUBBARD(Hamiltonian, Charge_dens)
             END DO
         END DO
     END DO
+
+    !Nambu space
+    DO spin = 0, 1
+        DO lat = 0, SUBLATTICES - 1
+            DO orb = 1, ORBITALS
+                Hamiltonian(DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb, DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb) = Hamiltonian(DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb, DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb) - &
+                & U_HUB*Charge_dens(MOD(spin + 1, 2)*TBA_DIM + lat*ORBITALS + orb) !Modulo should give opposite spin
+                DO orb_prime = 1, ORBITALS
+                    IF (orb .NE. orb_prime) THEN
+                        Hamiltonian(DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb, DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb) = Hamiltonian(DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb, DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb) - &
+                        & V_HUB*(Charge_dens(lat*ORBITALS + orb_prime) + Charge_dens(TBA_DIM + lat*ORBITALS + orb_prime)) !total charge dens in orbital
+                    END IF
+                END DO
+            END DO
+        END DO
+    END DO
+
 END SUBROUTINE COMPUTE_HUBBARD
 
 END MODULE mod_hamiltonians
