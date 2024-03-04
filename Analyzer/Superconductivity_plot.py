@@ -112,67 +112,34 @@ class DataReader:
 
 def main():
 
-    simulationData = DataReader(runsPath= '/home/jczarnecki/LAO-STO-results/RUNS_EF_refined', matchPattern= 'RUN_.*')
+    simulationData = DataReader(runsPath= '/home/jczarnecki/LAO-STO-results/RUNS_Hubbard_unfinished', matchPattern= 'RUN_.*')
     simulationData.LoadFilling()
-    simulationData.LoadGamma(xKeywords=('e_fermi', 'j_sc'))
+    simulationData.LoadGamma(xKeywords=('e_fermi', 'u_hub'))
 
 
     simulationDataHub = DataReader(runsPath= '/home/jczarnecki/LAO-STO-results/RUNS_Hubbard', matchPattern= 'RUN_.*')
     simulationDataHub.LoadFilling()
     simulationDataHub.LoadGamma(xKeywords=('e_fermi', 'j_sc'))
 
-    j_sc = 150.
-    key = (1,1,1,1)
+    u_hub = [0, 400, 800, 1200, 1600, 2000]
+    key = (1,3,2,1)
 
-
-    #Comparison of hubbard and without hubbard simulation
-    X_no_hub = []
-    Y_no_hub = []
-    X_hub = []
-    Y_hub = []
     plt.figure()
-    for i in range(len(simulationData.params)):
-        if int(simulationData.params[i][1]) == int(j_sc):
-            X_no_hub.append(simulationData.params[i][0])
-            #X_no_hub.append(simulationData.fillingTotal[i])
-            Y_no_hub.append(simulationData.gamma[key][i])
-    
-    for i in range(len(simulationDataHub.params)):
-        if int(simulationDataHub.params[i][1]) == int(j_sc):
-            X_hub.append(simulationDataHub.params[i][0])
-            #X_hub.append(simulationDataHub.fillingTotal[i])
-            Y_hub.append(simulationDataHub.gamma[key][i])
-    
-
-    plt.title(r"$J_{SC} = 150$ (meV)")
-    plt.plot(X_no_hub, Y_no_hub, '-', label = ' U = V = 0')
-    plt.plot(X_hub, Y_hub, '-', label = 'U = V = 2000 meV')
-    plt.xlabel(r"$E_{Fermi}$ (meV)")
-    plt.ylabel(r"$\Gamma$ (meV)")
-    plt.legend()
-    plt.savefig("../Plots/GammaHubComp.png")
-
-
-    #As a function of E_fermi for different J_SC
-    j_tab = [75.25, 150.]
-    plt.figure()
-    for j_sc in j_tab:
-        X_plot = []
-        Y_plot = []        
+    for u in u_hub:
+        gamma_plot = []
+        n_tot_plot = []
         for i in range(len(simulationData.params)):
-            if int(simulationData.params[i][1]) == int(j_sc):
-                X_plot.append(simulationData.params[i][0])
-                #X_hub.append(simulationData.fillingTotal[i])
-                Y_plot.append(simulationData.gamma[key][i])
-        plt.plot(X_plot, Y_plot, '-', label = j_sc)
-    
-    plt.title(r"$U = V = 0$")
-    plt.xlabel(r"$E_{Fermi}$ (meV)")
-    plt.ylabel(r"$\Gamma$ (meV)")
-    plt.legend(title = r"$J_{SC}$ (meV)")
-    plt.savefig("../Plots/GammaRefined.png")
+            if int(simulationData.params[i][1]) == int(u):
+                n_tot_plot.append(simulationData.fillingTotal[i] / 12.)
+                gamma_plot.append(simulationData.gamma[key][i])
+        plt.plot(n_tot_plot, gamma_plot, '-', label = u)
 
-    
+    plt.legend(title = r"$U_{Hub}$ (meV)")
+    plt.xlabel(r"$n_{total}$")
+    plt.ylabel(r"$\Gamma$ (meV)")
+    plt.grid()
+    plt.xlim(0 , 0.1)
+    plt.savefig("../Plots/HubbardTestExtendedOnlyHub.png") 
 
 
 

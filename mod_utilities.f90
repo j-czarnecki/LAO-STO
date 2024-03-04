@@ -141,6 +141,15 @@ PURE REAL*8 FUNCTION fd_distribution(E, E_Fermi, T)
     RETURN
 END FUNCTION fd_distribution
 
+!dir$ attributes forceinline :: dirac_delta
+REAL*8 FUNCTION dirac_delta(E, omega)
+    IMPLICIT NONE 
+    REAL*8, INTENT(IN) :: E, omega 
+    REAL*8, PARAMETER :: zeta = 1e-5
+    dirac_delta = zeta / (PI * ((E-omega)**2 + zeta**2))
+    RETURN
+END FUNCTION dirac_delta
+
 REAL*8 FUNCTION meV_to_au(x)
     IMPLICIT NONE
     REAL*8 :: x

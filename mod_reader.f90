@@ -118,7 +118,59 @@ SUBROUTINE GET_INPUT(nmlfile)
     eta_p = v * SQRT(3.) / 3.905 * nm2au
 
     READ(9, NML=romberg_integration)
+    
+    
+    CLOSE(9)
 
 END SUBROUTINE GET_INPUT
+
+SUBROUTINE GET_GAMMA_SC(Gamma_SC, path)
+    CHARACTER(LEN=*), INTENT(IN) :: path
+    COMPLEX*16, INTENT(OUT) :: Gamma_SC(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES)
+    INTEGER*4 :: n, lat, orb,spin
+    INTEGER*4 :: n_read, lat_read, orb_read, spin_read
+    REAL*8 :: Gamma_re, Gamma_im
+    CHARACTER(LEN=20) :: output_format   
+    
+    output_format = '(4I5, 2E15.5)'
+
+    OPEN(unit = 9, FILE=path, FORM = "FORMATTED", ACTION = "READ", STATUS="OLD")
+    READ(9,*)
+
+    DO spin =1, 2
+        DO n = 1, N_NEIGHBOURS
+            DO lat = 1, SUBLATTICES
+                DO orb = 1, ORBITALS
+                    READ(9, output_format) spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
+                    Gamma_SC(orb_read, n_read, spin_read, lat_read) = DCMPLX(Gamma_re , Gamma_im)
+                END DO
+            END DO
+            READ(9,*)
+            READ(9,*)
+        END DO
+    END DO
+    CLOSE(9)
+
+END SUBROUTINE GET_GAMMA_SC
+
+SUBROUTINE GET_CHARGE_DENS(Charge_dens, path)
+    CHARACTER(LEN=*), INTENT(IN) :: path
+    REAL*8, INTENT(OUT) :: Charge_dens(DIM_POSITIVE_K)
+    INTEGER*4 :: spin, lat, orb, n
+    CHARACTER(LEN=20) :: output_format   
+    
+    output_format = '(3I5, 1E15.5)'
+
+    OPEN(unit = 9, FILE=path, FORM = "FORMATTED", ACTION = "READ", STATUS="OLD")
+    READ(9,*)
+
+    DO n = 1, DIM_POSITIVE_K
+        READ(9, output_format) spin, lat, orb, Charge_dens(n)
+    END DO
+
+    CLOSE(9)
+
+END SUBROUTINE GET_CHARGE_DENS
+
 
 END MODULE mod_reader
