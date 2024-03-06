@@ -15,9 +15,9 @@ PROGRAM MAIN
     COMPLEX*16, ALLOCATABLE :: Delta_local(:,:,:,:), Delta_new(:,:,:,:)
     REAL*8, ALLOCATABLE :: Delta_broyden(:), Delta_new_broyden(:)
     COMPLEX*16, ALLOCATABLE :: Gamma_SC(:,:,:,:), Gamma_SC_new(:,:,:,:)
-    REAL*8, ALLOCATABLE :: Charge_dens(:), Charge_dens_local(:)
+    REAL*8, ALLOCATABLE :: Charge_dens(:), Charge_dens_new(:), Charge_dens_local(:)
 
-    REAL*8 :: gamma_error, gamma_max_error
+    REAL*8 :: gamma_error, gamma_max_error, charge_error, charge_max_error
 
     INTEGER*4 :: i,j,n, lat, orb, orb_prime,spin
     INTEGER*4 :: sc_iter
@@ -31,7 +31,8 @@ PROGRAM MAIN
     !2 because spin up-down and down-up,
     !2 because of complex number
     !SUBLATTICES because of Ti1-Ti2 coupling and Ti2 - Ti1 coupling (stored in this order)
-    delta_real_elems = ORBITALS*3*2*2!*SUBLATTICES !SUBLATTICES should be excluded in absence of magnetic field
+    !DIM_POSITIVE_K included due to Charge density self-consistency
+    delta_real_elems = DIM_POSITIVE_K + ORBITALS*3*2*2!*SUBLATTICES !SUBLATTICES should be excluded in absence of magnetic field
 
     CALL GET_INPUT("./input.nml")
 
@@ -53,6 +54,8 @@ PROGRAM MAIN
     ALLOCATE(Delta_new_broyden(delta_real_elems))
     ALLOCATE(Charge_dens(DIM_POSITIVE_K))
     ALLOCATE(Charge_dens_local(DIM_POSITIVE_K))
+    ALLOCATE(Charge_dens_new(DIM_POSITIVE_K))
+
 
     !Initializations
     Hamiltonian(:,:) = DCMPLX(0., 0.)
@@ -71,12 +74,16 @@ PROGRAM MAIN
     !Gamma_SC(:,:,:) = DCMPLX(0., 0.)
     Gamma_SC_new(:,:,:,:) = DCMPLX(0., 0.)
 
-    Charge_dens(:) = 0.
+    Charge_dens(:) = charge_start
+    Charge_dens_new(:) = 0.
     Charge_dens_local(:) = 0.
 
     Delta_broyden(:) = 0.
     Delta_new_broyden(:) = 0.
     
+    gamma_max_error = 0.
+    charge_max_error = 0.
+
     !Computing k-independent terms
     CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:,:))
     CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:,:))
@@ -89,10 +96,8 @@ PROGRAM MAIN
     
     OPEN(unit = 99, FILE= "./OutputData/Convergence.dat", FORM = "FORMATTED", ACTION = "WRITE")
     DO sc_iter = 1, max_sc_iter
-        PRINT*, "============= SC_ITER: ", sc_iter
+        !PRINT*, "============= SC_ITER: ", sc_iter
         !PRINT*, "Gamma = ", Gamma_SC(1,1,1,1)/meV2au
-        Delta_new(:,:,:,:) = DCMPLX(0. , 0.)
-        Charge_dens(:) = 0.
         counter = 0
 
         !Those loops are only for slicing and future parallelization
@@ -100,20 +105,20 @@ PROGRAM MAIN
         DO i = 0, k1_steps-1
             DO j = 0, k2_steps-1    
                 counter = counter + 1
-                PRINT*, counter
+                !PRINT*, counter
                 
-                CALL ROMBERG_Y(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), i*dk1, (i + 1)*dk1, j*dk2, (j + 1)*dk2, &
+                CALL ROMBERG_Y(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), Charge_dens(:), i*dk1, (i + 1)*dk1, j*dk2, (j + 1)*dk2, &
                 & Delta_local(:,:,:,:), Charge_dens_local(:), romb_eps_x, interpolation_deg_x, max_grid_refinements_x, &
                 & romb_eps_y, interpolation_deg_y, max_grid_refinements_y)
 
                 !This has to be atomic operations, since Delta_new and Charge_dens would be global variables for all threads
                 Delta_new(:,:,:,:) = Delta_new(:,:,:,:) + Delta_local(:,:,:,:)
-                Charge_dens(:) = Charge_dens(:) + Charge_dens_local(:)
+                Charge_dens_new(:) = Charge_dens_new(:) + Charge_dens_local(:)
             END DO
         END DO !End of k-loop
         !Due to change of sum to integral one has to divide by Brillouin zone volume
         Delta_new(:,:,:,:) = Delta_new(:,:,:,:)/(K1_MAX*K2_MAX)
-        Charge_dens(:) = Charge_dens(:)/(K1_MAX*K2_MAX)
+        Charge_dens_new(:) = Charge_dens_new(:)/(K1_MAX*K2_MAX)
 
         !#########################################################################################################################
         !This is a critical section - only one thread can execute that and all thread should have ended their job up to that point
@@ -150,7 +155,7 @@ PROGRAM MAIN
                         !It should be considered whether relative or absolute error must be checked
                         gamma_error = ABS( ABS(Gamma_SC_new(orb,n,spin,lat)) - ABS(Gamma_SC(orb,n,spin,lat)) )
                         !Gamma convergence checking
-                        IF(gamma_error > eps_convergence) THEN                   
+                        IF (gamma_error > gamma_eps_convergence) THEN                   
                             sc_flag = .FALSE.
                             !EXIT !Maybe go to???
                         END IF
@@ -163,14 +168,23 @@ PROGRAM MAIN
             END DO
         END DO
 
+        DO n = 1, DIM_POSITIVE_K
+            charge_error = ABS(Charge_dens(n) - Charge_dens_new(n))
+            IF (charge_error > charge_eps_convergence) THEN
+                sc_flag = .FALSE.
+            END IF
+
+            IF (charge_error > charge_max_error) charge_max_error = charge_error
+        END DO
+
         IF (sc_flag) THEN 
             PRINT*, "Convergence reached!"
             EXIT
         END IF
 
-        WRITE(99,'(I0, 5E15.5)') sc_iter, REAL(Gamma_SC(1,1,1,1)/meV2au), AIMAG(Gamma_SC(1,1,1,1)/meV2au), &
+        WRITE(99,'(I0, 8E15.5)') sc_iter, REAL(Gamma_SC(1,1,1,1)/meV2au), AIMAG(Gamma_SC(1,1,1,1)/meV2au), &
         &                                 REAL(Gamma_SC_new(1,1,1,1)/meV2au), AIMAG(Gamma_SC_new(1,1,1,1)/meV2au), &
-        &                                 gamma_max_error
+        &                                 Charge_dens(1), Charge_dens_new(1), gamma_max_error, charge_max_error
         !PRINT*, "Gamma max error ", gamma_max_error
 
         !In the beginning of convergence use Broyden method to quickly find minimum
@@ -184,14 +198,18 @@ PROGRAM MAIN
                     DO n = 1, N_NEIGHBOURS
                         DO lat = 1, 1 !to 1 in absence of magnetic field to SUBLATTICES if else
                             Delta_broyden(broyden_index) = REAL(Gamma_SC(orb,n,spin,lat))
-                            Delta_broyden(INT(delta_real_elems/2) + broyden_index) = AIMAG(Gamma_SC(orb,n,spin,lat))
+                            Delta_broyden(INT((delta_real_elems - DIM_POSITIVE_K)/2) + broyden_index) = AIMAG(Gamma_SC(orb,n,spin,lat))
                             Delta_new_broyden(broyden_index) = REAL(Gamma_SC_new(orb,n,spin,lat))
-                            Delta_new_broyden(INT(delta_real_elems/2) + broyden_index) = AIMAG(Gamma_SC_new(orb,n,spin,lat))
+                            Delta_new_broyden(INT((delta_real_elems - DIM_POSITIVE_K)/2) + broyden_index) = AIMAG(Gamma_SC_new(orb,n,spin,lat))
                             broyden_index = broyden_index + 1
                         END DO
                     END DO
                 END DO
             END DO
+
+            !Must be +1!!!
+            Delta_broyden((delta_real_elems - DIM_POSITIVE_K + 1) : delta_real_elems) = Charge_dens(:)
+            Delta_new_broyden((delta_real_elems - DIM_POSITIVE_K + 1) : delta_real_elems) = Charge_dens_new(:)
 
             !PRINT*, "Filled table for broyden mixing, calling mix_broyden"
             CALL mix_broyden(delta_real_elems, Delta_new_broyden(:), Delta_broyden(:), sc_alpha, sc_iter, 4, .FALSE.)        
@@ -202,12 +220,14 @@ PROGRAM MAIN
                 DO orb = 1, ORBITALS
                     DO n = 1, N_NEIGHBOURS
                         DO lat = 1, 1 !to 1 in absence of magnetic field to SUBLATTICES if else
-                            Gamma_SC(orb,n,spin,lat) = DCMPLX(Delta_broyden(broyden_index), Delta_broyden(INT(delta_real_elems/2) + broyden_index))
+                            Gamma_SC(orb,n,spin,lat) = DCMPLX(Delta_broyden(broyden_index), Delta_broyden(INT((delta_real_elems - DIM_POSITIVE_K)/2) + broyden_index))
                             broyden_index = broyden_index + 1
                         END DO
                     END DO
                 END DO
             END DO
+
+            Charge_dens(:) = Delta_broyden((delta_real_elems - DIM_POSITIVE_K + 1):delta_real_elems)
         !In the last phase of convergence use linear mixing to avoid spare oscillations
         ! ELSE
         !     PRINT*, "Linear mixing"
@@ -219,7 +239,9 @@ PROGRAM MAIN
         Gamma_SC(:,:,:,2) = CONJG(Gamma_SC(:,:,:,1)) !This is valid in asbence of magnetic field
         Delta_new(:,:,:,:) = DCMPLX(0. , 0.)
         Gamma_SC_new(:,:,:,:) = DCMPLX(0., 0.)
+        Charge_dens_new(:) = 0.
         gamma_max_error = 0.
+        charge_max_error = 0.
 
         !To check the state of the simulation
         CALL PRINT_GAMMA(Gamma_SC(:,:,:,:), "Gamma_SC_iter")
@@ -251,5 +273,6 @@ PROGRAM MAIN
     DEALLOCATE(Delta_new_broyden)
     DEALLOCATE(Charge_dens)
     DEALLOCATE(Charge_dens_local)
+    DEALLOCATE(Charge_dens_new)
 
 END PROGRAM MAIN

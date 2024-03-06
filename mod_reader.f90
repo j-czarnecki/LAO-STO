@@ -19,7 +19,6 @@ REAL*8 :: J_SC_PRIME = 0.
 REAL*8 :: U_HUB = 0.
 REAL*8 :: V_HUB = 0.
 REAL*8 :: E_Fermi = 0.
-REAL*8 :: gamma_start = 0.
 
 !Discretization
 INTEGER*4 :: k1_steps = 0
@@ -28,17 +27,20 @@ INTEGER*4 :: k2_steps = 0
 
 
 !Self-consistency
+REAL*8 :: gamma_start = 0.
+REAL*8 :: charge_start = 0.
 INTEGER*4 :: max_sc_iter = 0
 REAL*8 :: sc_alpha = 0.
-REAL*8 :: eps_convergence = 0.
+REAL*8 :: gamma_eps_convergence = 0.
+REAL*8 :: charge_eps_convergence = 0.
 
 !Romberg integration
-REAL*8 :: romb_eps_x
-INTEGER*4 :: interpolation_deg_x
-INTEGER*4 :: max_grid_refinements_x
-REAL*8 :: romb_eps_y
-INTEGER*4 :: interpolation_deg_y
-INTEGER*4 :: max_grid_refinements_y
+REAL*8 :: romb_eps_x = 0.
+INTEGER*4 :: interpolation_deg_x = 0
+INTEGER*4 :: max_grid_refinements_x = 0
+REAL*8 :: romb_eps_y = 0.
+INTEGER*4 :: interpolation_deg_y = 0
+INTEGER*4 :: max_grid_refinements_y = 0
 
 
 !Derived
@@ -67,9 +69,11 @@ NAMELIST /discretization/ &
 
 NAMELIST /self_consistency/ &
 & gamma_start,              &
+& charge_start,             &
 & max_sc_iter,              &
 & sc_alpha,                 &
-& eps_convergence
+& gamma_eps_convergence,    &
+& charge_eps_convergence
 
 NAMELIST /romberg_integration/ &
 & romb_eps_x,                 &
@@ -109,8 +113,14 @@ SUBROUTINE GET_INPUT(nmlfile)
     IF ((k1_steps .LE. 0) .OR. (k2_steps .LE. 0)) STOP "k_steps must be > 0"
 
     READ(9,NML=self_consistency)
+    IF (charge_start .LT. 0) STOP "charge_start must be >= 0"
+    IF (max_sc_iter .LE. 0) STOP "max_sc_iter must be > 0"
+    IF (sc_alpha .LE. 0) STOP "sc_alpha (mixing parameter) must be > 0"
+    IF (gamma_eps_convergence .LE. 0) STOP "gamma_eps_convergence must be > 0"
+    IF (charge_eps_convergence .LE. 0) STOP "charge_eps_convergence must be > 0"
+
     gamma_start = gamma_start * meV2au
-    eps_convergence = eps_convergence * meV2au
+    gamma_eps_convergence = gamma_eps_convergence * meV2au
     !Calculating derived values
     dk1 = K1_MAX / k1_steps
     dk2 = K2_MAX / k2_steps
@@ -118,8 +128,16 @@ SUBROUTINE GET_INPUT(nmlfile)
     eta_p = v * SQRT(3.) / 3.905 * nm2au
 
     READ(9, NML=romberg_integration)
-    
-    
+    IF (romb_eps_x .LE. 0) STOP "romb_eps_x must be > 0"
+    IF (interpolation_deg_x .LE. 0) STOP "interpolation_deg_x must be > 0"
+    IF (max_grid_refinements_x .LE. 0) STOP "max_grid_refinements_x must be > 0"
+
+    IF (romb_eps_y .LE. 0) STOP "romb_eps_y must be > 0"
+    IF (interpolation_deg_y .LE. 0) STOP "interpolation_deg_y must be > 0"
+    IF (max_grid_refinements_y .LE. 0) STOP "max_grid_refinements_y must be > 0"
+
+
+
     CLOSE(9)
 
 END SUBROUTINE GET_INPUT

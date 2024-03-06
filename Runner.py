@@ -36,9 +36,11 @@ def LAO_STO_default_nml():
                                     k2_steps = 10 / \
                                 &self_consistency \
                                     gamma_start = 1., \
+                                    charge_start = 0.1, \
                                     max_sc_iter = 1000, \
                                     sc_alpha = 0.4, \
-                                    eps_convergence = 1e-4 / \
+                                    gamma_eps_convergence = 1e-4, \
+                                    charge_eps_convergence = 1e-4 / \
                                 &romberg_integration \
                                     romb_eps_x = 1e-6, \
                                     interpolation_deg_x = 4, \

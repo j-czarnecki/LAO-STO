@@ -18,7 +18,7 @@ PROGRAM Tests
     CALL GET_INPUT("./test_input.nml")
 
     CALL COMPUTE_HUBBARD(Hamiltonian, Charge_dens)
-    CALL PRINT_HAMILTONIAN(Hamiltonian)
+    CALL PRINT_HAMILTONIAN(Hamiltonian/meV2au)
 
 
 

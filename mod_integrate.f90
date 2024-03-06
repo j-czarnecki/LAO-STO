@@ -7,13 +7,14 @@ CONTAINS
 !Adapted from "Numerical Recipes in Fortran Second Edition" 
 !William H. Press, Saul A. Teukolsky, W. T. Vetterling, B. P. Flannery
 
-SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2_chunk_min, k2_chunk_max, &
+SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chunk_min, k1_chunk_max, k2_chunk_min, k2_chunk_max, &
                     & Delta_local, Charge_dens_local, romb_eps_x, interpolation_deg_x, max_grid_refinements_x, &
                     & romb_eps_y, interpolation_deg_y, max_grid_refinements_y)
 
     COMPLEX*16, INTENT(IN) :: Hamiltonian_const(DIM, DIM)
     REAL*8, INTENT(IN) :: k1_chunk_min, k1_chunk_max, k2_chunk_min, k2_chunk_max
     COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES)
+    REAL*8, INTENT(IN) :: Charge_dens(DIM_POSITIVE_K)
     REAL*8, INTENT(IN) :: romb_eps_x, romb_eps_y
     INTEGER*4, INTENT(IN) :: interpolation_deg_x, interpolation_deg_y, max_grid_refinements_x, max_grid_refinements_y
     COMPLEX*16, INTENT(OUT) :: Delta_local(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES)
@@ -43,14 +44,14 @@ SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2
         !First approximation of the integral is taking only boundary values
         IF(j == 1) THEN
             !Calculation for lower bound of chunk
-            CALL ROMBERG_X(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), k1_chunk_min, k1_chunk_max, k2_chunk_max,&
+            CALL ROMBERG_X(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), Charge_dens(:), k1_chunk_min, k1_chunk_max, k2_chunk_max,&
                 &  Delta_local(:,:,:,:), Charge_dens_local(:), romb_eps_x, interpolation_deg_x, max_grid_refinements_x)
             Delta_iterations(:,:,:,:,j) = Delta_local(:,:,:,:)
             Charge_dens_iterations(:,j) = Charge_dens_local(:)
 
             
             !Calculation for upper bound of chunk
-            CALL ROMBERG_X(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), k1_chunk_min, k1_chunk_max, k2_chunk_min,&
+            CALL ROMBERG_X(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), Charge_dens(:), k1_chunk_min, k1_chunk_max, k2_chunk_min,&
                 &  Delta_local(:,:,:,:), Charge_dens_local(:), romb_eps_x, interpolation_deg_x, max_grid_refinements_x)
             Delta_iterations(:,:,:,:,j) = Delta_iterations(:,:,:,:,j) + Delta_local(:,:,:,:)
             Charge_dens_iterations(:,j) = Charge_dens_iterations(:,j) + Charge_dens_local(:)
@@ -70,7 +71,7 @@ SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2
             ! Charge_dens_iterations(:,j) = DCMPLX(0. , 0.)
             DO n = 1, i
                 !Here we pass k1_trap as actual k1 point
-                CALL ROMBERG_X(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), k1_chunk_min, k1_chunk_max, k2_trap,&
+                CALL ROMBERG_X(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), Charge_dens(:), k1_chunk_min, k1_chunk_max, k2_trap,&
                     &  Delta_local(:,:,:,:), Charge_dens_local(:), romb_eps_x, interpolation_deg_x, max_grid_refinements_x)
                 Delta_sum(:,:,:,:) = Delta_sum(:,:,:,:) + Delta_local(:,:,:,:)
                 Charge_dens_sum(:) = Charge_dens_sum(:) + Charge_dens_local(:)    
@@ -144,11 +145,12 @@ END SUBROUTINE ROMBERG_Y
 
 
 
-SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2_actual, Delta_local, Charge_dens_local, &
+SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chunk_min, k1_chunk_max, k2_actual, Delta_local, Charge_dens_local, &
                     & romb_eps_x, interpolation_deg_x, max_grid_refinements_x)
     COMPLEX*16, INTENT(IN) :: Hamiltonian_const(DIM, DIM)
     REAL*8, INTENT(IN) :: k1_chunk_min, k1_chunk_max, k2_actual
     COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES)
+    REAL*8, INTENT(IN) :: Charge_dens(DIM_POSITIVE_K)
     REAL*8, INTENT(IN) :: romb_eps_x
     INTEGER*4, INTENT(IN) :: interpolation_deg_x, max_grid_refinements_x
 
@@ -181,14 +183,14 @@ SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2
         IF(j == 1) THEN
             !Calculation for lower bound of chunk
             CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), &
-                & k1_chunk_min, k2_actual, Delta_local, Charge_dens_local)
+                & Charge_dens(:), k1_chunk_min, k2_actual, Delta_local, Charge_dens_local)
             Delta_iterations(:,:,:,:,j) = Delta_local(:,:,:,:)
             Charge_dens_iterations(:,j) = Charge_dens_local(:)
 
             
             !Calculation for upper bound of chunk
             CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), &
-            & k1_chunk_max, k2_actual, Delta_local, Charge_dens_local)
+            & Charge_dens(:), k1_chunk_max, k2_actual, Delta_local, Charge_dens_local)
             Delta_iterations(:,:,:,:,j) = Delta_iterations(:,:,:,:,j) + Delta_local(:,:,:,:)
             Charge_dens_iterations(:,j) = Charge_dens_iterations(:,j) + Charge_dens_local(:)
 
@@ -206,7 +208,7 @@ SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, k1_chunk_min, k1_chunk_max, k2
             DO n = 1, i
                 !Here we pass k1_trap as actual k1 point
                 CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), &
-                & k1_trap, k2_actual, Delta_local, Charge_dens_local)
+                & Charge_dens(:), k1_trap, k2_actual, Delta_local, Charge_dens_local)
                 Delta_sum(:,:,:,:) = Delta_sum(:,:,:,:) + Delta_local(:,:,:,:)
                 Charge_dens_sum(:) = Charge_dens_sum(:) + Charge_dens_local(:)
                 ! Delta_iterations(:,:,:,:,j) =  Delta_iterations(:,:,:,:,j) + Delta_local(:,:,:,:)
