@@ -23,20 +23,21 @@ SUBROUTINE PRINT_HAMILTONIAN(Hamiltonian)
 
 END SUBROUTINE PRINT_HAMILTONIAN
 
-SUBROUTINE PRINT_ENERGIES(Energies, k1_steps, k2_steps, dk1, dk2, filename)
-    REAL*8, INTENT(IN) :: Energies(0:k1_steps, 0:k2_steps, DIM)
+SUBROUTINE PRINT_ENERGIES(Energies, k1_steps, k2_steps, dk1, dk2, filename, N)
+    INTEGER*4, INTENT(IN) :: N
+    REAL*8, INTENT(IN) :: Energies(0:k1_steps, 0:k2_steps, N)
     REAL*8, INTENT(IN) :: dk1, dk2
     INTEGER*4, INTENT(IN) :: k1_steps, k2_steps
     REAL*8 :: k1, k2, kx, ky
 
     CHARACTER(LEN=*), INTENT(IN) :: filename
     CHARACTER(LEN=20) :: output_format
-    INTEGER*4 :: i,j,n
+    INTEGER*4 :: i,j,l
 
-    output_format = '(E15.5)'
+    output_format = '(I5, 3E15.5)'
 
     OPEN(unit = 9, FILE= "./OutputData/"//filename//".dat", FORM = "FORMATTED", ACTION = "WRITE")
-    DO n = 1, DIM
+    DO l = 1, N
         DO i = 0,k1_steps
             DO j = 0, k2_steps
                 k1 = i*dk1
@@ -44,10 +45,10 @@ SUBROUTINE PRINT_ENERGIES(Energies, k1_steps, k2_steps, dk1, dk2, filename)
     
                 kx = ( k1*SQRT(3.)/2. ) * A_TILDE
                 ky = ( -k1/2. + k2 ) * A_TILDE    
-                WRITE(9,*) k1, k2, Energies(i, j, n)/meV2au
+                WRITE(9, output_format) l, k1, k2, Energies(i, j, n)/meV2au
             END DO
             WRITE(9,*)
-            WRITE(9,*)    
+            WRITE(9,*)
         END DO
         WRITE(9,*)
         WRITE(9,*)

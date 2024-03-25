@@ -25,10 +25,12 @@ class DataReader:
         for row in range(len(pandasFile.spin)):
             dictKey = (int(pandasFile.spin[row]) , int(pandasFile.neighbor[row]) , int(pandasFile.sublat[row]) , int(pandasFile.orbital[row]))
             if firstIter:
-                self.gamma[dictKey] = [np.sqrt(pandasFile.gammaR[row]**2 + pandasFile.gammaIm[row]**2)]
+                #self.gamma[dictKey] = [np.sqrt(pandasFile.gammaR[row]**2 + pandasFile.gammaIm[row]**2)]
+                self.gamma[dictKey] = [pandasFile.gammaR[row] + pandasFile.gammaIm[row]*1j]
                 #print(dictKey)
             else:
-                self.gamma[dictKey].append(np.sqrt(pandasFile.gammaR[row]**2 + pandasFile.gammaIm[row]**2))
+                #self.gamma[dictKey].append(np.sqrt(pandasFile.gammaR[row]**2 + pandasFile.gammaIm[row]**2))
+                self.gamma[dictKey].append(pandasFile.gammaR[row] + pandasFile.gammaIm[row]*1j)
 
     def FillDictFilling(self, pandasFile, firstIter):
         self.fillingTotal.append(sum(pandasFile.filling[:]))
@@ -60,14 +62,19 @@ class DataReader:
             else:
                 print("No Charge dens file in ", dir)
                 continue
+            isFirstIter = False
                 
-        self.fillingTotal = sorted(self.fillingTotal)
-
-    def sortDict(self):
+    def sortData(self):
         
         sortedIndexes = sorted(range(len(self.params)), key = lambda x: self.params[x])
         for key, yList in self.gamma.items():
             self.gamma[key] = [yList[i] for i in sortedIndexes]
+        
+        for key, yList in self.filling.items():
+            self.filling[key] = [yList[i] for i in sortedIndexes]
+
+        self.fillingTotal = [self.fillingTotal[i] for i in sortedIndexes]
+
         self.params = sorted(self.params)
 
 
@@ -108,38 +115,66 @@ class DataReader:
                 continue
             firstIter = False
 
-        self.sortDict()
+class SymmetryResolver:
+    
+    def __init__(self):
+        self.symmetryGamma = {}
+    
+    def SWavePairing(self):
+        pass
+
+    def CalculateSymmetryGamma(self, gammaDict):
+
+        #Loop over all dict keys except from neighbours
+        for spin in [1,2]:
+            for sublat in [1,2]:
+                for orbital in [1,2,3]:
+
+                    #Loop over all gammas for given spin, sublat and orbital
+                    for i in range(len(gammaDict[(1,1,1,1)])):
+                        symmetryKey = (spin, sublat, orbital)
+                        if i == 0:
+                            self.symmetryGamma[symmetryKey] = self.SWavePairing(symmetryKey, gammaDict)
+                        else:
+                            self.symmetryGamma[symmetryKey].append(self.SWavePairing(symmetryKey, gammaDict))
+
 
 def main():
 
-    simulationData = DataReader(runsPath= '/home/jczarnecki/LAO-STO-results/RUNS_Hubbard_unfinished', matchPattern= 'RUN_.*')
+    simulationData = DataReader(runsPath= '/home/jczarnecki/LAO-STO-results/RUNS_U_unfinished', matchPattern= 'RUN_.*')
     simulationData.LoadFilling()
     simulationData.LoadGamma(xKeywords=('e_fermi', 'u_hub'))
+    simulationData.sortData()
 
+    #simulationDataHub = DataReader(runsPath= '/home/jczarnecki/LAO-STO-results/RUNS_Hubbard', matchPattern= 'RUN_.*')
+    #simulationDataHub.LoadFilling()
+    #simulationDataHub.LoadGamma(xKeywords=('e_fermi', 'j_sc'))
 
-    simulationDataHub = DataReader(runsPath= '/home/jczarnecki/LAO-STO-results/RUNS_Hubbard', matchPattern= 'RUN_.*')
-    simulationDataHub.LoadFilling()
-    simulationDataHub.LoadGamma(xKeywords=('e_fermi', 'j_sc'))
-
-    u_hub = [0, 400, 800, 1200, 1600, 2000]
-    key = (1,3,2,1)
-
-    plt.figure()
+    u_hub = [0, 2000]
+    key = (1,1,1,1)
+    key_filling = (1,2,1)
+    #key_filling_tab = [(1,1,1), (1,2,1)]
+    #plt.figure()
     for u in u_hub:
         gamma_plot = []
         n_tot_plot = []
+        ef_plot = []
+        n_orb_plot = []
         for i in range(len(simulationData.params)):
             if int(simulationData.params[i][1]) == int(u):
+                ef_plot.append(simulationData.params[i][0])
                 n_tot_plot.append(simulationData.fillingTotal[i] / 12.)
-                gamma_plot.append(simulationData.gamma[key][i])
-        plt.plot(n_tot_plot, gamma_plot, '-', label = u)
+                gamma_plot.append(np.abs(simulationData.gamma[key][i]))
+                n_orb_plot.append(simulationData.filling[key_filling][i])
+        plt.plot(ef_plot, gamma_plot, '-', label = u)
 
     plt.legend(title = r"$U_{Hub}$ (meV)")
-    plt.xlabel(r"$n_{total}$")
+    #plt.legend()
+    plt.xlabel(r"$E_{Fermi}$ (meV)")
     plt.ylabel(r"$\Gamma$ (meV)")
     plt.grid()
-    plt.xlim(0 , 0.1)
-    plt.savefig("../Plots/HubbardTestExtendedOnlyHub.png") 
+    #plt.xlim(0 , 0.1)
+    plt.savefig("../Plots/HubbardTesting.png")
 
 
 

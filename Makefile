@@ -1,6 +1,6 @@
 TARGET = LAO_STO.x
 SHELL = /bin/sh
-F90 = ifort
+F90 = ifx
 F90FLAGS = -O3 -ipo
 LIBS = -llapack -lblas
 

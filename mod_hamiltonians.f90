@@ -362,4 +362,33 @@ SUBROUTINE COMPUTE_HUBBARD(Hamiltonian, Charge_dens)
 
 END SUBROUTINE COMPUTE_HUBBARD
 
+
+!################ ADDITIONAL HAMILTONIANS FOR TESTING ########################
+SUBROUTINE DIAGONAL_TBA(Hamiltonian, kx, ky)
+    IMPLICIT NONE
+    COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
+    REAL*8, INTENT(INOUT) :: kx, ky
+    INTEGER*4 :: i
+
+    DO i = 1, DIM_POSITIVE_K
+        Hamiltonian(i,i) = Hamiltonian(i,i) + (DCOS(kx) + DCOS(ky))
+    END DO
+
+    !Nambu space
+    kx = -kx
+    ky = -ky
+    DO i = DIM_POSITIVE_K + 1, DIM
+        Hamiltonian(i,i) = Hamiltonian(i,i) - (DCOS(kx) + DCOS(ky))
+    END DO
+    kx = -kx
+    ky = -ky
+    
+
+
+
+END SUBROUTINE
+
+
+
+
 END MODULE mod_hamiltonians

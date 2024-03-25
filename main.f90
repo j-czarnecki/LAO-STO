@@ -92,7 +92,7 @@ PROGRAM MAIN
         Hamiltonian_const(n,n) = Hamiltonian_const(n,n) - E_Fermi
         Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) = Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) + E_Fermi
     END DO
-    CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:,:)) !This is not needed, since ZHEEV takes only upper triangle
+    CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
     
     OPEN(unit = 99, FILE= "./OutputData/Convergence.dat", FORM = "FORMATTED", ACTION = "WRITE")
     DO sc_iter = 1, max_sc_iter
@@ -119,6 +119,29 @@ PROGRAM MAIN
         !Due to change of sum to integral one has to divide by Brillouin zone volume
         Delta_new(:,:,:,:) = Delta_new(:,:,:,:)/(K1_MAX*K2_MAX)
         Charge_dens_new(:) = Charge_dens_new(:)/(K1_MAX*K2_MAX)
+
+        ! !Integration with simple trapezoid rule
+        ! DO i = 0, k1_steps
+        !     counter = counter + 1
+        !     PRINT*, counter
+            
+        !     DO j = 0, k2_steps
+
+        !         CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), &
+        !         & Charge_dens(:), i*dk1, j*dk2, Delta_local(:,:,:,:), Charge_dens_local(:))
+            
+        !         Delta_new(:,:,:,:) = Delta_new(:,:,:,:) + Delta_local(:,:,:,:)*dk1*dk2
+        !         Charge_dens_new(:) = Charge_dens_new(:) + Charge_dens_local(:)*dk1*dk2
+
+        !     END DO
+        ! END DO
+        ! Delta_new(:,:,:,:) = Delta_new(:,:,:,:)/(K1_MAX*K2_MAX)
+        ! Charge_dens_new(:) = Charge_dens_new(:)/(K1_MAX*K2_MAX)
+
+        ! DO i = 1, DIM_POSITIVE_K
+        !     PRINT*, "Charge elem ", i, " = ", Charge_dens_new(i)
+        ! END DO
+
 
         !#########################################################################################################################
         !This is a critical section - only one thread can execute that and all thread should have ended their job up to that point
@@ -184,7 +207,7 @@ PROGRAM MAIN
 
         WRITE(99,'(I0, 8E15.5)') sc_iter, REAL(Gamma_SC(1,1,1,1)/meV2au), AIMAG(Gamma_SC(1,1,1,1)/meV2au), &
         &                                 REAL(Gamma_SC_new(1,1,1,1)/meV2au), AIMAG(Gamma_SC_new(1,1,1,1)/meV2au), &
-        &                                 Charge_dens(1), Charge_dens_new(1), gamma_max_error, charge_max_error
+        &                                 Charge_dens(1), Charge_dens_new(1), gamma_max_error/meV2au, charge_max_error
         !PRINT*, "Gamma max error ", gamma_max_error
 
         !In the beginning of convergence use Broyden method to quickly find minimum
