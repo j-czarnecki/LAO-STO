@@ -303,7 +303,7 @@ SUBROUTINE COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC)
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
     COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_NEIGHBOURS,2,SUBLATTICES)
     REAL*8, INTENT(IN) :: kx, ky
-    INTEGER*4 :: orb, lat, orb_prime
+    INTEGER*4 :: orb
 
     DO orb = 1, ORBITALS
         !Up - down Ti1 - Ti2 coupling
@@ -323,16 +323,72 @@ SUBROUTINE COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC)
     END DO
 END SUBROUTINE COMPUTE_SC
 
-SUBROUTINE COMPUTE_HUBBARD(Hamiltonian, Energies)
+SUBROUTINE COMPUTE_HUBBARD(Hamiltonian, Charge_dens)
     IMPLICIT NONE 
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
-    REAL*8, INTENT(IN) :: Energies(DIM)
-    INTEGER*4 :: orb, lat, orb_prime
+    REAL*8, INTENT(IN) :: Charge_dens(DIM_POSITIVE_K)
+    INTEGER*4 :: orb, lat, orb_prime, spin
+    
+    DO spin = 0, 1
+        DO lat = 0, SUBLATTICES - 1
+            DO orb = 1, ORBITALS
+                Hamiltonian(spin*TBA_DIM + lat*ORBITALS + orb, spin*TBA_DIM + lat*ORBITALS + orb) = Hamiltonian(spin*TBA_DIM + lat*ORBITALS + orb, spin*TBA_DIM + lat*ORBITALS + orb) + &
+                & U_HUB*Charge_dens(MOD(spin + 1, 2)*TBA_DIM + lat*ORBITALS + orb) !Modulo should give opposite spin
+                DO orb_prime = 1, ORBITALS
+                    IF (orb .NE. orb_prime) THEN
+                        Hamiltonian(spin*TBA_DIM + lat*ORBITALS + orb, spin*TBA_DIM + lat*ORBITALS + orb) = Hamiltonian(spin*TBA_DIM + lat*ORBITALS + orb, spin*TBA_DIM + lat*ORBITALS + orb) + &
+                        & V_HUB*(Charge_dens(lat*ORBITALS + orb_prime) + Charge_dens(TBA_DIM + lat*ORBITALS + orb_prime)) !total charge dens in orbital
+                    END IF
+                END DO
+            END DO
+        END DO
+    END DO
+
+    !Nambu space
+    DO spin = 0, 1
+        DO lat = 0, SUBLATTICES - 1
+            DO orb = 1, ORBITALS
+                Hamiltonian(DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb, DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb) = Hamiltonian(DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb, DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb) - &
+                & U_HUB*Charge_dens(MOD(spin + 1, 2)*TBA_DIM + lat*ORBITALS + orb) !Modulo should give opposite spin
+                DO orb_prime = 1, ORBITALS
+                    IF (orb .NE. orb_prime) THEN
+                        Hamiltonian(DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb, DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb) = Hamiltonian(DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb, DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb) - &
+                        & V_HUB*(Charge_dens(lat*ORBITALS + orb_prime) + Charge_dens(TBA_DIM + lat*ORBITALS + orb_prime)) !total charge dens in orbital
+                    END IF
+                END DO
+            END DO
+        END DO
+    END DO
+
+END SUBROUTINE COMPUTE_HUBBARD
+
+
+!################ ADDITIONAL HAMILTONIANS FOR TESTING ########################
+SUBROUTINE DIAGONAL_TBA(Hamiltonian, kx, ky)
+    IMPLICIT NONE
+    COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
+    REAL*8, INTENT(INOUT) :: kx, ky
+    INTEGER*4 :: i
+
+    DO i = 1, DIM_POSITIVE_K
+        Hamiltonian(i,i) = Hamiltonian(i,i) + (DCOS(kx) + DCOS(ky))
+    END DO
+
+    !Nambu space
+    kx = -kx
+    ky = -ky
+    DO i = DIM_POSITIVE_K + 1, DIM
+        Hamiltonian(i,i) = Hamiltonian(i,i) - (DCOS(kx) + DCOS(ky))
+    END DO
+    kx = -kx
+    ky = -ky
     
 
 
 
+END SUBROUTINE
 
-END SUBROUTINE COMPUTE_HUBBARD
+
+
 
 END MODULE mod_hamiltonians
