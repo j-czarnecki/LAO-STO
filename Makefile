@@ -6,8 +6,9 @@ LIBS = -llapack -lblas
 
 TEST_TARGET = TEST_LAO_STO.x
 DISPERSION_TARGET = DISPERSION_LAO_STO.x
+CHERN_TARGET = CHERN_LAO_STO.x
 
-.PHONY: all debug clean test dispersion gnu
+.PHONY: all debug clean test dispersion chern gnu
 
 
 ####### Full-performance build (default)
@@ -60,6 +61,21 @@ $(DISPERSION_TARGET): $(DISPERSION_OBJS)
 %.o : %.f90
 	$(F90) $(F90FLAGS) -c $< -o $@
 
+CHERN_OBJS = 	chern.o \
+				mod_hamiltonians.o \
+				mod_parameters.o \
+				mod_utilities.o \
+				mod_writers.o \
+				mod_reader.o \
+				mod_compute_hamiltonians.o
+
+$(CHERN_TARGET): $(CHERN_OBJS)
+	$(F90) -o $(CHERN_TARGET) $(F90FLAGS) $^ $(LIBS)
+
+%.o : %.f90
+	$(F90) $(F90FLAGS) -c $< -o $@
+
+
 all: $(TARGET)
 
 gnu: F90 = gfortran
@@ -73,6 +89,8 @@ test: F90FLAGS = -O0 -g -check bounds -debug all
 test: $(TEST_TARGET)
 
 dispersion: $(DISPERSION_TARGET)
+
+chern: $(CHERN_TARGET)
 
 clean:
 	rm -f *.o
@@ -98,6 +116,13 @@ tests.o:	mod_hamiltonians.o \
 			mod_writers.o
 
 dispersion.o: 	mod_hamiltonians.o \
+				mod_parameters.o \
+				mod_utilities.o \
+				mod_writers.o \
+				mod_reader.o \
+				mod_compute_hamiltonians.o
+
+chern.o: 		mod_hamiltonians.o \
 				mod_parameters.o \
 				mod_utilities.o \
 				mod_writers.o \

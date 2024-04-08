@@ -170,7 +170,6 @@ class SymmetryResolver:
                             self.symmetryGammaDict[(spin,sublat,orbital, 'p')].append(self._PWavePairing(gammaToSymmetrize))
                             self.symmetryGammaDict[(spin,sublat,orbital, 'd')].append(self._DWavePairing(gammaToSymmetrize))
 
-
 def testing():
     symmetryResolver = SymmetryResolver(3)
 
@@ -188,45 +187,124 @@ def testing():
     print(symmetryResolver.symmetryGammaDict[(1,1,1,'p')])
     print(symmetryResolver.symmetryGammaDict[(1,1,1,'d')])
 
+def plotGammasFermi(simulationData, symmetryResolver):
+    U_tab = [0, 166, 333]
+    j_sc_tab = [75,150]
+    keys = []
+
+    for spin in [1]: #should be [1,2], but now spin are symmetric
+        for sublat in [1]: #should be [1,2], but now sublattices are symmetric
+            for orbital in [1,2,3]:
+                for symmetry in ['s','p','d']:
+                    keys.append((spin, sublat, orbital, symmetry))
+
+
+    for key in keys:
+        plt.figure()
+        for u in U_tab:
+            gamma_plot = []
+            ef_plot= []
+
+            for i in range(len(simulationData.params)):
+                if int(simulationData.params[i][1]) == u:
+                    ef_plot.append(simulationData.params[i][0])
+                    gamma_plot.append(np.abs(symmetryResolver.symmetryGammaDict[key][i]))
+            plt.plot(ef_plot, gamma_plot, '-', label = u)
+
+        spin, sublat, orbital, symmetry = key
+        plt.title(fr's = {-spin + 1.5}, $\alpha$ = {sublat}, l = {orbital}')
+        plt.legend(title = r"$U_{Hub}$ (meV)")
+        plt.xlabel(r"$E_{Fermi}$ (meV)")
+        plt.ylabel(fr"$\Gamma_{symmetry}$ (meV)")
+        plt.grid()
+        #plt.xlim(0 , 0.1)
+        plt.savefig(f"../Plots/GammaFermi_{spin}_{sublat}_{orbital}_{symmetry}.png")
+        plt.close()
+
+def plotGammasFilling(simulationData, symmetryResolver):
+    U_tab = [0, 166, 333]
+    j_sc_tab = [75,150]
+    keys = []
+
+    for spin in [1]: #should be [1,2], but now spin are symmetric
+        for sublat in [1]: #should be [1,2], but now sublattices are symmetric
+            for orbital in [1,2,3]:
+                for symmetry in ['s','p','d']:
+                    keys.append((spin, sublat, orbital, symmetry))
+
+
+    for key in keys:
+        plt.figure()
+        for u in U_tab:
+            gamma_plot = []
+            n_total_plot = []
+
+            for i in range(len(simulationData.params)):
+                if int(simulationData.params[i][1]) == u:
+                    n_total_plot.append(simulationData.fillingTotal[i]/12.)
+                    #gamma_plot.append(np.abs(symmetryResolver.symmetryGammaDict[key][i]))
+                    gamma_plot.append(np.abs(simulationData.gamma[(2,2,2,2)][i]))
+            plt.plot(n_total_plot, gamma_plot, '-', label = u)
+
+        spin, sublat, orbital, symmetry = key
+        plt.title(fr's = {-spin + 1.5}, $\alpha$ = {sublat}, l = {orbital}')
+        plt.legend(title = r"$U_{Hub}$ (meV)")
+        plt.xlabel(r"$n_{tot}$")
+        plt.ylabel(fr"$\Gamma_{symmetry}$ (meV)")
+        plt.grid()
+        #plt.xlim(0 , 0.1)
+        plt.savefig(f"../Plots/GammaFilling_{spin}_{sublat}_{orbital}_{symmetry}.png")
+        plt.close() 
+
+def plotFillingFermi(simulationData, symmetryResolver):
+    U_tab = [0, 166, 333]
+    plt.figure()
+    for u in U_tab:
+        ef_plot = []
+        n_total_plot = []
+        n_chosen_plot = []
+
+        for i in range(len(simulationData.params)):
+            if int(simulationData.params[i][1]) == u:
+                n_total_plot.append(simulationData.fillingTotal[i]/12.)
+                n_chosen_plot.append(simulationData.filling[(1,2,1)][i]/12.) #key (spin,sublat,orbital)
+                #gamma_plot.append(np.abs(symmetryResolver.symmetryGammaDict[key][i]))
+                ef_plot.append(simulationData.params[i][0])
+        plt.plot(ef_plot, n_chosen_plot, '-', label = u)
+
+    plt.legend(title = r"$U_{Hub}$ (meV)")
+    plt.xlabel(r"$E_{Fermi}$")
+    plt.ylabel(r"$n_{tot}$")
+    plt.grid()
+    #plt.xlim(0 , 0.1)
+    plt.savefig(f"../Plots/FillingFermi.png")
+    plt.close() 
+
 def main():
 
-    simulationData = DataReader(runsPath= '/home/jczarnecki/LAO-STO-results/RUNS_U_unfinished', matchPattern= 'RUN_.*')
+    simulationData = DataReader(runsPath= '/home/jczarnecki/LAO-STO-results/RUNS_low_U', matchPattern= 'RUN_.*')
     simulationData.LoadFilling()
     simulationData.LoadGamma(xKeywords=('e_fermi', 'u_hub'))
     simulationData.sortData()
+
+    symmetryResolver = SymmetryResolver(3)
+    symmetryResolver.CalculateSymmetryGamma(simulationData.gamma)
+
+    plotGammasFermi(simulationData, symmetryResolver)
+    plotGammasFilling(simulationData, symmetryResolver)
+    plotFillingFermi(simulationData, symmetryResolver)
+
+    # simulationData = DataReader(runsPath= '/home/jczarnecki/LAO-STO-results/RUNS_U_unfinished', matchPattern= 'RUN_.*')
+    # simulationData.LoadFilling()
+    # simulationData.LoadGamma(xKeywords=('e_fermi', 'u_hub'))
+    # simulationData.sortData()
 
     #simulationDataHub = DataReader(runsPath= '/home/jczarnecki/LAO-STO-results/RUNS_Hubbard', matchPattern= 'RUN_.*')
     #simulationDataHub.LoadFilling()
     #simulationDataHub.LoadGamma(xKeywords=('e_fermi', 'j_sc'))
 
-    u_hub = [0, 2000]
-    key = (1,1,1,1)
-    key_filling = (1,2,1)
-    #key_filling_tab = [(1,1,1), (1,2,1)]
-    #plt.figure()
-    for u in u_hub:
-        gamma_plot = []
-        n_tot_plot = []
-        ef_plot = []
-        n_orb_plot = []
-        for i in range(len(simulationData.params)):
-            if int(simulationData.params[i][1]) == int(u):
-                ef_plot.append(simulationData.params[i][0])
-                n_tot_plot.append(simulationData.fillingTotal[i] / 12.)
-                gamma_plot.append(np.abs(simulationData.gamma[key][i]))
-                n_orb_plot.append(simulationData.filling[key_filling][i])
-        plt.plot(ef_plot, gamma_plot, '-', label = u)
-
-    plt.legend(title = r"$U_{Hub}$ (meV)")
-    #plt.legend()
-    plt.xlabel(r"$E_{Fermi}$ (meV)")
-    plt.ylabel(r"$\Gamma$ (meV)")
-    plt.grid()
-    #plt.xlim(0 , 0.1)
-    plt.savefig("../Plots/HubbardTesting.png")
-
 
 
 if __name__ == "__main__":
-    #main()
-    testing()
+    main()
+    #testing()

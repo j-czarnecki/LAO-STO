@@ -22,8 +22,8 @@ PROGRAM dispersion
     REAL*8 :: E_DOS_min, E_DOS_max, dE0, E0
     INTEGER*4 :: DOS_steps
 
-    E_DOS_MIN = -1000 * meV2au
-    E_DOS_max = 1000 * meV2au
+    E_DOS_MIN = -1200 * meV2au
+    E_DOS_max = 1200 * meV2au
     dE0 = 1 * meV2au
     DOS_steps = INT((E_DOS_max - E_DOS_min) / dE0)
 

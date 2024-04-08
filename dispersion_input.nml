@@ -7,15 +7,15 @@
     v = 0.2e3,
     V_pdp = 0.028e3,
     V_pds = -0.065e3,
-    J_SC = 0.2e3,
-    J_SC_PRIME = 0.02e3,
+    J_SC = 0.175e3,
+    J_SC_PRIME = 0.0175e3,
     U_HUB = 0e3,
     V_HUB = 0e3,
     E_Fermi = 0.0e3 /
 
 &discretization
-    k1_steps = 100,
-    k2_steps = 100 /
+    k1_steps = 2000,
+    k2_steps = 2000 /
 
 &self_consistency
     gamma_start = 1.,
