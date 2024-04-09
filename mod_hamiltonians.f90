@@ -60,17 +60,17 @@ SUBROUTINE COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian)
     !Ti1 atoms
     Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 2) = Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 2) + imag*lambda_SOC/2.
     Hamiltonian(DIM_POSITIVE_K + 7, DIM_POSITIVE_K + 8) = Hamiltonian(DIM_POSITIVE_K + 7, DIM_POSITIVE_K + 8) - imag*lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 9) = Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 9) - lambda_SOC/2.
+    Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 9) = Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 9) + lambda_SOC/2.
     Hamiltonian(DIM_POSITIVE_K + 2, DIM_POSITIVE_K + 9) = Hamiltonian(DIM_POSITIVE_K + 2, DIM_POSITIVE_K + 9) + imag*lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 3, DIM_POSITIVE_K + 7) = Hamiltonian(DIM_POSITIVE_K + 3, DIM_POSITIVE_K + 7) + lambda_SOC/2.
+    Hamiltonian(DIM_POSITIVE_K + 3, DIM_POSITIVE_K + 7) = Hamiltonian(DIM_POSITIVE_K + 3, DIM_POSITIVE_K + 7) - lambda_SOC/2.
     Hamiltonian(DIM_POSITIVE_K + 3, DIM_POSITIVE_K + 8) = Hamiltonian(DIM_POSITIVE_K + 3, DIM_POSITIVE_K + 8) - imag*lambda_SOC/2.
 
     !Ti2 atoms
     Hamiltonian(DIM_POSITIVE_K + 4, DIM_POSITIVE_K + 5) = Hamiltonian(DIM_POSITIVE_K + 4,DIM_POSITIVE_K + 5) + imag*lambda_SOC/2.
     Hamiltonian(DIM_POSITIVE_K + 10, DIM_POSITIVE_K + 11) = Hamiltonian(DIM_POSITIVE_K + 10,DIM_POSITIVE_K + 11) - imag*lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 4, DIM_POSITIVE_K + 12) = Hamiltonian(DIM_POSITIVE_K + 4,DIM_POSITIVE_K + 2) - lambda_SOC/2.
+    Hamiltonian(DIM_POSITIVE_K + 4, DIM_POSITIVE_K + 12) = Hamiltonian(DIM_POSITIVE_K + 4,DIM_POSITIVE_K + 2) + lambda_SOC/2.
     Hamiltonian(DIM_POSITIVE_K + 5, DIM_POSITIVE_K + 12) = Hamiltonian(DIM_POSITIVE_K + 5,DIM_POSITIVE_K + 2) + imag*lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 6, DIM_POSITIVE_K + 10) = Hamiltonian(DIM_POSITIVE_K + 6,DIM_POSITIVE_K + 0) + lambda_SOC/2.
+    Hamiltonian(DIM_POSITIVE_K + 6, DIM_POSITIVE_K + 10) = Hamiltonian(DIM_POSITIVE_K + 6,DIM_POSITIVE_K + 0) - lambda_SOC/2.
     Hamiltonian(DIM_POSITIVE_K + 6, DIM_POSITIVE_K + 11) = Hamiltonian(DIM_POSITIVE_K + 6,DIM_POSITIVE_K + 1) - imag*lambda_SOC/2.
 
 END SUBROUTINE COMPUTE_ATOMIC_SOC_TERMS
