@@ -5,10 +5,10 @@ F90FLAGS = -O3 -ipo
 LIBS = -llapack -lblas
 
 TEST_TARGET = TEST_LAO_STO.x
-DISPERSION_TARGET = DISPERSION_LAO_STO.x
+POSTPROCESSING_TARGET = POSTPROCESSING_LAO_STO.x
 CHERN_TARGET = CHERN_LAO_STO.x
 
-.PHONY: all debug clean test dispersion chern gnu
+.PHONY: all debug clean test postprocessing chern gnu
 
 
 ####### Full-performance build (default)
@@ -47,16 +47,17 @@ $(TEST_TARGET): $(TEST_OBJS)
 	$(F90) $(F90FLAGS) -c $< -o $@
 
 ###### Plotting dispersion relation, calculating DOS
-DISPERSION_OBJS = 	dispersion.o \
-					mod_hamiltonians.o \
-					mod_parameters.o \
-					mod_utilities.o \
-					mod_writers.o \
-					mod_reader.o \
-					mod_compute_hamiltonians.o
+POSTPROCESSING_OBJS = 	main_postprocessing.o \
+						mod_postprocessing.o \
+						mod_hamiltonians.o \
+						mod_parameters.o \
+						mod_utilities.o \
+						mod_writers.o \
+						mod_reader.o \
+						mod_compute_hamiltonians.o
 
-$(DISPERSION_TARGET): $(DISPERSION_OBJS)
-	$(F90) -o $(DISPERSION_TARGET) $(F90FLAGS) $^ $(LIBS)
+$(POSTPROCESSING_TARGET): $(POSTPROCESSING_OBJS)
+	$(F90) -o $(POSTPROCESSING_TARGET) $(F90FLAGS) $^ $(LIBS)
 
 %.o : %.f90
 	$(F90) $(F90FLAGS) -c $< -o $@
@@ -88,7 +89,7 @@ debug: $(TARGET)
 test: F90FLAGS = -O0 -g -check bounds -debug all
 test: $(TEST_TARGET)
 
-dispersion: $(DISPERSION_TARGET)
+postprocessing: $(POSTPROCESSING_TARGET)
 
 chern: $(CHERN_TARGET)
 
@@ -115,12 +116,13 @@ tests.o:	mod_hamiltonians.o \
 			mod_parameters.o \
 			mod_writers.o
 
-dispersion.o: 	mod_hamiltonians.o \
-				mod_parameters.o \
-				mod_utilities.o \
-				mod_writers.o \
-				mod_reader.o \
-				mod_compute_hamiltonians.o
+main_postprocessing.o: 	mod_hamiltonians.o \
+						mod_parameters.o \
+						mod_utilities.o \
+						mod_writers.o \
+						mod_reader.o \
+						mod_compute_hamiltonians.o \
+						mod_postprocessing.o
 
 chern.o: 		mod_hamiltonians.o \
 				mod_parameters.o \
@@ -148,6 +150,13 @@ mod_compute_hamiltonians.o: mod_parameters.o \
 
 mod_integrate.o: mod_parameters.o \
 				 mod_compute_hamiltonians.o
+
+mod_postprocessing.o: 	mod_hamiltonians.o \
+						mod_parameters.o \
+						mod_utilities.o \
+						mod_writers.o \
+						mod_reader.o \
+						mod_compute_hamiltonians.o
 
 
 

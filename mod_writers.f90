@@ -45,7 +45,7 @@ SUBROUTINE PRINT_ENERGIES(Energies, k1_steps, k2_steps, dk1, dk2, filename, N)
     
                 kx = ( k1*SQRT(3.)/2. ) * A_TILDE
                 ky = ( -k1/2. + k2 ) * A_TILDE    
-                WRITE(9, output_format) l, k1, k2, Energies(i, j, n)/meV2au
+                WRITE(9, output_format) l, k1, k2, Energies(i, j, l)/meV2au
             END DO
             WRITE(9,*)
             WRITE(9,*)
