@@ -24,27 +24,36 @@ class DispersionPlotter(DataReader):
         self.dispersionDataframe.E -= lowestEnergy
         self.dosDataframe.E -= lowestEnergy
 
-    def plotKx0Crossection(self, plotOutputPath, maxEnergy, kMax, nBands):
+    def plotCrossection(self, plotOutputPath: str, maxEnergy: float, sliceAlong: str, fixedKVal: float, kMax: float, nBands: int):
+
+        fixedK = ''
+        xLabelOnPlot = ''
+        if sliceAlong == 'kx':
+            xLabelOnPlot = r'$k_x~(\tilde{a}^{-1})$'
+            fixedK = 'ky'
+        elif sliceAlong == 'ky':
+            xLabelOnPlot = r'$k_y~(\tilde{a}^{-1})$'
+            fixedK = 'kx'
 
         plotEnergies = np.zeros((self.kPoints1D, nBands), dtype = np.float64)
         currentIndex = np.zeros(nBands, dtype = int)
         for i in range(self.dataLength):
-            if self.dispersionDataframe.kx[i] == 0:
+            if self.dispersionDataframe[fixedK][i] == fixedKVal:
                 bandNo = int(self.dispersionDataframe.N[i]) - 1
                 plotEnergies[currentIndex[bandNo], bandNo] = self.dispersionDataframe.E[i]
                 currentIndex[bandNo] += 1
                 plt.figure(0)
-                plt.plot(self.dispersionDataframe.ky[i], self.dispersionDataframe.E[i], marker = '.', markersize = 2,  color = (self.dispersionDataframe.P_yz[i], self.dispersionDataframe.P_zx[i], self.dispersionDataframe.P_xy[i]))
+                plt.plot(self.dispersionDataframe[sliceAlong][i], self.dispersionDataframe.E[i], marker = '.', markersize = 2,  color = (self.dispersionDataframe.P_yz[i], self.dispersionDataframe.P_zx[i], self.dispersionDataframe.P_xy[i]))
                 plt.figure(1)
-                plt.plot(self.dispersionDataframe.ky[i], self.dispersionDataframe.E[i], marker = '.', markersize = 2,  color = (self.dispersionDataframe.P_lat1[i], 0, self.dispersionDataframe.P_lat2[i]))
+                plt.plot(self.dispersionDataframe[sliceAlong][i], self.dispersionDataframe.E[i], marker = '.', markersize = 2,  color = (self.dispersionDataframe.P_lat1[i], 0, self.dispersionDataframe.P_lat2[i]))
                 plt.figure(2)
-                plt.plot(self.dispersionDataframe.ky[i], self.dispersionDataframe.E[i], marker = '.', markersize = 2,  color = (self.dispersionDataframe.P_up[i], 0, self.dispersionDataframe.P_down[i]))
+                plt.plot(self.dispersionDataframe[sliceAlong][i], self.dispersionDataframe.E[i], marker = '.', markersize = 2,  color = (self.dispersionDataframe.P_up[i], 0, self.dispersionDataframe.P_down[i]))
 
 
         plt.figure(0)
         plt.xlim(-kMax, kMax)
         plt.ylim(bottom = -0.02*maxEnergy, top = maxEnergy)
-        plt.xlabel(r'$k_y~(\tilde{a}^{-1})$')
+        plt.xlabel(xLabelOnPlot)
         plt.ylabel(r'$E$ (meV)')
         plt.savefig(plotOutputPath + "_orbital.png")
         plt.close()
@@ -52,7 +61,7 @@ class DispersionPlotter(DataReader):
         plt.figure(1)
         plt.xlim(-kMax, kMax)
         plt.ylim(bottom = -0.02*maxEnergy, top = maxEnergy)
-        plt.xlabel(r'$k_y~(\tilde{a}^{-1})$')
+        plt.xlabel(xLabelOnPlot)
         plt.ylabel(r'$E$ (meV)')
 
         plt.savefig(plotOutputPath + "_lattice.png")
@@ -61,7 +70,7 @@ class DispersionPlotter(DataReader):
         plt.figure(2)
         plt.xlim(-kMax, kMax)
         plt.ylim(bottom = -0.02*maxEnergy, top = maxEnergy)
-        plt.xlabel(r'$k_y~(\tilde{a}^{-1})$')
+        plt.xlabel(xLabelOnPlot)
         plt.ylabel(r'$E$ (meV)')
 
         plt.savefig(plotOutputPath + "_spin.png")
@@ -71,7 +80,7 @@ class DispersionPlotter(DataReader):
         plt.plot(np.sort(list(set(self.dispersionDataframe.ky))), plotEnergies, linewidth = 1, color = 'black')
         plt.xlim(-kMax, kMax)
         plt.ylim(bottom = -0.02*maxEnergy, top = maxEnergy)
-        plt.xlabel(r'$k_y~(\tilde{a}^{-1})$')
+        plt.xlabel(xLabelOnPlot)
         plt.ylabel(r'$E$ (meV)')
 
         plt.savefig(plotOutputPath + '_standard.png')

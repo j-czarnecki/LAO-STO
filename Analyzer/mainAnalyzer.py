@@ -7,10 +7,10 @@ def testing():
     symmetryResolver = SymmetryResolver(3)
 
     testGammaDict = {}
-    for spin in [1,2]:
-        for sublat in [1,2]:
-            for orbital in [1,2,3]:
-                for neighbor in [1,2,3]:
+    for spin in (1,2):
+        for sublat in (1,2):
+            for orbital in (1,2,3):
+                for neighbor in (1,2,3):
                     key = (spin, neighbor, sublat, orbital)
                     testGammaDict[key] = [x*neighbor for x in range(1,3)]
 
@@ -38,33 +38,32 @@ def main():
     gammaAndFillingPlotter.sortData()
     gammaAndFillingPlotter.CalculateSymmetryGamma()
     gammaAndFillingPlotter.plotGammasFermi()
+    gammaAndFillingPlotter.plotGammasFilling()
+    gammaAndFillingPlotter.plotFillingFermi()
 
+
+    dispersionPlotter = DispersionPlotter()
+    dispersionPlotter.LoadDispersion("../OutputData/Energies.dat")
+    dispersionPlotter.LoadDos("../OutputData/DOS.dat")
+    dispersionPlotter.GetStatistics()
+    dispersionPlotter.shiftEnergies()
+
+
+    dispersionPlotter.plotCrossection('../Plots/DispersionSliceKy', 200, 'ky', 0.,  2, 12)
+    dispersionPlotter.plotCrossection("../Plots/DispersionSliceZoomKy", 100, 'ky', 0., 0.5, 12)
     
-    # dispersionPlotter = DispersionPlotter()
-    # dispersionPlotter.LoadDispersion("../OutputData/Energies.dat")
-    # dispersionPlotter.LoadDos("../OutputData/DOS.dat")
-    # dispersionPlotter.GetStatistics()
-    # dispersionPlotter.shiftEnergies()
+    dispersionPlotter.plotCrossection('../Plots/DispersionSliceKx', 200, 'kx', 0.,  2, 12)
+    dispersionPlotter.plotCrossection("../Plots/DispersionSliceZoomKx", 100, 'kx', 0., 0.5, 12)
+    
+    #dispersionPlotter.plotFermiCrossection(10, 0.05, '../Plots/FermiSlice10.png')
+    #dispersionPlotter.plotFermiCrossection(40, 0.05, '../Plots/FermiSlice40.png')
+    dispersionPlotter.plotFermiCrossection(100, 0.05, '../Plots/FermiSlice100.png')
+    dispersionPlotter.plotFermiCrossection(150, 0.05, '../Plots/FermiSlice150.png')
+    #dispersionPlotter.plotFermiCrossection(160, 0.05, '../Plots/FermiSlice160.png')
+    dispersionPlotter.plotFermiCrossection(200, 0.05, '../Plots/FermiSlice200.png')
 
-
-    # dispersionPlotter.plotKx0Crossection('../Plots/DispersionSlice', 100, 2.5, 12)
-    # dispersionPlotter.plotKx0Crossection("../Plots/DispersionSliceZoom", 50, 0.5, 12)
-    # dispersionPlotter.plotFermiCrossection(10, 0.05, '../Plots/FermiSlice.png')
-    # dispersionPlotter.plotDos(100, "../Plots/DOS.png")
-    # dispersionPlotter.plotDos(50, "../Plots/DOSzoom.png")
-
-    #plotGammasFermi(simulationData, symmetryResolver)
-    #plotGammasFilling(simulationData, symmetryResolver)
-    #plotFillingFermi(simulationData, symmetryResolver)
-
-    # simulationData = DataReader(runsPath= '/home/jczarnecki/LAO-STO-results/RUNS_U_unfinished', matchPattern= 'RUN_.*')
-    # simulationData.LoadFilling()
-    # simulationData.LoadGamma(xKeywords=('e_fermi', 'u_hub'))
-    # simulationData.sortData()
-
-    #simulationDataHub = DataReader(runsPath= '/home/jczarnecki/LAO-STO-results/RUNS_Hubbard', matchPattern= 'RUN_.*')
-    #simulationDataHub.LoadFilling()
-    #simulationDataHub.LoadGamma(xKeywords=('e_fermi', 'j_sc'))
+    dispersionPlotter.plotDos(200, "../Plots/DOS.png")
+    #dispersionPlotter.plotDos(10, "../Plots/DOSzoom.png")
 
 
 

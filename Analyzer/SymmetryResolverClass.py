@@ -3,10 +3,10 @@ from DataReaderClass import *
 
 class SymmetryResolver(DataReader):
     
-    def __init__(self, nNeighbors, runsPath, matchPattern):
+    def __init__(self, nNeighbors: int, runsPath: str, matchPattern: str):
         DataReader.__init__(self, runsPath, matchPattern)
         self.nNeighbors = nNeighbors
-        self.symmetryGammaDict = {}
+        self.symmetryGammaDict: dict = {}
 
     #RETHINK ___WavePairing construction to avoid code repetition
     def _SWavePairing(self, listOfGammas: list):
@@ -35,14 +35,14 @@ class SymmetryResolver(DataReader):
 
     def CalculateSymmetryGamma(self):
 
-        #Loop over all dict keys except from neighbours
+        #Loop over all dict keys except for neighbours
         for spin in [1,2]:
             for sublat in [1,2]:
                 for orbital in [1,2,3]:
 
                     #Loop over all gammas for given spin, sublat and orbital
                     for i in range(len(self.gamma[(1,1,1,1)])):
-                        gammaToSymmetrize = []
+                        gammaToSymmetrize = [] #THis code could be simplified, maybe list comprehension?
                         for neighbor in range(1, self.nNeighbors + 1):
                             gammaToSymmetrize.append(self.gamma[(spin, neighbor, sublat, orbital)][i])
                         if i == 0:

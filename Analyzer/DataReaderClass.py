@@ -6,13 +6,13 @@ import numpy as np
 
 class DataReader:
 
-    def __init__(self, runsPath, matchPattern):
+    def __init__(self, runsPath: str, matchPattern: str):
         self.matchPattern = matchPattern
         self.runsPath = runsPath
-        self.gamma = {}
-        self.filling = {}
-        self.fillingTotal = []
-        self.params = []
+        self.gamma: dict = {}
+        self.filling: dict = {}
+        self.fillingTotal: list = []
+        self.params: list = []
         self.dispersionDataframe = pd.DataFrame()
         self.dosDataframe = pd.DataFrame()
 
