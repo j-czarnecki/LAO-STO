@@ -117,8 +117,9 @@ PROGRAM MAIN
             END DO
         END DO !End of k-loop
         !Due to change of sum to integral one has to divide by Brillouin zone volume
-        Delta_new(:,:,:,:) = Delta_new(:,:,:,:)/(K1_MAX*K2_MAX)
-        Charge_dens_new(:) = Charge_dens_new(:)/(K1_MAX*K2_MAX)
+        !Jacobian and volume of Brillouin zone cancel out thus no multiplier
+        Delta_new(:,:,:,:) = Delta_new(:,:,:,:)
+        Charge_dens_new(:) = Charge_dens_new(:)
 
         ! !Integration with simple trapezoid rule
         ! DO i = 0, k1_steps
@@ -135,8 +136,9 @@ PROGRAM MAIN
 
         !     END DO
         ! END DO
-        ! Delta_new(:,:,:,:) = Delta_new(:,:,:,:)/(K1_MAX*K2_MAX)
-        ! Charge_dens_new(:) = Charge_dens_new(:)/(K1_MAX*K2_MAX)
+        !Jacobian and volume of Brillouin zone cancel out thus no multiplier
+        ! Delta_new(:,:,:,:) = Delta_new(:,:,:,:)
+        ! Charge_dens_new(:) = Charge_dens_new(:)
 
         ! DO i = 1, DIM_POSITIVE_K
         !     PRINT*, "Charge elem ", i, " = ", Charge_dens_new(i)

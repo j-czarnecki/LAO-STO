@@ -43,8 +43,8 @@ SUBROUTINE PRINT_ENERGIES(Energies, k1_steps, k2_steps, dk1, dk2, filename, N)
                 k1 = i*dk1
                 k2 = j*dk2
     
-                kx = ( k1*SQRT(3.)/2. ) * A_TILDE
-                ky = ( -k1/2. + k2 ) * A_TILDE    
+                kx = 2.*PI/(SQRT(3.0d0)) * k1
+                ky = -2.*PI/3. * k1 + 4.*PI/3. * k2
                 WRITE(9, output_format) l, k1, k2, Energies(i, j, l)/meV2au
             END DO
             WRITE(9,*)

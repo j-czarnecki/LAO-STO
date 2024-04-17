@@ -22,8 +22,8 @@ SUBROUTINE GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge_dens, 
 
 
     !Transform from graphene reciprocal lattice to kx and ky
-    kx = ( k1*SQRT(3.)/2. ) * A_TILDE
-    ky = ( -k1/2. + k2 ) * A_TILDE
+    kx = 2.*PI/(SQRT(3.0d0)) * k1
+    ky = -2.*PI/3. * k1 + 4.*PI/3. * k2
     Energies(:) = 0.
     Hamiltonian(:,:) = DCMPLX(0. , 0.)
     U_transformation(:,:) = DCMPLX(0. , 0.)

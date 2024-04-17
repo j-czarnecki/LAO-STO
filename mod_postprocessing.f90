@@ -60,7 +60,7 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, DOS_filename)
 
     !Get self consistent gamma and charge density
     !CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), "OutputData/Gamma_SC_iter.dat")
-    !CALL GET_CHARGE_DENS(Charge_dens(:), "OutputData/Chargen_dens_iter.dat")
+    CALL GET_CHARGE_DENS(Charge_dens(:), "/home/jczarnecki/LAO-STO-results/RUNS_low_U/RUN_E_Fermi_-905.0_U_HUB_166.66666666666666_V_HUB_166.66666666666666/OutputData/Chargen_dens_final.dat")
 
 
     !Computing k-independent terms
@@ -78,8 +78,8 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, DOS_filename)
             k1 = i*dk1
             k2 = j*dk2
 
-            kx = ( k1*SQRT(3.)/2. ) * A_TILDE
-            ky = ( -k1/2. + k2 ) * A_TILDE
+            kx = 2.*PI/(SQRT(3.0d0)) * k1
+            ky = -2.*PI/3. * k1 + 4.*PI/3. * k2
             Hamiltonian(:,:) = DCMPLX(0. , 0.)
             CALL COMPUTE_TBA_TERM(Hamiltonian(:,:), kx, ky)
             CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
@@ -182,6 +182,7 @@ SUBROUTINE CALCULATE_DISPERSION(filename)
     Energies(:,:,:) = 0.
     Gamma_SC(:,:,:,:) = DCMPLX(0. , 0.)*meV2au
     Charge_dens(:) = 0.
+    CALL GET_CHARGE_DENS(Charge_dens(:), "/home/jczarnecki/LAO-STO-results/RUNS_low_U/RUN_E_Fermi_-905.0_U_HUB_166.66666666666666_V_HUB_166.66666666666666/OutputData/Chargen_dens_final.dat")
 
     !Computing k-independent terms
     CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:,:))
@@ -195,9 +196,8 @@ SUBROUTINE CALCULATE_DISPERSION(filename)
 
     DO i = -kx_steps, kx_steps
         DO j = -ky_steps, ky_steps
-            kx = i*dk1*A_TILDE
-            ky = j*dk2*A_TILDE
-
+            kx = i*dk1 * (2. * PI * 2./3.)
+            ky = j*dk2 * (2. * PI * 2./3.)
 
             Hamiltonian(:,:) = DCMPLX(0. , 0.)
             CALL COMPUTE_TBA_TERM(Hamiltonian(:,:), kx, ky)
@@ -225,8 +225,8 @@ SUBROUTINE CALCULATE_DISPERSION(filename)
     DO l = 1, DIM_POSITIVE_K
         DO i = -kx_steps, kx_steps
             DO j = -ky_steps, ky_steps
-                kx = i*dk1*A_TILDE
-                ky = j*dk2*A_TILDE
+                kx = i*dk1 * (2. * PI * 2./3.)
+                ky = j*dk2 * (2. * PI * 2./3.)
 
 
                 !Calculate specific contributions
@@ -353,8 +353,8 @@ SUBROUTINE CALCULATE_CHERN()
             k1 = i*dk1
             k2 = j*dk2
 
-            kx = ( k1*SQRT(3.)/2. ) * A_TILDE
-            ky = ( -k1/2. + k2 ) * A_TILDE
+            kx = 2.*PI/(SQRT(3.0d0)) * k1
+            ky = -2.*PI/3. * k1 + 4.*PI/3. * k2
             Hamiltonian(:,:) = DCMPLX(0. , 0.)
             CALL COMPUTE_TBA_TERM(Hamiltonian(:,:), kx, ky)
             CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
@@ -432,7 +432,7 @@ SUBROUTINE CALCULATE_CHERN()
         END DO
     END DO
 
-    PRINT*, "Chern number is ", f_12*dk1*dk2/(K1_MAX*K2_MAX*imag)
+    PRINT*, "Chern number is ", f_12*dk1*dk2/imag
 
     DEALLOCATE(Hamiltonian)
     DEALLOCATE(Hamiltonian_const)
