@@ -39,6 +39,7 @@ def LAO_STO_default_nml():
                                     charge_start = 0.1, \
                                     max_sc_iter = 1000, \
                                     sc_alpha = 0.4, \
+                                    sc_alpha_adapt = 0.9, \
                                     gamma_eps_convergence = 1e-4, \
                                     charge_eps_convergence = 1e-4 / \
                                 &romberg_integration \

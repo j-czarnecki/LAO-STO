@@ -18,6 +18,7 @@ PROGRAM MAIN
     REAL*8, ALLOCATABLE :: Charge_dens(:), Charge_dens_new(:), Charge_dens_local(:)
 
     REAL*8 :: gamma_error, gamma_max_error, charge_error, charge_max_error
+    REAL*8 :: gamma_max_error_prev, charge_max_error_prev
 
     INTEGER*4 :: i,j,n, lat, orb, orb_prime,spin
     INTEGER*4 :: sc_iter
@@ -170,7 +171,11 @@ PROGRAM MAIN
 
         !PRINT*, "Gamma new = ", Gamma_SC_new(1,1,1,1)/meV2au
         !PRINT*, "Filling ", SUM(Charge_dens(:)) / DIM_POSITIVE_K 
-        
+
+        gamma_max_error_prev = gamma_max_error
+        charge_max_error_prev = charge_max_error
+        gamma_max_error = 0.
+        charge_max_error = 0.
         !Here we check whether convergence was reached
         sc_flag = .TRUE.
         DO spin = 1, 2
@@ -192,7 +197,8 @@ PROGRAM MAIN
                 END DO
             END DO
         END DO
-
+        IF (ABS(gamma_max_error) > ABS(gamma_max_error_prev)) sc_alpha = sc_alpha*sc_alpha_adapt
+        
         DO n = 1, DIM_POSITIVE_K
             charge_error = ABS(Charge_dens(n) - Charge_dens_new(n))
             IF (charge_error > charge_eps_convergence) THEN
@@ -265,8 +271,6 @@ PROGRAM MAIN
         Delta_new(:,:,:,:) = DCMPLX(0. , 0.)
         Gamma_SC_new(:,:,:,:) = DCMPLX(0., 0.)
         Charge_dens_new(:) = 0.
-        gamma_max_error = 0.
-        charge_max_error = 0.
 
         !To check the state of the simulation
         CALL PRINT_GAMMA(Gamma_SC(:,:,:,:), "Gamma_SC_iter")

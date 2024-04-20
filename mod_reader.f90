@@ -31,6 +31,7 @@ REAL*8 :: gamma_start = 0.
 REAL*8 :: charge_start = 0.
 INTEGER*4 :: max_sc_iter = 0
 REAL*8 :: sc_alpha = 0.
+REAL*8 :: sc_alpha_adapt = 0.
 REAL*8 :: gamma_eps_convergence = 0.
 REAL*8 :: charge_eps_convergence = 0.
 
@@ -72,6 +73,7 @@ NAMELIST /self_consistency/ &
 & charge_start,             &
 & max_sc_iter,              &
 & sc_alpha,                 &
+& sc_alpha_adapt,           &
 & gamma_eps_convergence,    &
 & charge_eps_convergence
 
@@ -116,6 +118,7 @@ SUBROUTINE GET_INPUT(nmlfile)
     IF (charge_start .LT. 0) STOP "charge_start must be >= 0"
     IF (max_sc_iter .LE. 0) STOP "max_sc_iter must be > 0"
     IF (sc_alpha .LE. 0) STOP "sc_alpha (mixing parameter) must be > 0"
+    IF ((sc_alpha_adapt .LE. 0) .OR. (sc_alpha_adapt .GT. 1)) STOP "sc_alpha_adapt must be in interval [0,1]"
     IF (gamma_eps_convergence .LE. 0) STOP "gamma_eps_convergence must be > 0"
     IF (charge_eps_convergence .LE. 0) STOP "charge_eps_convergence must be > 0"
 
