@@ -9,9 +9,9 @@
     V_pds = -0.065e3,
     J_SC = 0.175e3,
     J_SC_PRIME = 0.0175e3,
-    U_HUB = 166.66666666666666,
-    V_HUB = 166.66666666666666,
-    E_Fermi = 0.0e3 /
+    U_HUB = 0.0,
+    V_HUB = 0.0,
+    E_Fermi = -1.03e3 /
 
 &discretization
     k1_steps = 200,

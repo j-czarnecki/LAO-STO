@@ -16,7 +16,7 @@ class DispersionPlotter(DataReader):
     def GetStatistics(self):
         self.dataLength = len(self.dispersionDataframe.N)
         self.kPoints1D = len(set(self.dispersionDataframe.kx))
-
+        self.lowestEnergy = np.min(self.dispersionDataframe.E)
 
     def shiftEnergies(self):
         lowestEnergy = np.min(self.dispersionDataframe.E)
@@ -52,37 +52,38 @@ class DispersionPlotter(DataReader):
 
         plt.figure(0)
         plt.xlim(-kMax, kMax)
-        plt.ylim(bottom = -0.02*maxEnergy, top = maxEnergy)
+        plt.ylim(bottom = self.lowestEnergy - 0.02*maxEnergy, top = maxEnergy)
         plt.xlabel(xLabelOnPlot)
         plt.ylabel(r'$E$ (meV)')
+        plt.grid()
         plt.savefig(plotOutputPath + "_orbital.png")
         plt.close()
 
         plt.figure(1)
         plt.xlim(-kMax, kMax)
-        plt.ylim(bottom = -0.02*maxEnergy, top = maxEnergy)
+        plt.ylim(bottom = self.lowestEnergy - 0.02*maxEnergy, top = maxEnergy)
         plt.xlabel(xLabelOnPlot)
         plt.ylabel(r'$E$ (meV)')
-
+        plt.grid()
         plt.savefig(plotOutputPath + "_lattice.png")
         plt.close()
        
         plt.figure(2)
         plt.xlim(-kMax, kMax)
-        plt.ylim(bottom = -0.02*maxEnergy, top = maxEnergy)
+        plt.ylim(bottom = self.lowestEnergy - 0.02*maxEnergy, top = maxEnergy)
         plt.xlabel(xLabelOnPlot)
         plt.ylabel(r'$E$ (meV)')
-
+        plt.grid()
         plt.savefig(plotOutputPath + "_spin.png")
         plt.close()
 
         plt.figure(3)
         plt.plot(np.sort(list(set(self.dispersionDataframe.ky))), plotEnergies, linewidth = 1, color = 'black')
         plt.xlim(-kMax, kMax)
-        plt.ylim(bottom = -0.02*maxEnergy, top = maxEnergy)
+        plt.ylim(bottom = self.lowestEnergy - 0.02*maxEnergy, top = maxEnergy)
         plt.xlabel(xLabelOnPlot)
         plt.ylabel(r'$E$ (meV)')
-
+        plt.grid()
         plt.savefig(plotOutputPath + '_standard.png')
         plt.close()
 
