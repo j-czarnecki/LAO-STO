@@ -301,10 +301,11 @@ END SUBROUTINE COMPUTE_H_SIGMA
 SUBROUTINE COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC)
     IMPLICIT NONE 
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
-    COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_NEIGHBOURS,2,SUBLATTICES)
+    COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2,SUBLATTICES)
     REAL*8, INTENT(IN) :: kx, ky
-    INTEGER*4 :: orb
+    INTEGER*4 :: orb, lat, spin
 
+    !Nearest neighbours pairing
     DO orb = 1, ORBITALS
         !Up - down Ti1 - Ti2 coupling
         Hamiltonian(orb, orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM) = Hamiltonian(orb, orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM) + &
@@ -319,8 +320,23 @@ SUBROUTINE COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC)
         !Down - up Ti2 - Ti1 coupling
         Hamiltonian(orb + ORBITALS + TBA_DIM, orb + DIM_POSITIVE_K) = Hamiltonian(orb + ORBITALS + TBA_DIM, orb + DIM_POSITIVE_K) + &
         & Gamma_SC(orb,1,1,1) * CONJG(pairing_1(ky)) + Gamma_SC(orb,2,1,1) * CONJG(pairing_2(kx,ky)) + Gamma_SC(orb,3,1,1) * CONJG(pairing_3(kx,ky))
-
     END DO
+
+    !Next nearest neighbours pairing
+    DO orb = 1, ORBITALS
+        DO lat = 0, SUBLATTICES - 1
+            DO spin = 0, 1
+                Hamiltonian(orb + lat*ORBITALS + spin*TBA_DIM, orb + lat*ORBITALS + MOD(spin+1,2)*TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(orb + lat*ORBITALS + spin*TBA_DIM, orb + lat*ORBITALS + MOD(spin+1,2)*TBA_DIM + DIM_POSITIVE_K) + &
+                & Gamma_SC(orb, N_NEIGHBOURS + 1, MOD(spin + 1, 2) + 1, lat + 1)*CONJG(pairing_nnn_1(kx)) + &
+                & Gamma_SC(orb, N_NEIGHBOURS + 2, MOD(spin + 1, 2) + 1, lat + 1)*CONJG(pairing_nnn_2(kx, ky)) + &
+                & Gamma_SC(orb, N_NEIGHBOURS + 3, MOD(spin + 1, 2) + 1, lat + 1)*CONJG(pairing_nnn_3(kx, ky)) + &
+                & Gamma_SC(orb, N_NEIGHBOURS + 4, MOD(spin + 1, 2) + 1, lat + 1)*CONJG(pairing_nnn_4(kx)) + &
+                & Gamma_SC(orb, N_NEIGHBOURS + 5, MOD(spin + 1, 2) + 1, lat + 1)*CONJG(pairing_nnn_5(kx, ky)) + &
+                & Gamma_SC(orb, N_NEIGHBOURS + 6, MOD(spin + 1, 2) + 1, lat + 1)*CONJG(pairing_nnn_6(kx, ky))
+            END DO
+        END DO
+    END DO
+
 END SUBROUTINE COMPUTE_SC
 
 SUBROUTINE COMPUTE_HUBBARD(Hamiltonian, Charge_dens)

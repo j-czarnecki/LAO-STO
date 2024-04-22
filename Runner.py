@@ -28,6 +28,8 @@ def LAO_STO_default_nml():
                                     V_pds = -0.065e3, \
                                     J_SC = 0.175e3, \
                                     J_SC_PRIME = 0.0175e3, \
+                                    J_SC_NNN = 0.175e3, \
+                                    J_SC_PRIME_NNN = 0.0175e3, \
                                     U_HUB = 2e3, \
                                     V_HUB = 2e3, \
                                     E_Fermi = -0.1e3 / \

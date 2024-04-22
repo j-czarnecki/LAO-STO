@@ -146,7 +146,8 @@ mod_reader.o: mod_parameters.o
 
 mod_compute_hamiltonians.o: mod_parameters.o \
 							mod_utilities.o \
-							mod_hamiltonians.o 
+							mod_hamiltonians.o \
+							mod_writers.o
 
 mod_integrate.o: mod_parameters.o \
 				 mod_compute_hamiltonians.o

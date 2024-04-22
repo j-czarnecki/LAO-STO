@@ -28,12 +28,12 @@ PROGRAM MAIN
     INTEGER*4 :: delta_real_elems
     INTEGER*4 :: broyden_index
 
-    !3 because of neighbours, 
+    !N_NEIGHBOURS + N_NEXT_NEIGHBOURS = 9, to implement both pairings
     !2 because spin up-down and down-up,
     !2 because of complex number
     !SUBLATTICES because of Ti1-Ti2 coupling and Ti2 - Ti1 coupling (stored in this order)
     !DIM_POSITIVE_K included due to Charge density self-consistency
-    delta_real_elems = DIM_POSITIVE_K + ORBITALS*3*2*2!*SUBLATTICES !SUBLATTICES should be excluded in absence of magnetic field
+    delta_real_elems = DIM_POSITIVE_K + ORBITALS*N_ALL_NEIGHBOURS*2*2*SUBLATTICES !SUBLATTICES should be excluded in absence of magnetic field
 
     CALL GET_INPUT("./input.nml")
 
@@ -47,10 +47,10 @@ PROGRAM MAIN
     ALLOCATE(Hamiltonian_const(DIM,DIM))
     ALLOCATE(U_transformation(DIM,DIM))
     ALLOCATE(Energies(DIM))
-    ALLOCATE(Delta_local(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES))    !Third dimension for spin coupling up-down and down-up
-    ALLOCATE(Delta_new(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES))
-    ALLOCATE(Gamma_SC(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES))
-    ALLOCATE(Gamma_SC_new(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES))
+    ALLOCATE(Delta_local(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES))    !Third dimension for spin coupling up-down and down-up
+    ALLOCATE(Delta_new(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES))
+    ALLOCATE(Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES))
+    ALLOCATE(Gamma_SC_new(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES))
     ALLOCATE(Delta_broyden(delta_real_elems))   !Flattened Gamma array
     ALLOCATE(Delta_new_broyden(delta_real_elems))
     ALLOCATE(Charge_dens(DIM_POSITIVE_K))
@@ -68,9 +68,13 @@ PROGRAM MAIN
     Delta_new(:,:,:,:) = DCMPLX(0. , 0.)
 
     !Breaking spin up-down down-up symmetry
-    Gamma_SC(:,:,1,:) = DCMPLX(gamma_start, 0.)
-    Gamma_SC(:,:,2,:) = DCMPLX(-gamma_start, 0.)
-
+    !coupling for nearest-neighbours
+    Gamma_SC(:,:N_NEIGHBOURS,1,:) = DCMPLX(gamma_start, 0.)
+    Gamma_SC(:,:N_NEIGHBOURS,2,:) = DCMPLX(-gamma_start, 0.)
+    !coupling for next nearest neighbours
+    Gamma_SC(:,N_NEIGHBOURS:N_NEXT_NEIGHBOURS,1,:) = DCMPLX(gamma_start/10., 0.)
+    Gamma_SC(:,N_NEIGHBOURS:N_NEXT_NEIGHBOURS,2,:) = DCMPLX(-gamma_start/10., 0.)
+   
 
     !Gamma_SC(:,:,:) = DCMPLX(0., 0.)
     Gamma_SC_new(:,:,:,:) = DCMPLX(0., 0.)
@@ -97,7 +101,7 @@ PROGRAM MAIN
     
     OPEN(unit = 99, FILE= "./OutputData/Convergence.dat", FORM = "FORMATTED", ACTION = "WRITE")
     DO sc_iter = 1, max_sc_iter
-        !PRINT*, "============= SC_ITER: ", sc_iter
+        PRINT*, "============= SC_ITER: ", sc_iter
         !PRINT*, "Gamma = ", Gamma_SC(1,1,1,1)/meV2au
         counter = 0
 
@@ -169,6 +173,24 @@ PROGRAM MAIN
             END DO
         END DO
 
+        !Gamma for next nearest neighbours pairing
+        DO spin = 1,2   !Loop over spin coupling up-down or down-up
+            DO n = N_NEIGHBOURS, N_ALL_NEIGHBOURS !Loop over next nearest neighbours
+                DO lat = 1, SUBLATTICES !Loop over sublattices coupling
+                    DO orb = 1, ORBITALS
+                        Gamma_SC_new(orb,n,spin,lat) = -0.5*J_SC_NNN*Delta_new(orb,n,spin,lat)
+                        DO orb_prime = 1, ORBITALS
+                            IF(orb .NE. orb_prime) THEN
+                                ! CHECK WHETHER THIS IS 0.25 OR 0.5
+                                Gamma_SC_new(orb,n,spin,lat) = Gamma_SC_new(orb,n,spin,lat) - 0.5 * J_SC_PRIME_NNN * Delta_new(orb_prime, n,spin,lat)
+                            END IF
+                        END DO
+                    END DO
+                END DO
+            END DO
+        END DO
+       
+
         !PRINT*, "Gamma new = ", Gamma_SC_new(1,1,1,1)/meV2au
         !PRINT*, "Filling ", SUM(Charge_dens(:)) / DIM_POSITIVE_K 
 
@@ -180,7 +202,7 @@ PROGRAM MAIN
         sc_flag = .TRUE.
         DO spin = 1, 2
             DO orb = 1, ORBITALS
-                DO n = 1, N_NEIGHBOURS
+                DO n = 1, N_ALL_NEIGHBOURS
                     DO lat = 1, 1 !to 1 in absence of magnetic field to SUBLATTICES if else
                         !It should be considered whether relative or absolute error must be checked
                         gamma_error = ABS( ABS(Gamma_SC_new(orb,n,spin,lat)) - ABS(Gamma_SC(orb,n,spin,lat)) )
@@ -226,8 +248,8 @@ PROGRAM MAIN
             broyden_index = 1
             DO spin = 1, 2
                 DO orb = 1, ORBITALS
-                    DO n = 1, N_NEIGHBOURS
-                        DO lat = 1, 1 !to 1 in absence of magnetic field to SUBLATTICES if else
+                    DO n = 1, N_ALL_NEIGHBOURS
+                        DO lat = 1, 2 !to 1 in absence of magnetic field to SUBLATTICES if else
                             Delta_broyden(broyden_index) = REAL(Gamma_SC(orb,n,spin,lat))
                             Delta_broyden(INT((delta_real_elems - DIM_POSITIVE_K)/2) + broyden_index) = AIMAG(Gamma_SC(orb,n,spin,lat))
                             Delta_new_broyden(broyden_index) = REAL(Gamma_SC_new(orb,n,spin,lat))
@@ -249,8 +271,8 @@ PROGRAM MAIN
             broyden_index = 1
             DO spin = 1, 2
                 DO orb = 1, ORBITALS
-                    DO n = 1, N_NEIGHBOURS
-                        DO lat = 1, 1 !to 1 in absence of magnetic field to SUBLATTICES if else
+                    DO n = 1, N_ALL_NEIGHBOURS
+                        DO lat = 1, 2 !to 1 in absence of magnetic field to SUBLATTICES if else
                             Gamma_SC(orb,n,spin,lat) = DCMPLX(Delta_broyden(broyden_index), Delta_broyden(INT((delta_real_elems - DIM_POSITIVE_K)/2) + broyden_index))
                             broyden_index = broyden_index + 1
                         END DO
@@ -267,21 +289,21 @@ PROGRAM MAIN
         ! END IF
 
 
-        Gamma_SC(:,:,:,2) = CONJG(Gamma_SC(:,:,:,1)) !This is valid in asbence of magnetic field
+        !Gamma_SC(:,:,:,2) = CONJG(Gamma_SC(:,:,:,1)) !This is valid in asbence of magnetic field
         Delta_new(:,:,:,:) = DCMPLX(0. , 0.)
         Gamma_SC_new(:,:,:,:) = DCMPLX(0., 0.)
         Charge_dens_new(:) = 0.
 
         !To check the state of the simulation
         CALL PRINT_GAMMA(Gamma_SC(:,:,:,:), "Gamma_SC_iter")
-        CALL PRINT_CHARGE(Charge_dens(:), "Chargen_dens_iter")
+        CALL PRINT_CHARGE(Charge_dens(:), "Charge_dens_iter")
 
     END DO !End of SC loop
     CLOSE(99)
 
     !Printing results after the simulation is done
     CALL PRINT_GAMMA(Gamma_SC(:,:,:,:), "Gamma_SC_final")
-    CALL PRINT_CHARGE(Charge_dens(:), "Chargen_dens_final")
+    CALL PRINT_CHARGE(Charge_dens(:), "Charge_dens_final")
 
 
     !Just for memory deallocation, the .TRUE. flag is crucial

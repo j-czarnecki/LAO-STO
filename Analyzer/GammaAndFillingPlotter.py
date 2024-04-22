@@ -20,6 +20,31 @@ class GammaAndFillingPlotter(SymmetryResolver):
                         self.symmetryKeys.append((spin, sublat, orbital, symmetry))
 
     
+    def plotGammasJ(self):
+        E_fermi_tab = [-1030, -1040, -1050]
+
+        for key in self.symmetryKeys:
+            plt.figure()
+            for ef in E_fermi_tab:
+                gamma_plot = []
+                j_plot = []
+                for i in range(len(self.params)):
+                    if int(self.params[i][1]) == ef:
+                        j_plot.append(self.params[i][0] - self.eMinimal)
+                        gamma_plot.append(np.abs(self.symmetryGammaDict[key][i]))
+                plt.plot(j_plot, gamma_plot, '-', label = ef)
+
+            spin, sublat, orbital, symmetry = key
+            plt.title(fr's = {-spin + 1.5}, $\alpha$ = {sublat}, l = {orbital}')
+            plt.legend(title = r"$E_{Fermi}$ (meV)")
+            plt.xlabel(r"$J_{SC}$ (meV)")
+            plt.ylabel(fr"$\Gamma_{symmetry}$ (meV)")
+            plt.grid()
+            plt.ylim(0 , 0.2)
+            plt.savefig(f"../Plots/GammaJ_{spin}_{sublat}_{orbital}_{symmetry}.png")
+            plt.close()
+                
+
     def plotGammasFermi(self):
         U_tab = [0, 166, 333]
         j_sc_tab = [75,150]

@@ -126,6 +126,48 @@ PURE COMPLEX*16 FUNCTION pairing_3(kx, ky)
     RETURN
 END FUNCTION pairing_3
 
+!dir$ attributes forceinline :: pairing_nnn_1
+PURE COMPLEX*16 FUNCTION pairing_nnn_1(kx)
+    REAL*8, INTENT(IN) :: kx
+    pairing_nnn_1 = EXP(-imag*(SQRT(3.)*kx))
+    RETURN
+END FUNCTION pairing_nnn_1
+
+!dir$ attributes forceinline :: pairing_nnn_2
+PURE COMPLEX*16 FUNCTION pairing_nnn_2(kx, ky)
+    REAL*8, INTENT(IN) :: kx, ky
+    pairing_nnn_2 = EXP(-imag*(3.*SQRT(3.)/2.*kx + 3./2.*ky))
+    RETURN
+END FUNCTION pairing_nnn_2
+
+!dir$ attributes forceinline :: pairing_nnn_3
+PURE COMPLEX*16 FUNCTION pairing_nnn_3(kx, ky)
+    REAL*8, INTENT(IN) :: kx, ky
+    pairing_nnn_3 = EXP(-imag*(-SQRT(3.)/2.*kx + 3./2.*ky))
+    RETURN
+END FUNCTION pairing_nnn_3
+
+!dir$ attributes forceinline :: pairing_nnn_4
+PURE COMPLEX*16 FUNCTION pairing_nnn_4(kx)
+    REAL*8, INTENT(IN) :: kx
+    pairing_nnn_4 = EXP(-imag*(-SQRT(3.)*kx))
+    RETURN
+END FUNCTION pairing_nnn_4
+
+!dir$ attributes forceinline :: pairing_nnn_5
+PURE COMPLEX*16 FUNCTION pairing_nnn_5(kx, ky)
+    REAL*8, INTENT(IN) :: kx, ky
+    pairing_nnn_5 = EXP(-imag*(-SQRT(3.)/2.*kx - 3./2.*ky))
+    RETURN
+END FUNCTION pairing_nnn_5
+
+!dir$ attributes forceinline :: pairing_nnn_6
+PURE COMPLEX*16 FUNCTION pairing_nnn_6(kx, ky)
+    REAL*8, INTENT(IN) :: kx, ky
+    pairing_nnn_6 = EXP(-imag*(SQRT(3.)/2.*kx - 3./2.*ky))
+    RETURN
+END FUNCTION pairing_nnn_6
+
 !dir$ attributes forceinline :: fd_distribution
 PURE REAL*8 FUNCTION fd_distribution(E, E_Fermi, T)
     IMPLICIT NONE 

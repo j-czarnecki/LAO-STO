@@ -16,6 +16,8 @@ REAL*8 :: V_pdp = 0.
 REAL*8 :: V_pds = 0.
 REAL*8 :: J_SC = 0.
 REAL*8 :: J_SC_PRIME = 0.
+REAL*8 :: J_SC_NNN = 0.
+REAL*8 :: J_SC_PRIME_NNN = 0.
 REAL*8 :: U_HUB = 0.
 REAL*8 :: V_HUB = 0.
 REAL*8 :: E_Fermi = 0.
@@ -60,6 +62,8 @@ NAMELIST /physical_params/  &
 & V_pds,                    &
 & J_SC,                     &
 & J_SC_PRIME,               &
+& J_SC_NNN,                 &
+& J_SC_PRIME_NNN,           &
 & U_HUB,                    &
 & V_HUB,                    &
 & E_Fermi
@@ -107,6 +111,8 @@ SUBROUTINE GET_INPUT(nmlfile)
     V_pds = V_pds * meV2au
     J_SC = J_SC * meV2au
     J_SC_PRIME = J_SC_PRIME * meV2au
+    J_SC_NNN = J_SC_NNN * meV2au
+    J_SC_PRIME_NNN = J_SC_PRIME_NNN * meV2au
     U_HUB = U_HUB * meV2au
     V_HUB = V_HUB * meV2au
     E_Fermi = E_Fermi * meV2au
@@ -147,7 +153,7 @@ END SUBROUTINE GET_INPUT
 
 SUBROUTINE GET_GAMMA_SC(Gamma_SC, path)
     CHARACTER(LEN=*), INTENT(IN) :: path
-    COMPLEX*16, INTENT(OUT) :: Gamma_SC(ORBITALS,N_NEIGHBOURS,2, SUBLATTICES)
+    COMPLEX*16, INTENT(OUT) :: Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES)
     INTEGER*4 :: n, lat, orb,spin
     INTEGER*4 :: n_read, lat_read, orb_read, spin_read
     REAL*8 :: Gamma_re, Gamma_im
@@ -159,7 +165,7 @@ SUBROUTINE GET_GAMMA_SC(Gamma_SC, path)
     READ(9,*)
 
     DO spin =1, 2
-        DO n = 1, N_NEIGHBOURS
+        DO n = 1, N_ALL_NEIGHBOURS
             DO lat = 1, SUBLATTICES
                 DO orb = 1, ORBITALS
                     READ(9, output_format) spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im

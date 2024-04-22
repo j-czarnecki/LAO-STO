@@ -11,8 +11,8 @@ SUBROUTINE PRINT_HAMILTONIAN(Hamiltonian)
     WRITE(output_format, '(A, I0, A)') '(',DIM,'E15.5)'
     output_format = TRIM(output_format)
 
-    OPEN(unit = 9, FILE= "./Test/H_real.dat", FORM = "FORMATTED", ACTION = "WRITE")
-    OPEN(unit = 10, FILE= "./Test/H_imag.dat", FORM = "FORMATTED", ACTION = "WRITE")
+    OPEN(unit = 9, FILE= "./OutputData/H_real.dat", FORM = "FORMATTED", ACTION = "WRITE")
+    OPEN(unit = 10, FILE= "./OutputData/H_imag.dat", FORM = "FORMATTED", ACTION = "WRITE")
     DO i = 1, DIM
         WRITE(9, output_format) REAL(Hamiltonian(i,:))
         WRITE(10, output_format) AIMAG(Hamiltonian(i,:))
@@ -57,7 +57,7 @@ SUBROUTINE PRINT_ENERGIES(Energies, k1_steps, k2_steps, dk1, dk2, filename, N)
 END SUBROUTINE
 
 SUBROUTINE PRINT_GAMMA(Gamma_SC, filename)
-    COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_NEIGHBOURS, 2,SUBLATTICES)
+    COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS, 2,SUBLATTICES)
     CHARACTER(LEN=*), INTENT(IN) :: filename
     CHARACTER(LEN=20) :: output_format
 
@@ -68,7 +68,7 @@ SUBROUTINE PRINT_GAMMA(Gamma_SC, filename)
     OPEN(unit = 9, FILE= "./OutputData/"//filename//".dat", FORM = "FORMATTED", ACTION = "WRITE")
     WRITE(9,*) "#spin neighbour lattice orbital Re(Gamma) Im(Gamma)"
     DO spin =1, 2
-        DO j = 1, N_NEIGHBOURS
+        DO j = 1, N_ALL_NEIGHBOURS
             DO lat = 1, SUBLATTICES
                 DO orb = 1, ORBITALS
                     WRITE(9, output_format) spin, j, lat, orb, REAL(Gamma_SC(orb,j, spin,lat))/meV2au, AIMAG(Gamma_SC(orb,j, spin,lat))/meV2au
