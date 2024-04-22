@@ -5,3 +5,5 @@
 *.mod
 *.o
 *.x
+*.pyc
+__pycache__/*

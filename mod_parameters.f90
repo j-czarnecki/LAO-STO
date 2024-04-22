@@ -17,29 +17,13 @@ REAL*8, PARAMETER :: nm2au = 1./0.05292
 REAL*8, PARAMETER :: k_B = 8.617333262 * 1e-5 * 1e3 * meV2au
 REAL*8, PARAMETER :: A_TILDE =  SQRT(2./3.)*0.3905 * nm2au !length
 
-!MOVED TO MOD_READER
-! REAL*8, PARAMETER :: T = 0.
-
-! !Energies in [meV], lengths in [nm] transformed to atomic units
-! REAL*8, PARAMETER :: t_D = 1e3 * 0.5 * meV2au
-! REAL*8, PARAMETER :: t_I = 1e3 * 0.04 * meV2au
-! REAL*8, PARAMETER :: lambda_SOC = 1e3 * 0.01 * meV2au
-! REAL*8, PARAMETER :: DELTA_TRI =  -0.005 * 1e3 * meV2au
-! REAL*8, PARAMETER :: v = 0.2 * 1e3 * meV2au !electric field potential
-! REAL*8, PARAMETER :: V_pdp = 0.028 * 1e3 * meV2au
-! REAL*8, PARAMETER :: V_pds = -0.065 * 1e3 * meV2au
-! REAL*8, PARAMETER :: eta_p = v * SQRT(3.) / 3.905 * nm2au
-! !REAL*8, PARAMETER :: J_SC = 0.165 * 1e3 * meV2au
-! !REAL*8, PARAMETER :: J_SC_PRIME = 0.0165 * 1e3 * meV2au
-! REAL*8, PARAMETER :: J_SC = 0.5 * 1e3 * meV2au
-! REAL*8, PARAMETER :: J_SC_PRIME = 0.05 * 1e3 * meV2au
-! REAL*8, PARAMETER :: U_HUB = 2 * 1e3 * meV2au
-! REAL*8, PARAMETER :: V_HUB = 2 * 1e3 * meV2au
-
 REAL*8, PARAMETER :: PI = 4*ATAN(1.0d0)
 
-REAL*8, PARAMETER :: K1_MAX = (2. * PI * 2./3.)/A_TILDE !Full Brillouin zone to integrate over
-REAL*8, PARAMETER :: K2_MAX = (2. * PI * 2./3.)/A_TILDE
+! REAL*8, PARAMETER :: K1_MAX = (2. * PI * 2./3.)/A_TILDE !Full Brillouin zone to integrate over
+! REAL*8, PARAMETER :: K2_MAX = (2. * PI * 2./3.)/A_TILDE
+REAL*8, PARAMETER :: K1_MAX = 1. !Full Brillouin zone to integrate over
+REAL*8, PARAMETER :: K2_MAX = 1.
+REAL*8, PARAMETER :: JACOBIAN = 8*PI**2/(3.*SQRT(3.0d0))
 
 
 

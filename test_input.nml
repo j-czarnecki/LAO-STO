@@ -9,9 +9,9 @@
     V_pds = -0.065e3,
     J_SC = 0.2e3,
     J_SC_PRIME = 0.02e3,
-    U_HUB = 0e3,
-    V_HUB = 0e3,
-    E_Fermi = -0.0e3 /
+    U_HUB = 2e4,
+    V_HUB = 2e4,
+    E_Fermi = -1.0e3 /
 
 &discretization
     k1_steps = 10,
@@ -19,18 +19,15 @@
 
 &self_consistency
     gamma_start = 1.,
-    charge_start = 0.1,
     max_sc_iter = 50,
     sc_alpha = 0.2,
-    sc_alpha_adapt = 0.9,
-    gamma_eps_convergence = 1e-3,
-    charge_eps_convergence = 1e-3 /
+    eps_convergence = 1e-3 /
 
 &romberg_integration
-    romb_eps_x = 1e-1,
+    romb_eps_x = 1e-3,
     interpolation_deg_x = 4,
     max_grid_refinements_x = 10,
-    romb_eps_y = 1e-1,
+    romb_eps_y = 1e-3,
     interpolation_deg_y = 4,
     max_grid_refinements_y = 10 /
 
