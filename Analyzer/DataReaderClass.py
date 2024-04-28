@@ -7,6 +7,24 @@ import numpy as np
 class DataReader:
 
     def __init__(self, runsPath: str, matchPattern: str):
+        '''
+        Initializes DataReader object, which contains all data from a series of simulations.
+        Arguments:
+            runsPath - path which contains folders with single simulations
+            matchPattern - regex that tells the program which directories form runsPath should be loaded
+        Initializes:
+            self.gamma - dictionary with keys of form (spin, neighbour, sublat, orbital), by default stores unsorted lists of given gammas.
+                         It has the same order as self.params, based on which it could be sorted.
+            self.filling - dictionary with keys of formm (spin, sublat, orbital), 
+                           by default contains unsorted electron concentrations in range [0,1] for each subband.
+                           It has the same order as self.params, based on which it could be sorted.
+            self.fillingTotal - list containing sum of all subbands' concentrations divided by 12 (number of subbands).
+            self.params - contains list of tuples of parameters changed during simulations.
+                          Based on that self.gamma, self.filling and self.fillingTotal can be sorted.
+            self.dispersionDataFrame - contains dispersion data
+            self.dosDataFrame - contains DOS data
+        '''
+        #TODO: improve annotations
         self.matchPattern = matchPattern
         self.runsPath = runsPath
         self.gamma: dict = {}
@@ -21,7 +39,10 @@ class DataReader:
                    'runsPath': self.runsPath}
         return str(dataStr)
 
-    def FillDictGamma(self, pandasFile, firstIter):
+    def FillDictGamma(self, pandasFile: pd.DataFrame, firstIter: bool):
+        """
+        Extracts proper key from simulation files, converts gamma back to complex value and writes do dict
+        """
         for row in range(len(pandasFile.spin)):
             dictKey = (int(pandasFile.spin[row]) , int(pandasFile.neighbor[row]) , int(pandasFile.sublat[row]) , int(pandasFile.orbital[row]))
             if firstIter:
@@ -32,7 +53,10 @@ class DataReader:
                 #self.gamma[dictKey].append(np.sqrt(pandasFile.gammaR[row]**2 + pandasFile.gammaIm[row]**2))
                 self.gamma[dictKey].append(pandasFile.gammaR[row] + pandasFile.gammaIm[row]*1j)
 
-    def FillDictFilling(self, pandasFile, firstIter):
+    def FillDictFilling(self, pandasFile: pd.DataFrame, firstIter: bool):
+        """
+        Extracts proper key from simulation files and appends to filling dict
+        """
         self.fillingTotal.append(sum(pandasFile.filling[:]))
         for row in range(len(pandasFile.spin)):
             dictKey = (int(pandasFile.spin[row]) , int(pandasFile.sublat[row]) , int(pandasFile.orbital[row]))
@@ -44,11 +68,16 @@ class DataReader:
  
 
     def LoadFilling(self):
+        """
+        Loads filling data from simulations base on specified in __init__() runsPath and matchPattern.
+        If simulation had not converged, takse values from _iter.dat file - the last iteration before program timeout.
+        """
         print("---> Loading filling data")
         directories = [dir for dir in os.listdir(self.runsPath) if re.match(self.matchPattern, dir)]
         isFirstIter = True
 
         for dir in directories:
+            #TODO: it was recently corrected that filling is in Charge_dens_XXX.dat files (not Chargen_XXX)
             filePathConverged = os.path.join(self.runsPath, dir, 'OutputData', 'Chargen_dens_final.dat')
             filePathIter = os.path.join(self.runsPath, dir, 'OutputData', 'Chargen_dens_iter.dat')
 
@@ -66,7 +95,10 @@ class DataReader:
             isFirstIter = False
                 
     def sortData(self):
-        
+        """
+        Sorts datafrom self.gamma, self.filling and self.fillingTotal dicts.
+        Based on the order of self.params list of tuples (first elements ???)
+        """
         sortedIndexes = sorted(range(len(self.params)), key = lambda x: self.params[x])
         for key, yList in self.gamma.items():
             self.gamma[key] = [yList[i] for i in sortedIndexes]
@@ -79,7 +111,14 @@ class DataReader:
         self.params = sorted(self.params)
 
 
-    def LoadGamma(self, xKeywords):
+    def LoadGamma(self, xKeywords: tuple):
+        """
+        Loads gamma data from simulations base on specified in __init__() runsPath and matchPattern.
+        If simulation had not converged, takse values from _iter.dat file - the last iteration before program timeout.
+        Additionally fills self.params list based on xKeywords - names of f90 .nml parameters from input.nml file
+        that were changed during simulation.
+        """
+
         print("---> Loading gamma data")
         directories = [dir for dir in os.listdir(self.runsPath) if re.match(self.matchPattern, dir)]
         #print(directories)
@@ -117,7 +156,10 @@ class DataReader:
                 continue
             firstIter = False
 
-    def LoadDispersion(self, energiesPath):
+    def LoadDispersion(self, energiesPath: str):
+        """
+        Loads dispersion relations data from energiesPath.
+        """
         print("---> Loading dispersion data")
         if os.path.exists(energiesPath):
            #dispersion = pd.read_fwf(energiesPath, skiprows=1, colspecs=[(0,6), (7,21), (22,36), (37,51), (52, 66), (67, 81), (82, 96), (97, 111), (112,126), (127, 141), (142, 156)]) 
@@ -128,7 +170,10 @@ class DataReader:
             print("No such file ", energiesPath)
         
 
-    def LoadDos(self, dosPath):
+    def LoadDos(self, dosPath: str):
+        """
+        Loads DOS data from dosPath.
+        """
         print("---> Loading DOS data")
         if os.path.exists(dosPath):
            #dispersion = pd.read_fwf(energiesPath, skiprows=1, colspecs=[(0,6), (7,21), (22,36), (37,51), (52, 66), (67, 81), (82, 96), (97, 111), (112,126), (127, 141), (142, 156)]) 

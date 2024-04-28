@@ -2,7 +2,8 @@ from DataReaderClass import *
 import matplotlib.pyplot as plt
 import numpy as np
 
-
+#TODO: self.lowestEnergy should not be used - all energies should be shown with respect to E_Fermi
+#Data reader is in fact not used here, rethink this architecture
 class DispersionPlotter(DataReader):
 
     def __init__(self):
@@ -88,7 +89,7 @@ class DispersionPlotter(DataReader):
         plt.close()
 
 
-    def plotFermiCrossection(self, eFermi, dE, plotOutputPath):
+    def plotFermiCrossection(self, eFermi: float, dE: float, plotOutputPath: str):
         plt.figure()
         for i in range(len(self.dispersionDataframe.N)):
             if np.abs(self.dispersionDataframe.E[i] - eFermi) < dE:
@@ -100,7 +101,7 @@ class DispersionPlotter(DataReader):
         plt.savefig(plotOutputPath)
         plt.close()
 
-    def plotDos(self, eMax, plotOutputPath):
+    def plotDos(self, eMax: float, plotOutputPath: str):
         plt.figure()
         plt.plot(self.dosDataframe.DOS, self.dosDataframe.E)
         plt.ylim(bottom = 0, top=eMax)

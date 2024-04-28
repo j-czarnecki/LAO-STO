@@ -3,6 +3,8 @@ import numpy as np
 from DataReaderClass import *
 from SymmetryResolverClass import *
 
+#TODO: this class should be improved to be more general and possibly plot more symmetries of gamma
+# self.eMinimal should not be used, as all energies must be calculated with respect to E_Fermi
 class GammaAndFillingPlotter(SymmetryResolver):
 
     def __init__(self, runsPath: str, matchPattern: str, nNeighbors: int, eMinimal: float):
@@ -13,8 +15,8 @@ class GammaAndFillingPlotter(SymmetryResolver):
         print("Initialized GammaAndFillingPlotter")
 
     def __initializedSymmetryKeys(self):
-        for spin in (1,): #should be [1,2], but now spin are symmetric
-            for sublat in (1,): #should be [1,2], but now sublattices are symmetric
+        for spin in (1,2): #should be [1,2], but now spin are symmetric
+            for sublat in (1,2): #should be [1,2], but now sublattices are symmetric
                 for orbital in (1,2,3):
                     for symmetry in ('s','p','d'):
                         self.symmetryKeys.append((spin, sublat, orbital, symmetry))
