@@ -48,24 +48,24 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 
 
     def plotGammasFermi(self):
-        U_tab = [0, 166, 333]
-        j_sc_tab = [75,150]
+        #U_tab = [0, 166, 333]
+        j_sc_tab = [150, 170, 180, 200, 210, 225, 250]
 
         for key in self.symmetryKeys:
             plt.figure()
-            for u in U_tab:
+            for j_sc in j_sc_tab:
                 gamma_plot = []
                 ef_plot= []
 
                 for i in range(len(self.params)):
-                    if int(self.params[i][1]) == u:
+                    if int(self.params[i][1]) == j_sc:
                         ef_plot.append(self.params[i][0] - self.eMinimal)
                         gamma_plot.append(np.abs(self.symmetryGammaDict[key][i]))
-                plt.plot(ef_plot, gamma_plot, '-', label = u)
+                plt.plot(ef_plot, gamma_plot, '-', label = j_sc)
 
             spin, sublat, orbital, symmetry = key
             plt.title(fr's = {-spin + 1.5}, $\alpha$ = {sublat}, l = {orbital}')
-            plt.legend(title = r"$U_{Hub}$ (meV)")
+            plt.legend(title = r"$J_{SC}$ (meV)")
             plt.xlabel(r"$E_{Fermi}$ (meV)")
             plt.ylabel(fr"$\Gamma_{symmetry}$ (meV)")
             plt.grid()
@@ -74,24 +74,24 @@ class GammaAndFillingPlotter(SymmetryResolver):
             plt.close()
 
     def plotGammasFilling(self):
-        U_tab = [0, 166, 333]
-        j_sc_tab = [75,150]
+        #U_tab = [0, 166, 333]
+        j_sc_tab = [150, 170, 180, 200, 210, 225, 250]
 
         for key in self.symmetryKeys:
             plt.figure()
-            for u in U_tab:
+            for j_sc in j_sc_tab:
                 gamma_plot = []
                 n_total_plot = []
                 for i in range(len(self.params)):
-                    if int(self.params[i][1]) == u:
+                    if int(self.params[i][1]) == j_sc:
                         n_total_plot.append(self.fillingTotal[i]/12.)
                         #gamma_plot.append(np.abs(symmetryResolver.symmetryGammaDict[key][i]))
                         gamma_plot.append(np.abs(self.gamma[(2,2,2,2)][i]))
-                plt.plot(n_total_plot, gamma_plot, '-', label = u)
+                plt.plot(n_total_plot, gamma_plot, '-', label = j_sc)
 
             spin, sublat, orbital, symmetry = key
             plt.title(fr's = {-spin + 1.5}, $\alpha$ = {sublat}, l = {orbital}')
-            plt.legend(title = r"$U_{Hub}$ (meV)")
+            plt.legend(title = r"$J_{SC}$ (meV)")
             plt.xlabel(r"$n_{tot}$")
             plt.ylabel(fr"$\Gamma_{symmetry}$ (meV)")
             plt.grid()

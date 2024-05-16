@@ -5,17 +5,17 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label":"make_debug",
+            "label":"Make debug",
             "type": "shell",
-            "command":"make clean && make debug",
+            "command":"source ~/intel/oneapi/setvars.sh && make clean && make debug",
             "options":{
                 "cwd": "${workspaceRoot}"        
                 }
         },
         {
-            "label": "run_dispersion",
+            "label": "Make postprocessing",
             "type": "shell",
-            "command": "make clean && make dispersion",
+            "command": "make clean && make postprocessing_debug",
             "options": {
                 "cwd": "${workspaceRoot}"
             }

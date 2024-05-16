@@ -1,0 +1,767 @@
+<!-- -*- mode: jinja2 -*- -->
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+      <meta name="description" content="Documentation for Fortran Program">
+    <meta name="author" content="" >
+    <link rel="icon" href="../favicon.png">
+
+    <title>MAIN &ndash; Fortran Program</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <link href="../css/pygments.css" rel="stylesheet">
+    <link href="../css/font-awesome.min.css" rel="stylesheet">
+    <link href="../css/local.css" rel="stylesheet">
+      <link  href="../tipuesearch/tipuesearch.css" rel="stylesheet">
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <script src="../js/svg-pan-zoom.min.js"></script>
+  </head>
+
+  <body>
+
+    <!-- Fixed navbar -->
+    <div class="container-fluid mb-sm-4 mb-xl-2">
+      <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+        <div class="container">
+          <a class="navbar-brand" href="../index.html">Fortran Program </a>
+          <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar"
+                  aria-expanded="false" aria-controls="navbar" aria-label="Toggle navigation">
+                  <span class="navbar-toggler-icon">
+          </button>
+
+          <div id="navbar" class="navbar-collapse collapse">
+            <ul class="navbar-nav">
+                  <li class="nav-item">
+                    <a class="nav-link" href="../lists/files.html">Source Files</a>
+                  </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="../lists/modules.html">Modules</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="../lists/procedures.html">Procedures</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="../lists/programs.html">Programs</a>
+                </li>
+            </ul>
+              <div class="d-flex align-items-end flex-grow-1">
+                <form action="../search.html" role="search" class="ms-auto">
+                  <input type="text" class="form-control" aria-label="Search" placeholder="Search" name="q" id="tipue_search_input" autocomplete="off" required>
+                </form>
+              </div>
+          </div><!--/.nav-collapse -->
+        </div>
+      </nav>
+    </div>
+
+    <div class="container">
+  <div class="row">
+    <h1>MAIN      <small>Program</small>
+      
+    </h1>
+      <div class="container p-2 mb-4 bg-light border rounded-3">
+    <div class="row align-items-center justify-content-between" id="info-bar">
+      <div class="col">
+        <ul class="list-inline" style="margin-bottom:0px;display:inline">
+
+            <li class="list-inline-item" id="statements"><i class="fa fa-list-ol"></i>
+              <a data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-html="true"
+                 title="85.1% of total for programs.">194 statements</a>
+            </li>
+
+            <li class="list-inline-item" id="source-file">
+              <i class="fa fa-code"></i>
+              <a href="../src/main.f90"> Source File</a>
+            </li>
+        </ul>
+      </div>
+      <div class="col">
+        <nav aria-label="breadcrumb">
+          <ol class="breadcrumb justify-content-end mb-0">
+                <li class="breadcrumb-item"><a href='../sourcefile/main.f90.html'>main.f90</a></li>
+            <li class="breadcrumb-item active" aria-current="page">MAIN</li>
+          </ol>
+        </nav>
+      </div>
+    </div>
+  </div>
+  <script>
+    $(function () {
+    $('[data-bs-toggle="tooltip"]').tooltip()
+    })
+  </script>
+
+  </div>
+  
+  <div class="row">
+    <div class="col-md-3 hidden-xs hidden-sm visible-md visible-lg">
+      <div id="sidebar">
+      <h3>Contents</h3>
+  
+      <div class="card mb-4">
+      <a data-bs-toggle="collapse" href="#vars-0"
+         aria-expanded="false" aria-controls="vars-0">
+         <h4 class="card-header bg-primary text-white">Variables</h4>
+      </a>
+      <div id="vars-0" class="collapse">
+        <div class="list-group list-group-flush">
+            <a class="list-group-item" href="../program/main.html#variable-hamiltonian~14">Hamiltonian</a>
+            <a class="list-group-item" href="../program/main.html#variable-hamiltonian_const~2">Hamiltonian_const</a>
+            <a class="list-group-item" href="../program/main.html#variable-u_transformation~2">U_transformation</a>
+            <a class="list-group-item" href="../program/main.html#variable-energies~2">Energies</a>
+            <a class="list-group-item" href="../program/main.html#variable-delta_local~2">Delta_local</a>
+            <a class="list-group-item" href="../program/main.html#variable-delta_new">Delta_new</a>
+            <a class="list-group-item" href="../program/main.html#variable-delta_broyden">Delta_broyden</a>
+            <a class="list-group-item" href="../program/main.html#variable-delta_new_broyden">Delta_new_broyden</a>
+            <a class="list-group-item" href="../program/main.html#variable-gamma_sc~4">Gamma_SC</a>
+            <a class="list-group-item" href="../program/main.html#variable-gamma_sc_new">Gamma_SC_new</a>
+            <a class="list-group-item" href="../program/main.html#variable-charge_dens~5">Charge_dens</a>
+            <a class="list-group-item" href="../program/main.html#variable-charge_dens_new">Charge_dens_new</a>
+            <a class="list-group-item" href="../program/main.html#variable-charge_dens_local~2">Charge_dens_local</a>
+            <a class="list-group-item" href="../program/main.html#variable-gamma_error">gamma_error</a>
+            <a class="list-group-item" href="../program/main.html#variable-gamma_max_error">gamma_max_error</a>
+            <a class="list-group-item" href="../program/main.html#variable-charge_error">charge_error</a>
+            <a class="list-group-item" href="../program/main.html#variable-charge_max_error">charge_max_error</a>
+            <a class="list-group-item" href="../program/main.html#variable-gamma_max_error_prev">gamma_max_error_prev</a>
+            <a class="list-group-item" href="../program/main.html#variable-charge_max_error_prev">charge_max_error_prev</a>
+            <a class="list-group-item" href="../program/main.html#variable-i~4">i</a>
+            <a class="list-group-item" href="../program/main.html#variable-j">j</a>
+            <a class="list-group-item" href="../program/main.html#variable-n~4">n</a>
+            <a class="list-group-item" href="../program/main.html#variable-lat~6">lat</a>
+            <a class="list-group-item" href="../program/main.html#variable-orb~6">orb</a>
+            <a class="list-group-item" href="../program/main.html#variable-orb_prime~2">orb_prime</a>
+            <a class="list-group-item" href="../program/main.html#variable-spin~6">spin</a>
+            <a class="list-group-item" href="../program/main.html#variable-sc_iter">sc_iter</a>
+            <a class="list-group-item" href="../program/main.html#variable-sc_flag">sc_flag</a>
+            <a class="list-group-item" href="../program/main.html#variable-counter">counter</a>
+            <a class="list-group-item" href="../program/main.html#variable-delta_real_elems">delta_real_elems</a>
+            <a class="list-group-item" href="../program/main.html#variable-broyden_index">broyden_index</a>
+        </div>
+      </div>
+    </div>
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+
+  </div>
+
+    </div>
+    
+    <div class="col-md-9" id='text'>
+        <div class="card mb-4">
+      <h3 class="card-header card-title bg-light">Uses</h3>
+      <div class="card-body">
+        <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+              <ul class="list-inline">
+                  <li class="list-inline-item"><a href='../module/mod_reader.html'>mod_reader</a></li>
+                  <li class="list-inline-item"><a href='../module/mod_integrate.html'>mod_integrate</a></li>
+                  <li class="list-inline-item">mod_parameters</li>
+                  <li class="list-inline-item"><a href='../module/mod_compute_hamiltonians.html'>mod_compute_hamiltonians</a></li>
+                  <li class="list-inline-item"><a href='../module/mod_broydenv2.html'>mod_broydenV2</a></li>
+                  <li class="list-inline-item"><a href='../module/mod_writers.html'>mod_writers</a></li>
+                  <li class="list-inline-item"><a href='../module/mod_hamiltonians.html'>mod_hamiltonians</a></li>
+                  <li class="list-inline-item"><a href='../module/mod_utilities.html'>mod_utilities</a></li>
+              </ul>
+            </li>
+        </ul>
+      </div>
+    </div>
+
+    
+
+
+    <section>
+    <h2>Variables</h2>
+      <table class="table table-striped varlist">
+    <thead>
+      <tr>
+        <th scope="col">Type</th>
+        <th scope="col">Attributes</th>
+        <th scope="col"></th>
+        <th scope="col">Name</th>
+<th></th><th scope="col">Initial</th>        <th scope="col"></th>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-hamiltonian~14"></span>
+              complex(kind=16),
+            </td>
+            <td>
+              ALLOCATABLE
+            </td>
+            <td>::</td>
+            <td><strong>Hamiltonian</strong>(:,:)</td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-hamiltonian_const~2"></span>
+              complex(kind=16),
+            </td>
+            <td>
+              ALLOCATABLE
+            </td>
+            <td>::</td>
+            <td><strong>Hamiltonian_const</strong>(:,:)</td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-u_transformation~2"></span>
+              complex(kind=16),
+            </td>
+            <td>
+              ALLOCATABLE
+            </td>
+            <td>::</td>
+            <td><strong>U_transformation</strong>(:,:)</td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-energies~2"></span>
+              real(kind=8),
+            </td>
+            <td>
+              ALLOCATABLE
+            </td>
+            <td>::</td>
+            <td><strong>Energies</strong>(:)</td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-delta_local~2"></span>
+              complex(kind=16),
+            </td>
+            <td>
+              ALLOCATABLE
+            </td>
+            <td>::</td>
+            <td><strong>Delta_local</strong>(:,:,:,:)</td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-delta_new"></span>
+              complex(kind=16),
+            </td>
+            <td>
+              ALLOCATABLE
+            </td>
+            <td>::</td>
+            <td><strong>Delta_new</strong>(:,:,:,:)</td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-delta_broyden"></span>
+              real(kind=8),
+            </td>
+            <td>
+              ALLOCATABLE
+            </td>
+            <td>::</td>
+            <td><strong>Delta_broyden</strong>(:)</td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-delta_new_broyden"></span>
+              real(kind=8),
+            </td>
+            <td>
+              ALLOCATABLE
+            </td>
+            <td>::</td>
+            <td><strong>Delta_new_broyden</strong>(:)</td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-gamma_sc~4"></span>
+              complex(kind=16),
+            </td>
+            <td>
+              ALLOCATABLE
+            </td>
+            <td>::</td>
+            <td><strong>Gamma_SC</strong>(:,:,:,:)</td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-gamma_sc_new"></span>
+              complex(kind=16),
+            </td>
+            <td>
+              ALLOCATABLE
+            </td>
+            <td>::</td>
+            <td><strong>Gamma_SC_new</strong>(:,:,:,:)</td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-charge_dens~5"></span>
+              real(kind=8),
+            </td>
+            <td>
+              ALLOCATABLE
+            </td>
+            <td>::</td>
+            <td><strong>Charge_dens</strong>(:)</td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-charge_dens_new"></span>
+              real(kind=8),
+            </td>
+            <td>
+              ALLOCATABLE
+            </td>
+            <td>::</td>
+            <td><strong>Charge_dens_new</strong>(:)</td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-charge_dens_local~2"></span>
+              real(kind=8),
+            </td>
+            <td>
+              ALLOCATABLE
+            </td>
+            <td>::</td>
+            <td><strong>Charge_dens_local</strong>(:)</td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-gamma_error"></span>
+              real(kind=8)
+            </td>
+            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>gamma_error</strong></td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-gamma_max_error"></span>
+              real(kind=8)
+            </td>
+            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>gamma_max_error</strong></td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-charge_error"></span>
+              real(kind=8)
+            </td>
+            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>charge_error</strong></td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-charge_max_error"></span>
+              real(kind=8)
+            </td>
+            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>charge_max_error</strong></td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-gamma_max_error_prev"></span>
+              real(kind=8)
+            </td>
+            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>gamma_max_error_prev</strong></td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-charge_max_error_prev"></span>
+              real(kind=8)
+            </td>
+            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>charge_max_error_prev</strong></td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-i~4"></span>
+              integer(kind=4)
+            </td>
+            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>i</strong></td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-j"></span>
+              integer(kind=4)
+            </td>
+            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>j</strong></td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-n~4"></span>
+              integer(kind=4)
+            </td>
+            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>n</strong></td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-lat~6"></span>
+              integer(kind=4)
+            </td>
+            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>lat</strong></td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-orb~6"></span>
+              integer(kind=4)
+            </td>
+            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>orb</strong></td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-orb_prime~2"></span>
+              integer(kind=4)
+            </td>
+            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>orb_prime</strong></td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-spin~6"></span>
+              integer(kind=4)
+            </td>
+            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>spin</strong></td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-sc_iter"></span>
+              integer(kind=4)
+            </td>
+            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>sc_iter</strong></td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-sc_flag"></span>
+              logical
+            </td>
+            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>sc_flag</strong></td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-counter"></span>
+              integer(kind=4)
+            </td>
+            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>counter</strong></td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-delta_real_elems"></span>
+              integer(kind=4)
+            </td>
+            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>delta_real_elems</strong></td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-broyden_index"></span>
+              integer(kind=4)
+            </td>
+            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>broyden_index</strong></td>
+                <td></td>
+                <td></td>
+            <td>
+                
+            </td>
+        </tr>
+    </tbody>
+  </table>
+
+    </section>
+    <br>
+    
+    
+    
+
+    
+
+
+    
+
+    
+    </div>
+  </div>
+
+      <hr>
+    </div> <!-- /container -->
+    <footer>
+      <div class="container">
+        <div class="row justify-content-between">
+          <div class="col">
+            <p>
+              Fortran Program
+              &copy; 2024 
+</p>
+          </div>
+          <div class="col">
+            <p class="text-end">
+              Documentation generated by
+              <a href="https://github.com/Fortran-FOSS-Programmers/ford">FORD</a>
+            </p>
+          </div>
+        </div>
+        <br>
+      </div> <!-- /container -->
+    </footer>
+
+    <!-- Bootstrap core JavaScript -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>    
+
+    <!-- MathJax JavaScript
+             ================================================== -->
+             <!-- Placed at the end of the document so the pages load faster -->
+        <script type="text/x-mathjax-config">
+          MathJax.Hub.Config({
+          TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'AMS' } },
+          jax: ['input/TeX','input/MathML','output/HTML-CSS'],
+          extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']
+          });
+        </script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+
+          <script src="../tipuesearch/tipuesearch_content.js"></script>
+          <script src="../tipuesearch/tipuesearch_set.js"></script>
+          <script src="../tipuesearch/tipuesearch.js"></script>
+
+  </body>
+</html>

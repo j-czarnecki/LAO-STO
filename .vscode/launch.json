@@ -11,24 +11,19 @@
             "cwd": "${workspaceRoot}",
             "externalConsole": false,
             "MIMode": "gdb",
-            "preLaunchTask": "make_debug"
+            "preLaunchTask": "Make debug",
         },
         {
-            "name": "Intel Debug Attach",
-            "type": "cppvsdbg",
-            "request": "attach",
-            "processId": "${command:pickProcess}"
-        },
-        {
-            "name": "Dispersion",
+            "name": "Postprocessing debug",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceRoot}/DISPERSION_LAO_STO.x",
+            "program": "${workspaceRoot}/POSTPROCESSING_LAO_STO.x",
             "args": [],
             "cwd": "${workspaceRoot}",
             "externalConsole": false,
-            "stopAtEntry": false,
-            "preLaunchTask": "run_dispersion"
+            "stopAtEntry": true,
+            "MIMode": "gdb",
+            "preLaunchTask": "Make postprocessing",
         }
     ]
     }

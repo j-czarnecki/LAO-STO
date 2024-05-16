@@ -1,3 +1,5 @@
 # LAO-STO
-
-Edit readme
+---
+project: LAO-STO
+author: jczarnecki
+---
