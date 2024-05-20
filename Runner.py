@@ -14,6 +14,26 @@ job_header = f"#!/bin/bash\n\
 #SBATCH --mem-per-cpu=8GB          # Memory (i.e. RAM) per processor\n\
 #SBATCH --output=\"output.out\"    # Path to the standard output and error files relative to the working directory\n"
 
+job_header_ares = f'#!/bin/bash -l\n\
+## Job name\n\
+#SBATCH -J LAO-STO\n\
+## Number of allocated nodes\n\
+#SBATCH -N 1\n\
+## Number of tasks per node (by default this corresponds to the number of cores allocated per node)\n\
+#SBATCH --ntasks-per-node=1\n\
+## Memory allocated per core (default is 5GB)\n\
+#SBATCH --mem-per-cpu=8GB\n\
+## Max task execution time (format is HH:MM:SS)\n\
+#SBATCH --time=168:00:00\n\
+## Name of grant to which resource usage will be charged\n\
+#SBATCH -A plglaosto111\n\
+## Name of partition\n\
+#SBATCH -p plgrid-long\n\
+## Name of file to which standard output will be redirected\n\
+#SBATCH --output="output.out"\n\
+## Name of file to which the standard error stream will be redirected\n\
+#SBATCH --error="error.err"\n'
+
 
 def LAO_STO_default_nml():
     parser = f90nml.Parser()
@@ -53,17 +73,25 @@ def LAO_STO_default_nml():
                                     max_grid_refinements_y = 10 /')
     return params_nml
 
-def run_slurm_param_value(paramValuePairs):
+def run_slurm_param_value(paramValuePairs, isAres: bool = False):
     '''
     Sets all parameters given in key-value pairs.
     No need to specify J_SC_PRIME, since it is always set
     to be J_SC / 10
     '''
+    if isAres:
+        pathToAppend = f'/net/ascratch/people/plgjczarnecki/LAO-STO/RUN'
+    else:
+        pathToAppend = f'RUN'
 
-    pathToAppend = f'RUN'
     for pair in paramValuePairs:
         pathToAppend = pathToAppend + f'_{pair[1]}_{pair[2]}'
-    path = os.path.join(os.getcwd(), pathToAppend)
+    
+    runner_cwd = os.getcwd()
+    if isAres:
+        path = pathToAppend
+    else:
+        path = os.path.join(runner_cwd, pathToAppend)
 
     output_dir = f'OutputData'
     if not os.path.exists(path):
@@ -81,13 +109,17 @@ def run_slurm_param_value(paramValuePairs):
         f90nml.write(nml, nml_file, sort = False)
     #setting up slurm script
     with open('job.sh', 'w') as job_file:
-        print(job_header, file = job_file)
+        if isAres:
+            print(job_header_ares, file = job_file)
+        else:
+            print(job_header, file = job_file)
+
         print('cd ' + path, file = job_file)
-        print(f'../LAO_STO.x', file = job_file)
+        print(os.path.join(runner_cwd, 'LAO_STO.x'), file = job_file)
 
     #queue slurm job
     #simulate = subprocess.run(["sbatch", "job.sh"])
-    os.chdir(f'../')
+    os.chdir(runner_cwd)
 
 if __name__ == '__main__':
 

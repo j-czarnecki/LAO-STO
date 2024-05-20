@@ -1,7 +1,7 @@
 TARGET = LAO_STO.x
 SHELL = /bin/sh
 F90 = ifx
-F90FLAGS = -O3 -ipo -check all -warn all
+F90FLAGS = -O3 -ipo
 LIBS = -llapack -lblas
 
 TEST_TARGET = TEST_LAO_STO.x
@@ -21,6 +21,12 @@ OBJS = 	main.o \
 		mod_broydenV2.o \
 		mod_compute_hamiltonians.o \
 		mod_integrate.o
+
+# Rule to check if a library is available
+CHECK_LIB := $(shell $(TARGET) $(LIBS) -o /dev/null $(OBJS) 2>/dev/null && echo "yes" || echo "no")
+
+# Rule to check if an alternative library is available
+CHECK_ARES_LIB := $(shell $(TARGET) $(ARES_LIBS) -o /dev/null $(OBJS) 2>/dev/null && echo "yes" || echo "no")
 
 $(TARGET): $(OBJS)
 	$(F90) -o $(TARGET) $(F90FLAGS) $^ $(LIBS)
@@ -64,6 +70,12 @@ $(POSTPROCESSING_TARGET): $(POSTPROCESSING_OBJS)
 
 all: $(TARGET)
 
+ares_all: LIBS = -lscalapack -lflexiblas
+ares_all: $(TARGET)
+
+ares_postprocessing: LIBS = -lscalapack -lflexiblas
+ares_postprocessing: $(POSTPROCESSING_TARGET)
+
 gnu: F90 = gfortran
 gnu: F90FLAGS = -O3 -Wall -Wextra -ffree-line-length-none
 gnu: $(TARGET)
@@ -74,13 +86,11 @@ debug: $(TARGET)
 test: F90FLAGS = -O0 -g -check all -debug all -warn all -diag-enable sc
 test: $(TEST_TARGET)
 
-postprocessing: F90FLAGS = -O3
 postprocessing: $(POSTPROCESSING_TARGET)
 
 postprocessing_debug: F90 = gfortran
 postprocessing_debug: F90FLAGS = -O0 -g -fcheck=array-temps,bounds,do,mem -fsanitize=address -ffree-line-length-none #-check all -warn all #-g flag necessary to generate debug symbols
 postprocessing_debug: $(POSTPROCESSING_TARGET)
-
 
 clean:
 	rm -f *.o
