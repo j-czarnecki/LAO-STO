@@ -32,13 +32,16 @@ def main():
     # symmetryResolver.CalculateSymmetryGamma(simulationData.gamma)
 
 
-    gammaAndFillingPlotter = GammaAndFillingPlotter(runsPath= '../../LAO-STO-results/RUNS_Ef_18_05_24', matchPattern= 'RUN_.*', nNeighbors=3, eMinimal = 0)
+    gammaAndFillingPlotter = GammaAndFillingPlotter(runsPath= '../../LAO-STO-results/Jnnn_0_Ef_Jnn', matchPattern= 'RUN_.*', nNeighbors=3, nNextNeighbors=6, eMinimal = 0)
     gammaAndFillingPlotter.LoadFilling()
     gammaAndFillingPlotter.LoadGamma(xKeywords=('e_fermi', 'j_sc'))
     gammaAndFillingPlotter.sortData()
     gammaAndFillingPlotter.CalculateSymmetryGamma()
     gammaAndFillingPlotter.plotGammasFermi()
     gammaAndFillingPlotter.plotGammasFilling()
+    gammaAndFillingPlotter.plotNnnGammasFermi()
+    gammaAndFillingPlotter.plotNnnGammasFilling()
+    gammaAndFillingPlotter.plotGammaFermiUnsymmetrized()
     #gammaAndFillingPlotter.plotGammasJ()
     #gammaAndFillingPlotter.plotFillingFermi()
 

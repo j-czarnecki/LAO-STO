@@ -30,6 +30,7 @@ INTEGER*4 :: k2_steps = 0
 
 !Self-consistency
 REAL*8 :: gamma_start = 0.
+REAL*8 :: gamma_nnn_start = 0.
 REAL*8 :: charge_start = 0.
 INTEGER*4 :: max_sc_iter = 0
 REAL*8 :: sc_alpha = 0.
@@ -74,6 +75,7 @@ NAMELIST /discretization/ &
 
 NAMELIST /self_consistency/ &
 & gamma_start,              &
+& gamma_nnn_start,          &
 & charge_start,             &
 & max_sc_iter,              &
 & sc_alpha,                 &
@@ -129,6 +131,7 @@ SUBROUTINE GET_INPUT(nmlfile)
     IF (charge_eps_convergence .LE. 0) STOP "charge_eps_convergence must be > 0"
 
     gamma_start = gamma_start * meV2au
+    gamma_nnn_start = gamma_nnn_start * meV2au
     gamma_eps_convergence = gamma_eps_convergence * meV2au
     !Calculating derived values
     dk1 = K1_MAX / k1_steps

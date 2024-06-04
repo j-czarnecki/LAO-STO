@@ -3,6 +3,7 @@ import f90nml
 import os
 import re
 import numpy as np
+import shutil
 
 class DataReader:
 
@@ -78,8 +79,8 @@ class DataReader:
 
         for dir in directories:
             #TODO: it was recently corrected that filling is in Charge_dens_XXX.dat files (not Chargen_XXX)
-            filePathConverged = os.path.join(self.runsPath, dir, 'OutputData', 'Chargen_dens_final.dat')
-            filePathIter = os.path.join(self.runsPath, dir, 'OutputData', 'Chargen_dens_iter.dat')
+            filePathConverged = os.path.join(self.runsPath, dir, 'OutputData', 'Charge_dens_final.dat')
+            filePathIter = os.path.join(self.runsPath, dir, 'OutputData', 'Charge_dens_iter.dat')
 
             if os.path.exists(filePathConverged):
                 currentFilling = pd.read_fwf(filePathConverged, skiprows = 1, colspecs = [(0,6), (7,11), (12,16), (17,31)],
@@ -153,6 +154,8 @@ class DataReader:
             
             else:
                 print("No Gamma file in ", dir)
+                # shutil.rmtree(os.path.join(self.runsPath, dir))
+                # print('Direcotry removed')
                 continue
             firstIter = False
 

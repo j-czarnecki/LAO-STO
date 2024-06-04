@@ -72,8 +72,8 @@ PROGRAM MAIN
     Gamma_SC(:,:N_NEIGHBOURS,1,:) = DCMPLX(gamma_start, 0.)
     Gamma_SC(:,:N_NEIGHBOURS,2,:) = DCMPLX(-gamma_start, 0.)
     !coupling for next nearest neighbours
-    Gamma_SC(:,N_NEIGHBOURS:N_NEXT_NEIGHBOURS,1,:) = DCMPLX(gamma_start/10., 0.)
-    Gamma_SC(:,N_NEIGHBOURS:N_NEXT_NEIGHBOURS,2,:) = DCMPLX(-gamma_start/10., 0.)
+    Gamma_SC(:,(N_NEIGHBOURS + 1):N_ALL_NEIGHBOURS,1,:) = DCMPLX(gamma_nnn_start, 0.)
+    Gamma_SC(:,(N_NEIGHBOURS + 1):N_ALL_NEIGHBOURS,2,:) = DCMPLX(-gamma_nnn_start, 0.)
    
 
     !Gamma_SC(:,:,:) = DCMPLX(0., 0.)
@@ -101,7 +101,7 @@ PROGRAM MAIN
     
     OPEN(unit = 99, FILE= "./OutputData/Convergence.dat", FORM = "FORMATTED", ACTION = "WRITE")
     DO sc_iter = 1, max_sc_iter
-        PRINT*, "============= SC_ITER: ", sc_iter
+        !PRINT*, "============= SC_ITER: ", sc_iter
         !PRINT*, "Gamma = ", Gamma_SC(1,1,1,1)/meV2au
         counter = 0
 
@@ -175,7 +175,7 @@ PROGRAM MAIN
 
         !Gamma for next nearest neighbours pairing
         DO spin = 1,2   !Loop over spin coupling up-down or down-up
-            DO n = N_NEIGHBOURS, N_ALL_NEIGHBOURS !Loop over next nearest neighbours
+            DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS !Loop over next nearest neighbours
                 DO lat = 1, SUBLATTICES !Loop over sublattices coupling
                     DO orb = 1, ORBITALS
                         Gamma_SC_new(orb,n,spin,lat) = -0.5*J_SC_NNN*Delta_new(orb,n,spin,lat)
@@ -203,7 +203,7 @@ PROGRAM MAIN
         DO spin = 1, 2
             DO orb = 1, ORBITALS
                 DO n = 1, N_ALL_NEIGHBOURS
-                    DO lat = 1, 1 !to 1 in absence of magnetic field to SUBLATTICES if else
+                    DO lat = 1, SUBLATTICES !to 1 in absence of magnetic field to SUBLATTICES if else
                         !It should be considered whether relative or absolute error must be checked
                         gamma_error = ABS( ABS(Gamma_SC_new(orb,n,spin,lat)) - ABS(Gamma_SC(orb,n,spin,lat)) )
                         !Gamma convergence checking
@@ -222,7 +222,7 @@ PROGRAM MAIN
         !Change Broyden mixing parameter if simulation diverges between iterations
         !To avoid oscillations near convergence
         IF (ABS(gamma_max_error) > ABS(gamma_max_error_prev)) THEN
-            PRINT*, "Adapted sc_alpha = ", sc_alpha
+            !PRINT*, "Adapted sc_alpha = ", sc_alpha
             sc_alpha = sc_alpha*sc_alpha_adapt
         END IF
 
@@ -254,7 +254,7 @@ PROGRAM MAIN
             DO spin = 1, 2
                 DO orb = 1, ORBITALS
                     DO n = 1, N_ALL_NEIGHBOURS
-                        DO lat = 1, 2 !to 1 in absence of magnetic field to SUBLATTICES if else
+                        DO lat = 1, SUBLATTICES !to 1 in absence of magnetic field to SUBLATTICES if else
                             Delta_broyden(broyden_index) = REAL(Gamma_SC(orb,n,spin,lat))
                             Delta_broyden(INT((delta_real_elems - DIM_POSITIVE_K)/2) + broyden_index) = AIMAG(Gamma_SC(orb,n,spin,lat))
                             Delta_new_broyden(broyden_index) = REAL(Gamma_SC_new(orb,n,spin,lat))
@@ -277,7 +277,7 @@ PROGRAM MAIN
             DO spin = 1, 2
                 DO orb = 1, ORBITALS
                     DO n = 1, N_ALL_NEIGHBOURS
-                        DO lat = 1, 2 !to 1 in absence of magnetic field to SUBLATTICES if else
+                        DO lat = 1, SUBLATTICES !to 1 in absence of magnetic field to SUBLATTICES if else
                             Gamma_SC(orb,n,spin,lat) = DCMPLX(Delta_broyden(broyden_index), Delta_broyden(INT((delta_real_elems - DIM_POSITIVE_K)/2) + broyden_index))
                             broyden_index = broyden_index + 1
                         END DO
