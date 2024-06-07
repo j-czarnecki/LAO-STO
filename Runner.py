@@ -22,7 +22,7 @@ job_header_ares = f'#!/bin/bash -l\n\
 ## Number of tasks per node (by default this corresponds to the number of cores allocated per node)\n\
 #SBATCH --ntasks-per-node=1\n\
 ## Memory allocated per core (default is 5GB)\n\
-#SBATCH --mem-per-cpu=3.8GB\n\
+#SBATCH --mem-per-cpu=3800MB\n\
 ## Max task execution time (format is HH:MM:SS)\n\
 #SBATCH --time=168:00:00\n\
 ## Name of grant to which resource usage will be charged\n\

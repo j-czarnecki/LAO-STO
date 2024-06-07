@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from DataReaderClass import *
 from SymmetryResolverClass import *
-
+import seaborn as sns
 #TODO: this class should be improved to be more general and possibly plot more symmetries of gamma
 # self.eMinimal should not be used, as all energies must be calculated with respect to E_Fermi
 class GammaAndFillingPlotter(SymmetryResolver):
@@ -14,6 +14,45 @@ class GammaAndFillingPlotter(SymmetryResolver):
         self.nnnSymmetryKeys: list[tuple[int,int,int,str]] = []
         self.__initializedSymmetryKeys()
         print("Initialized GammaAndFillingPlotter")
+
+        plt.rcParams['text.usetex'] = True
+        plt.rcParams['font.family'] = 'serif'
+        plt.rcParams['font.serif'] = 'Computer Modern Roman'
+        plt.rcParams['font.sans-serif'] = 'Computer Modern Sans serif'
+        plt.rcParams['font.monospace'] = 'Computer Modern Typewriter'
+        plt.rcParams['axes.titlesize'] = 16
+        plt.rcParams['axes.labelsize'] = 16
+        plt.rcParams['xtick.labelsize'] = 14
+        plt.rcParams['ytick.labelsize'] = 14
+        # Optionally, add custom LaTeX preamble
+        plt.rcParams['text.latex.preamble'] = r'\usepackage{amsmath} \usepackage{amsfonts} \usepackage{amssymb}'
+
+        # Choose a seaborn palette
+        palette = sns.color_palette('hsv', 7) #has to specify number of lines
+
+        # Set the color cycle
+        plt.rcParams['axes.prop_cycle'] = plt.cycler(color=palette)
+
+
+        # Set rcParams for tighter layout
+        plt.rcParams['figure.autolayout'] = True
+        plt.rcParams['figure.constrained_layout.use'] = True
+        plt.rcParams['axes.linewidth'] = 1.2
+
+        # Set rcParams to show ticks on both left and right sides
+        plt.rcParams['xtick.direction'] = 'in'
+        plt.rcParams['ytick.direction'] = 'in'
+        plt.rcParams['xtick.bottom'] = True
+        plt.rcParams['ytick.left'] = True
+        plt.rcParams['xtick.top'] = True
+        plt.rcParams['ytick.right'] = True
+
+        plt.rcParams['legend.fontsize'] = 12
+        plt.rcParams['legend.title_fontsize'] = 14
+
+        plt.rcParams['axes.xmargin'] = 0.01
+
+
 
     def __initializedSymmetryKeys(self):
         for spin in (1,2): #should be [1,2], but now spin are symmetric
@@ -44,11 +83,11 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 plt.plot(j_plot, gamma_plot, '-', label = ef)
 
             spin, sublat, orbital, symmetry = key
-            plt.title(fr's = {-spin + 1.5}, $\alpha$ = {sublat}, l = {orbital}')
+            plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {orbital}')
             plt.legend(title = r"$E_{Fermi}$ (meV)")
             plt.xlabel(r"$J_{SC}$ (meV)")
-            plt.ylabel(fr"$\Gamma_{symmetry}$ (meV)")
-            plt.grid()
+            plt.ylabel(fr"$\Gamma_{{{symmetry}}}$ (meV)")
+            #plt.grid()
             plt.ylim(0 , 0.2)
             plt.savefig(f"../Plots/GammaJ_{spin}_{sublat}_{orbital}_{symmetry}.png")
             plt.close()
@@ -71,12 +110,11 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 plt.plot(ef_plot, gamma_plot, '-', label = secondParam)
 
             spin, sublat, orbital, symmetry = key
-            plt.title(fr's = {-spin + 1.5}, $\alpha$ = {sublat}, l = {orbital}')
+            plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {orbital}')
             plt.legend(title = r"$J_{SC}$ (meV)")
             plt.xlabel(r"$E_{Fermi}$ (meV)")
-            plt.ylabel(fr"$\Gamma_{symmetry}$ (meV)")
-            plt.grid()
-            plt.xlim(right=-900)
+            plt.ylabel(fr"$\Gamma_{{{symmetry}}}$ (meV)")
+            #plt.grid()
             #plt.xlim(0 , 0.1)
             plt.savefig(f"../Plots/GammaFermi_{spin}_{sublat}_{orbital}_{symmetry}.png")
             plt.close()
@@ -98,11 +136,11 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 plt.plot(n_total_plot, gamma_plot, '-', label = secondParam)
 
             spin, sublat, orbital, symmetry = key
-            plt.title(fr's = {-spin + 1.5}, $\alpha$ = {sublat}, l = {orbital}')
+            plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {orbital}')
             plt.legend(title = r"$J_{SC}$ (meV)")
             plt.xlabel(r"$n_{tot}$")
-            plt.ylabel(fr"$\Gamma_{symmetry}$ (meV)")
-            plt.grid()
+            plt.ylabel(fr"$\Gamma_{{{symmetry}}}$ (meV)")
+            #plt.grid()
             #plt.xlim(0 , 0.1)
             plt.savefig(f"../Plots/GammaFilling_{spin}_{sublat}_{orbital}_{symmetry}.png")
             plt.close() 
@@ -124,11 +162,11 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 plt.plot(ef_plot, gamma_plot, '-', label = secondParam)
 
             spin, sublat, orbital, symmetry = key
-            plt.title(fr's = {-spin + 1.5}, $\alpha$ = {sublat}, l = {orbital}')
+            plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {orbital}')
             plt.legend(title = r"$J_{SC}$ (meV)")
             plt.xlabel(r"$E_{Fermi}$ (meV)")
-            plt.ylabel(fr"$\Gamma_{symmetry}$ (meV)")
-            plt.grid()
+            plt.ylabel(fr"$\Gamma_{{{symmetry}}}$ (meV)")
+            #plt.grid()
             #plt.xlim(0 , 0.1)
             plt.savefig(f"../Plots/nnnGammaFermi_{spin}_{sublat}_{orbital}_{symmetry}.png")
             plt.close()
@@ -150,11 +188,11 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 plt.plot(n_total_plot, gamma_plot, '-', label = secondParam)
 
             spin, sublat, orbital, symmetry = key
-            plt.title(fr's = {-spin + 1.5}, $\alpha$ = {sublat}, l = {orbital}')
+            plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {orbital}')
             plt.legend(title = r"$J_{SC}$ (meV)")
             plt.xlabel(r"$n_{tot}$")
-            plt.ylabel(fr"$\Gamma_{symmetry}$ (meV)")
-            plt.grid()
+            plt.ylabel(fr"$\Gamma_{{{symmetry}}}$ (meV)")
+            #plt.grid()
             #plt.xlim(0 , 0.1)
             plt.savefig(f"../Plots/nnnGammaFilling_{spin}_{sublat}_{orbital}_{symmetry}.png")
             plt.close() 
@@ -183,7 +221,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
         plt.legend(title = r"$U_{Hub}$ (meV)")
         plt.xlabel(r"$E_{Fermi}$ (meV)")
         plt.ylabel(r"$n_{orb}$")
-        plt.grid()
+        #plt.grid()
         plt.savefig(f"../Plots/FillingFermiOrbital.png")
         plt.close()
 
@@ -222,11 +260,11 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 plt.plot(ef_plot, gamma_plot, '-', label = secondParam)
 
             spin, neighbor, sublat, orbital = key
-            plt.title(fr's = {-spin + 1.5}, $\alpha$ = {sublat}, l = {orbital}')
+            plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {orbital}')
             plt.legend(title = r"$J_{SC}$ (meV)")
             plt.xlabel(r"$E_{Fermi}$ (meV)")
             plt.ylabel(fr"$\Gamma_{neighbor}$ (meV)")
-            plt.grid()
+            #plt.grid()
             plt.xlim(right=-900)
             #plt.xlim(0 , 0.1)
             plt.savefig(f"../Plots/noSymGammaFermi_{spin}_{sublat}_{orbital}_{neighbor}.png")
