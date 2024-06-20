@@ -11,15 +11,15 @@ PROGRAM main_postprocessing
     REAL*8 :: zeta
     INTEGER*4 :: Nk, HamDim
 
-    zeta = 1e-5
+    zeta = 1e-3
 
     Nk = 5000
     HamDim = DIM
 
 
     !CALL CALCULATE_DISPERSION("Energies.dat")
-    !CALL CALCULATE_DOS(-1.2e3*meV2au, -0.8e3*meV2au, 0.1*meV2au, zeta, "OutputData/DOS.dat")
-    CALL CALCULATE_CHERN_PARAMS(Nk, Nk, HamDim)
+    CALL CALCULATE_DOS(-1.1e3*meV2au, -0.9e3*meV2au, 1.*meV2au, zeta, "OutputData/DOS.dat")
+    !CALL CALCULATE_CHERN_PARAMS(Nk, Nk, HamDim)
 
 
 END PROGRAM main_postprocessing

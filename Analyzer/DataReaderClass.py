@@ -40,7 +40,7 @@ class DataReader:
                    'runsPath': self.runsPath}
         return str(dataStr)
 
-    def FillDictGamma(self, pandasFile: pd.DataFrame, firstIter: bool):
+    def FillDictGamma(self, pandasFile: pd.DataFrame, firstIter: bool, fillNones: bool = False):
         """
         Extracts proper key from simulation files, converts gamma back to complex value and writes do dict
         """
@@ -48,13 +48,19 @@ class DataReader:
             dictKey = (int(pandasFile.spin[row]) , int(pandasFile.neighbor[row]) , int(pandasFile.sublat[row]) , int(pandasFile.orbital[row]))
             if firstIter:
                 #self.gamma[dictKey] = [np.sqrt(pandasFile.gammaR[row]**2 + pandasFile.gammaIm[row]**2)]
-                self.gamma[dictKey] = [pandasFile.gammaR[row] + pandasFile.gammaIm[row]*1j]
+                if not fillNones:
+                    self.gamma[dictKey] = [pandasFile.gammaR[row] + pandasFile.gammaIm[row]*1j]
+                else:
+                   self.gamma[dictKey] = np.nan
                 #print(dictKey)
             else:
                 #self.gamma[dictKey].append(np.sqrt(pandasFile.gammaR[row]**2 + pandasFile.gammaIm[row]**2))
-                self.gamma[dictKey].append(pandasFile.gammaR[row] + pandasFile.gammaIm[row]*1j)
+                if not fillNones:
+                    self.gamma[dictKey].append(pandasFile.gammaR[row] + pandasFile.gammaIm[row]*1j)
+                else:
+                    self.gamma[dictKey].append(np.nan)
 
-    def FillDictFilling(self, pandasFile: pd.DataFrame, firstIter: bool):
+    def FillDictFilling(self, pandasFile: pd.DataFrame, firstIter: bool, fillNones: bool = False):
         """
         Extracts proper key from simulation files and appends to filling dict
         """
@@ -62,13 +68,18 @@ class DataReader:
         for row in range(len(pandasFile.spin)):
             dictKey = (int(pandasFile.spin[row]) , int(pandasFile.sublat[row]) , int(pandasFile.orbital[row]))
             if firstIter:
-                self.filling[dictKey] = [pandasFile.filling[row]]
+                if not fillNones:
+                    self.filling[dictKey] = [pandasFile.filling[row]]
+                else:
+                    self.filling[dictKey] = np.nan
                 #print(dictKey)
             else:
-                self.filling[dictKey].append(pandasFile.filling[row])
- 
+                if not fillNones:
+                    self.filling[dictKey].append(pandasFile.filling[row])
+                else:
+                   self.filling[dictKey].append(np.nan) 
 
-    def LoadFilling(self):
+    def LoadFilling(self, loadUnfinished: bool):
         """
         Loads filling data from simulations base on specified in __init__() runsPath and matchPattern.
         If simulation had not converged, takse values from _iter.dat file - the last iteration before program timeout.
@@ -87,9 +98,13 @@ class DataReader:
                                              names = ['spin', 'sublat', 'orbital', 'filling'])
                 self.FillDictFilling(currentFilling, isFirstIter)
             elif os.path.exists(filePathIter):
-                currentFilling = pd.read_fwf(filePathIter, skiprows = 1, colspecs = [(0,6), (7,11), (12,16), (17,31)],
-                                             names = ['spin', 'sublat', 'orbital', 'filling'])
-                self.FillDictFilling(currentFilling, isFirstIter)
+                print("No convergence in ", dir)
+                if loadUnfinished:
+                    currentFilling = pd.read_fwf(filePathIter, skiprows = 1, colspecs = [(0,6), (7,11), (12,16), (17,31)],
+                                                names = ['spin', 'sublat', 'orbital', 'filling'])
+                    self.FillDictFilling(currentFilling, isFirstIter)
+                else:
+                    self.FillDictFilling(currentFilling, isFirstIter, fillNones=True)
             else:
                 print("No Charge dens file in ", dir)
                 continue
@@ -112,7 +127,7 @@ class DataReader:
         self.params = sorted(self.params)
 
 
-    def LoadGamma(self, xKeywords: tuple):
+    def LoadGamma(self, xKeywords: tuple, loadUnfinished: bool):
         """
         Loads gamma data from simulations base on specified in __init__() runsPath and matchPattern.
         If simulation had not converged, takse values from _iter.dat file - the last iteration before program timeout.
@@ -147,11 +162,13 @@ class DataReader:
                 self.FillDictGamma(currentGamma, firstIter)   
                 
             #If simulation did NOT converge, iteration file should exists
-            elif os.path.exists(filePathGammaIter):        
-                currentGamma = pd.read_fwf(filePathGammaIter, skiprows = 1, colspecs = [(0,6), (7,11), (12, 16), (17,21), (22,36), (37,51)], names = ['spin', 'neighbor', 'sublat', 'orbital', 'gammaR', 'gammaIm'], dtype = np.float64)
-                self.FillDictGamma(currentGamma, firstIter)
+            elif os.path.exists(filePathGammaIter):
                 print("No convergence in ", dir)       
-            
+                if loadUnfinished:
+                    currentGamma = pd.read_fwf(filePathGammaIter, skiprows = 1, colspecs = [(0,6), (7,11), (12, 16), (17,21), (22,36), (37,51)], names = ['spin', 'neighbor', 'sublat', 'orbital', 'gammaR', 'gammaIm'], dtype = np.float64)
+                    self.FillDictGamma(currentGamma, firstIter)
+                else:
+                    self.FillDictGamma(currentGamma, firstIter, fillNones=True)
             else:
                 print("No Gamma file in ", dir)
                 # shutil.rmtree(os.path.join(self.runsPath, dir))

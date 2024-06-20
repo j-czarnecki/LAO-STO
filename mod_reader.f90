@@ -29,6 +29,10 @@ INTEGER*4 :: k2_steps = 0
 
 
 !Self-consistency
+LOGICAL :: read_gamma_from_file = .FALSE.
+CHARACTER(1000) :: path_to_gamma_start
+LOGICAL :: read_charge_from_file = .FALSE.
+CHARACTER(1000) :: path_to_charge_start
 REAL*8 :: gamma_start = 0.
 REAL*8 :: gamma_nnn_start = 0.
 REAL*8 :: charge_start = 0.
@@ -74,6 +78,10 @@ NAMELIST /discretization/ &
 & k2_steps                
 
 NAMELIST /self_consistency/ &
+& read_gamma_from_file,     &
+& path_to_gamma_start,      &
+& read_charge_from_file,    &
+& path_to_charge_start,     &
 & gamma_start,              &
 & gamma_nnn_start,          &
 & charge_start,             &
@@ -123,6 +131,8 @@ SUBROUTINE GET_INPUT(nmlfile)
     IF ((k1_steps .LE. 0) .OR. (k2_steps .LE. 0)) STOP "k_steps must be > 0"
 
     READ(9,NML=self_consistency)
+    IF (read_gamma_from_file .AND. path_to_gamma_start == "") STOP "If read_gamma_from_file == .TRUE. then path_to_gamma_start must not be empty" 
+    IF (read_charge_from_file .AND. path_to_charge_start == "") STOP "If read_charge_from_file == .TRUE. then path_to_charge_start must not be empty" 
     IF (charge_start .LT. 0) STOP "charge_start must be >= 0"
     IF (max_sc_iter .LE. 0) STOP "max_sc_iter must be > 0"
     IF (sc_alpha .LE. 0) STOP "sc_alpha (mixing parameter) must be > 0"
@@ -172,7 +182,7 @@ SUBROUTINE GET_GAMMA_SC(Gamma_SC, path)
             DO lat = 1, SUBLATTICES
                 DO orb = 1, ORBITALS
                     READ(9, output_format) spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
-                    Gamma_SC(orb_read, n_read, spin_read, lat_read) = DCMPLX(Gamma_re , Gamma_im)
+                    Gamma_SC(orb_read, n_read, spin_read, lat_read) = DCMPLX(Gamma_re, Gamma_im)*meV2au
                 END DO
             END DO
             READ(9,*)

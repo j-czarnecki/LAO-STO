@@ -116,22 +116,23 @@ class SymmetryResolver(DataReader):
 
                         nnnGammaToSymmetrize = [] #THis code could be simplified, maybe list comprehension?
                         #Next nearest neighbours pairing
-                        for neighbor in range(self.nNeighbors + 1, self.nNeighbors + self.nNextNeighbors + 1):
-                            nnnGammaToSymmetrize.append(self.gamma[(spin, neighbor, sublat, orbital)][i])
-                        if i == 0:
-                            self.nnnSymmetryGammaDict[(spin,sublat,orbital, 's')] = [self._ExtSWavePairing(nnnGammaToSymmetrize)]
-                            self.nnnSymmetryGammaDict[(spin,sublat,orbital, 'p+')] = [self._PPlusWavePairing(nnnGammaToSymmetrize)]
-                            self.nnnSymmetryGammaDict[(spin,sublat,orbital, 'd+')] = [self._DPlusWavePairing(nnnGammaToSymmetrize)]
-                            self.nnnSymmetryGammaDict[(spin,sublat,orbital, 'f')] = [self._FWavePairing(nnnGammaToSymmetrize)]
-                            self.nnnSymmetryGammaDict[(spin,sublat,orbital, 'd-')] = [self._DMinusWavePairing(nnnGammaToSymmetrize)]
-                            self.nnnSymmetryGammaDict[(spin,sublat,orbital, 'p-')] = [self._PMinusWavePairing(nnnGammaToSymmetrize)]
-                        else:
-                            self.nnnSymmetryGammaDict[(spin,sublat,orbital, 's')].append(self._ExtSWavePairing(nnnGammaToSymmetrize))
-                            self.nnnSymmetryGammaDict[(spin,sublat,orbital, 'p+')].append(self._PPlusWavePairing(nnnGammaToSymmetrize))
-                            self.nnnSymmetryGammaDict[(spin,sublat,orbital, 'd+')].append(self._DPlusWavePairing(nnnGammaToSymmetrize))
-                            self.nnnSymmetryGammaDict[(spin,sublat,orbital, 'f')].append(self._FWavePairing(nnnGammaToSymmetrize))
-                            self.nnnSymmetryGammaDict[(spin,sublat,orbital, 'd-')].append(self._DMinusWavePairing(nnnGammaToSymmetrize))
-                            self.nnnSymmetryGammaDict[(spin,sublat,orbital, 'p-')].append(self._PMinusWavePairing(nnnGammaToSymmetrize))
+                        if self.nNextNeighbors != 0:
+                            for neighbor in range(self.nNeighbors + 1, self.nNeighbors + self.nNextNeighbors + 1):
+                                nnnGammaToSymmetrize.append(self.gamma[(spin, neighbor, sublat, orbital)][i])
+                            if i == 0:
+                                self.nnnSymmetryGammaDict[(spin,sublat,orbital, 's')] = [self._ExtSWavePairing(nnnGammaToSymmetrize)]
+                                self.nnnSymmetryGammaDict[(spin,sublat,orbital, 'p+')] = [self._PPlusWavePairing(nnnGammaToSymmetrize)]
+                                self.nnnSymmetryGammaDict[(spin,sublat,orbital, 'd+')] = [self._DPlusWavePairing(nnnGammaToSymmetrize)]
+                                self.nnnSymmetryGammaDict[(spin,sublat,orbital, 'f')] = [self._FWavePairing(nnnGammaToSymmetrize)]
+                                self.nnnSymmetryGammaDict[(spin,sublat,orbital, 'd-')] = [self._DMinusWavePairing(nnnGammaToSymmetrize)]
+                                self.nnnSymmetryGammaDict[(spin,sublat,orbital, 'p-')] = [self._PMinusWavePairing(nnnGammaToSymmetrize)]
+                            else:
+                                self.nnnSymmetryGammaDict[(spin,sublat,orbital, 's')].append(self._ExtSWavePairing(nnnGammaToSymmetrize))
+                                self.nnnSymmetryGammaDict[(spin,sublat,orbital, 'p+')].append(self._PPlusWavePairing(nnnGammaToSymmetrize))
+                                self.nnnSymmetryGammaDict[(spin,sublat,orbital, 'd+')].append(self._DPlusWavePairing(nnnGammaToSymmetrize))
+                                self.nnnSymmetryGammaDict[(spin,sublat,orbital, 'f')].append(self._FWavePairing(nnnGammaToSymmetrize))
+                                self.nnnSymmetryGammaDict[(spin,sublat,orbital, 'd-')].append(self._DMinusWavePairing(nnnGammaToSymmetrize))
+                                self.nnnSymmetryGammaDict[(spin,sublat,orbital, 'p-')].append(self._PMinusWavePairing(nnnGammaToSymmetrize))
 
                         
 

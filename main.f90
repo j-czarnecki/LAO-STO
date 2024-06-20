@@ -67,19 +67,27 @@ PROGRAM MAIN
     Delta_local(:,:,:,:) = DCMPLX(0. , 0.)
     Delta_new(:,:,:,:) = DCMPLX(0. , 0.)
 
-    !Breaking spin up-down down-up symmetry
-    !coupling for nearest-neighbours
-    Gamma_SC(:,:N_NEIGHBOURS,1,:) = DCMPLX(gamma_start, 0.)
-    Gamma_SC(:,:N_NEIGHBOURS,2,:) = DCMPLX(-gamma_start, 0.)
-    !coupling for next nearest neighbours
-    Gamma_SC(:,(N_NEIGHBOURS + 1):N_ALL_NEIGHBOURS,1,:) = DCMPLX(gamma_nnn_start, 0.)
-    Gamma_SC(:,(N_NEIGHBOURS + 1):N_ALL_NEIGHBOURS,2,:) = DCMPLX(-gamma_nnn_start, 0.)
-   
+    IF (read_gamma_from_file) THEN
+        CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(path_to_gamma_start))    
+    ELSE
+        !Breaking spin up-down down-up symmetry
+        !coupling for nearest-neighbours
+        Gamma_SC(:,:N_NEIGHBOURS,1,:) = DCMPLX(gamma_start, 0.)
+        Gamma_SC(:,:N_NEIGHBOURS,2,:) = DCMPLX(-gamma_start, 0.)
+        !coupling for next nearest neighbours
+        Gamma_SC(:,(N_NEIGHBOURS + 1):N_ALL_NEIGHBOURS,1,:) = DCMPLX(gamma_nnn_start, 0.)
+        Gamma_SC(:,(N_NEIGHBOURS + 1):N_ALL_NEIGHBOURS,2,:) = DCMPLX(-gamma_nnn_start, 0.)
+    END IF
 
     !Gamma_SC(:,:,:) = DCMPLX(0., 0.)
     Gamma_SC_new(:,:,:,:) = DCMPLX(0., 0.)
 
-    Charge_dens(:) = charge_start
+    IF (read_gamma_from_file) THEN
+        CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(path_to_charge_start))
+    ELSE
+        Charge_dens(:) = charge_start
+    END IF
+
     Charge_dens_new(:) = 0.
     Charge_dens_local(:) = 0.
 

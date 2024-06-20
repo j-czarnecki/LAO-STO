@@ -5,6 +5,7 @@ import sys
 if os.path.exists('/net/home/pwojcik/.local/lib/python2.7/site-packages'):
     sys.path.insert(0, '/net/home/pwojcik/.local/lib/python2.7/site-packages')
 import f90nml
+import time
 
 job_header = f"#!/bin/bash\n\
 #SBATCH --job-name=LAO_STO              # Job name\n\
@@ -50,13 +51,17 @@ def LAO_STO_default_nml():
                                     J_SC_PRIME = 0.0175e3, \
                                     J_SC_NNN = 0.0e3, \
                                     J_SC_PRIME_NNN = 0.0e3, \
-                                    U_HUB = 0e3, \
-                                    V_HUB = 0e3, \
+                                    U_HUB = 2e3, \
+                                    V_HUB = 2e3, \
                                     E_Fermi = -0.1e3 / \
                                 &discretization \
                                     k1_steps = 10, \
                                     k2_steps = 10 / \
                                 &self_consistency \
+                                    read_gamma_from_file = .FALSE., \
+                                    path_to_gamma_start = , \
+                                    read_charge_from_file = .FALSE., \
+                                    path_to_charge_start = , \
                                     gamma_start = 1., \
                                     gamma_nnn_start = 0., \
                                     charge_start = 0.1, \
@@ -86,7 +91,8 @@ def run_slurm_param_value(paramValuePairs, isAres: bool = False):
         pathToAppend = f'RUN'
 
     for pair in paramValuePairs:
-        pathToAppend = pathToAppend + f'_{pair[1]}_{pair[2]}'
+        if pair[0] != 'self_consistency':
+            pathToAppend = pathToAppend + f'_{pair[1]}_{pair[2]}'
     
     runner_cwd = os.getcwd()
     if isAres:
@@ -121,19 +127,65 @@ def run_slurm_param_value(paramValuePairs, isAres: bool = False):
     #queue slurm job
     #simulate = subprocess.run(["sbatch", "job.sh"])
     os.chdir(runner_cwd)
+    return path #for sequential runner
+
+def run_sequential():
+    '''
+    Runs jobs sequentialy i.e. output of first job is the starting point for the second etc.
+    '''
+    nml_name = 'physical_params'
+    param_name = 'E_Fermi'
+    Ef_min = -1.1e3
+    Ef_max = 0e3
+    Ef_steps = 150
+    dE = abs(Ef_max - Ef_min)/Ef_steps
+    Fermi_table = [(nml_name, param_name, Ef_min + i*dE) for i in range(Ef_steps + 1)]
+
+    isFirstIter = True
+    previousPathRun = ''
+
+    for Ef in Fermi_table:
+        
+        if isFirstIter:
+            pathRun = run_slurm_param_value(
+                [Ef,
+                ('self_consistency', 'read_gamma_from_file', False),
+                ('self_consistency', 'read_charge_from_file', False)],
+                isAres=False)
+            isFirstIter = False
+        else:
+            pathRun = run_slurm_param_value(
+                [Ef,
+                ('self_consistency', 'read_gamma_from_file', True),
+                ('self_consistency', 'path_to_gamma_start', os.path.join(previousPathRun, 'OutputData/Gamma_SC_final.dat')),
+                ('self_consistency', 'read_charge_from_file', True),
+                ('self_consistency', 'path_to_charge_start', os.path.join(previousPathRun, 'OutputData/Charge_dens_final.dat'))],
+                isAres=False)
+
+        previousPathRun = pathRun
+
+        while True:
+            if os.path.exists(os.path.join(previousPathRun, 'OutputData/Gamma_SC_final.dat')):
+                break
+            else:
+                time.sleep(30)
+
+    print('!!! ALL SEQUENTIAL JOBS FINISHED !!!')
 
 if __name__ == '__main__':
 
+    run_sequential()
+
     #Fermi energy setting
-    nml_name = 'physical_params'
-    param_name = 'E_Fermi'
-    Ef_min = -1.05e3
-    Ef_max = -0.8e3
-    Ef_steps = 300
-    dE = abs(Ef_max - Ef_min)/Ef_steps
-    Fermi_table = [(nml_name, param_name, Ef_min + i*dE) for i in range(Ef_steps + 1)]
-    for Ef in Fermi_table:
-        run_slurm_param_value([Ef], True)
+    # nml_name = 'physical_params'
+    # param_name = 'E_Fermi'
+    # Ef_min = -1.05e3
+    # Ef_max = -0.8e3
+    # Ef_steps = 300
+    # dE = abs(Ef_max - Ef_min)/Ef_steps
+    # Fermi_table = [(nml_name, param_name, Ef_min + i*dE) for i in range(Ef_steps + 1)]
+    # for Ef in Fermi_table:
+    #     run_slurm_param_value([Ef], True)
 
     # try:
     #     with multiprocessing.Pool(processes=8) as pool:

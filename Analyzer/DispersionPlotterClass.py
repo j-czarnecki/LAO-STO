@@ -1,7 +1,7 @@
 from DataReaderClass import *
 import matplotlib.pyplot as plt
 import numpy as np
-
+import seaborn as sns
 #TODO: self.lowestEnergy should not be used - all energies should be shown with respect to E_Fermi
 #Data reader is in fact not used here, rethink this architecture
 class DispersionPlotter(DataReader):
@@ -10,6 +10,45 @@ class DispersionPlotter(DataReader):
         DataReader.__init__(self, "./", 'xxx')
         self.dataLength = 0
         self.kPoints1D = 0
+
+        plt.rcParams['text.usetex'] = True
+        plt.rcParams['font.family'] = 'serif'
+        plt.rcParams['font.serif'] = 'Computer Modern Roman'
+        plt.rcParams['font.sans-serif'] = 'Computer Modern Sans serif'
+        plt.rcParams['font.monospace'] = 'Computer Modern Typewriter'
+        plt.rcParams['axes.titlesize'] = 16
+        plt.rcParams['axes.labelsize'] = 16
+        plt.rcParams['xtick.labelsize'] = 14
+        plt.rcParams['ytick.labelsize'] = 14
+        # Optionally, add custom LaTeX preamble
+        plt.rcParams['text.latex.preamble'] = r'\usepackage{amsmath} \usepackage{amsfonts} \usepackage{amssymb}'
+
+        # Choose a seaborn palette
+        palette = sns.color_palette('hsv', 7) #has to specify number of lines
+
+        # Set the color cycle
+        plt.rcParams['axes.prop_cycle'] = plt.cycler(color=palette)
+
+
+        # Set rcParams for tighter layout
+        plt.rcParams['figure.autolayout'] = True
+        plt.rcParams['figure.constrained_layout.use'] = True
+        plt.rcParams['axes.linewidth'] = 1.2
+
+        # Set rcParams to show ticks on both left and right sides
+        plt.rcParams['xtick.direction'] = 'in'
+        plt.rcParams['ytick.direction'] = 'in'
+        plt.rcParams['xtick.bottom'] = True
+        plt.rcParams['ytick.left'] = True
+        plt.rcParams['xtick.top'] = True
+        plt.rcParams['ytick.right'] = True
+
+        plt.rcParams['legend.fontsize'] = 12
+        plt.rcParams['legend.title_fontsize'] = 14
+
+        plt.rcParams['axes.xmargin'] = 0.01
+
+
         print("Initialized DispersionPlotter object")
         print(self.kPoints1D)
 
@@ -53,38 +92,42 @@ class DispersionPlotter(DataReader):
 
         plt.figure(0)
         plt.xlim(-kMax, kMax)
-        plt.ylim(bottom = self.lowestEnergy - 0.02*maxEnergy, top = maxEnergy)
+        #plt.ylim(bottom = self.lowestEnergy - 0.02*maxEnergy, top = maxEnergy
+        plt.ylim(bottom = -0.02*maxEnergy, top = maxEnergy)
         plt.xlabel(xLabelOnPlot)
         plt.ylabel(r'$E$ (meV)')
-        plt.grid()
+        #plt.grid()
         plt.savefig(plotOutputPath + "_orbital.png")
         plt.close()
 
         plt.figure(1)
         plt.xlim(-kMax, kMax)
-        plt.ylim(bottom = self.lowestEnergy - 0.02*maxEnergy, top = maxEnergy)
+        #plt.ylim(bottom = self.lowestEnergy - 0.02*maxEnergy, top = maxEnergy)
+        plt.ylim(bottom = -0.02*maxEnergy, top = maxEnergy)
         plt.xlabel(xLabelOnPlot)
         plt.ylabel(r'$E$ (meV)')
-        plt.grid()
+        #plt.grid()
         plt.savefig(plotOutputPath + "_lattice.png")
         plt.close()
        
         plt.figure(2)
         plt.xlim(-kMax, kMax)
-        plt.ylim(bottom = self.lowestEnergy - 0.02*maxEnergy, top = maxEnergy)
+        #plt.ylim(bottom = self.lowestEnergy - 0.02*maxEnergy, top = maxEnergy)
+        plt.ylim(bottom = -0.02*maxEnergy, top = maxEnergy)
         plt.xlabel(xLabelOnPlot)
         plt.ylabel(r'$E$ (meV)')
-        plt.grid()
+        #plt.grid()
         plt.savefig(plotOutputPath + "_spin.png")
         plt.close()
 
         plt.figure(3)
         plt.plot(np.sort(list(set(self.dispersionDataframe.ky))), plotEnergies, linewidth = 1, color = 'black')
         plt.xlim(-kMax, kMax)
-        plt.ylim(bottom = self.lowestEnergy - 0.02*maxEnergy, top = maxEnergy)
+        #plt.ylim(bottom = self.lowestEnergy - 0.02*maxEnergy, top = maxEnergy)
+        plt.ylim(bottom = -0.02*maxEnergy, top = maxEnergy)
         plt.xlabel(xLabelOnPlot)
         plt.ylabel(r'$E$ (meV)')
-        plt.grid()
+        #plt.grid()
         plt.savefig(plotOutputPath + '_standard.png')
         plt.close()
 
@@ -107,7 +150,7 @@ class DispersionPlotter(DataReader):
         plt.ylim(bottom = 0, top=eMax)
         plt.xlabel(r'DOS')
         plt.ylabel(r"E (meV)")
-        plt.grid(True)
+        #plt.grid(True)
         plt.savefig(plotOutputPath)
         plt.close()
 
