@@ -131,9 +131,10 @@ END SUBROUTINE CALCULATE_DOS
 
 
 
-SUBROUTINE CALCULATE_DISPERSION(filename)
+SUBROUTINE CALCULATE_DISPERSION(filename, brilouinZoneFraction)
 
     CHARACTER(LEN=*), INTENT(IN) :: filename
+    INTEGER*4, INTENT(IN) :: brilouinZoneFraction
     CHARACTER(LEN=20) :: output_format
 
     COMPLEX*16, ALLOCATABLE :: Hamiltonian(:,:), Hamiltonian_const(:,:), U_transformation(:,:)
@@ -164,8 +165,8 @@ SUBROUTINE CALCULATE_DISPERSION(filename)
     spin_down_contribution = 0.
 
 
-    kx_steps = INT(k1_steps/2)
-    ky_steps = INT(k2_steps/2)
+    kx_steps = INT(k1_steps/2 / brilouinZoneFraction)
+    ky_steps = INT(k2_steps/2 / brilouinZoneFraction)
     output_format = '(I5, 10E15.5)'
 
     ALLOCATE(Hamiltonian(DIM,DIM)) 
@@ -182,7 +183,7 @@ SUBROUTINE CALCULATE_DISPERSION(filename)
     Energies(:,:,:) = 0.
     Gamma_SC(:,:,:,:) = DCMPLX(0. , 0.)*meV2au
     Charge_dens(:) = 0.
-    CALL GET_CHARGE_DENS(Charge_dens(:), "/home/jczarnecki/LAO-STO-results/RUNS_low_U/RUN_E_Fermi_-905.0_U_HUB_166.66666666666666_V_HUB_166.66666666666666/OutputData/Chargen_dens_final.dat")
+    CALL GET_CHARGE_DENS(Charge_dens(:), "/home/jczarnecki/LAO-STO-results/LAO-STO-Hub/RUN_E_Fermi_990.0_J_SC_150.0/OutputData/Charge_dens_final.dat")
 
     !Computing k-independent terms
     CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:,:))
@@ -406,6 +407,143 @@ SUBROUTINE CALCULATE_CHERN_PARAMS(Nk1, Nk2, HamDim)
 
 END SUBROUTINE CALCULATE_CHERN_PARAMS
 
+SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(simulationPath, postfix, brilouinZoneFraction, dE, nBrillouinPoints)
+    
+    CHARACTER(LEN=*), INTENT(IN) :: postfix
+    CHARACTER(LEN=*), INTENT(IN) :: simulationPath
+    REAL*8, INTENT(IN) :: brilouinZoneFraction
+    REAL*8, INTENT(IN) :: dE
+    INTEGER*4, INTENT(IN) :: nBrillouinPoints
+    CHARACTER(LEN=20) :: output_format
+ 
+    COMPLEX*16, ALLOCATABLE :: Hamiltonian(:,:), Hamiltonian_const(:,:), U_transformation(:,:)
+    REAL*8, ALLOCATABLE :: Energies(:)
+
+    COMPLEX*16, ALLOCATABLE :: Gamma_SC(:,:,:,:)
+    REAL*8, ALLOCATABLE :: Charge_dens(:)
+
+    INTEGER*1, ALLOCATABLE :: IsFermiSurface(:,:) 
+
+    REAL*8 :: k1, k2, kx, ky, dkx, dky
+    INTEGER*4 :: i,j,n
+    INTEGER*4 :: kx_steps, ky_steps
+
+
+    dkx = 1. / nBrillouinPoints
+    dky = 1. / nBrillouinPoints
+
+    kx_steps = INT(nBrillouinPoints/2 * brilouinZoneFraction)
+    ky_steps = INT(nBrillouinPoints/2 * brilouinZoneFraction)
+
+
+    ALLOCATE(Hamiltonian(DIM,DIM)) 
+    ALLOCATE(Hamiltonian_const(DIM,DIM))
+    ALLOCATE(Energies(DIM))
+    ALLOCATE(IsFermiSurface(-kx_steps:kx_steps, -ky_steps:ky_steps))
+    ALLOCATE(Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES))
+    ALLOCATE(Charge_dens(DIM_POSITIVE_K))
+
+
+    Hamiltonian(:,:) = DCMPLX(0., 0.)
+    Hamiltonian_const(:,:) = DCMPLX(0. , 0.)
+    Energies(:) = 0.
+    Gamma_SC(:,:,:,:) = DCMPLX(0. , 0.)*meV2au
+    Charge_dens(:) = 0.
+    IsFermiSurface(:,:) = 0
+    output_format = '(2E15.5, I10)'
+
+
+    !Get parameters from simulation
+    CALL GET_INPUT(TRIM(simulationPath)//"input.nml")
+    CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(simulationPath)//"OutputData/Charge_dens_final.dat")
+
+    !Computing k-independent terms
+    CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:,:))
+    CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:,:))
+    CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian_const(:,:))
+    DO n = 1, DIM_POSITIVE_K
+        Hamiltonian_const(n,n) = Hamiltonian_const(n,n) - E_Fermi
+        Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) = Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) + E_Fermi
+    END DO
+    CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
+
+    OPEN(unit = 9, FILE= "./OutputData/FermiSurface"//TRIM(postfix)//".dat", FORM = "FORMATTED", ACTION = "WRITE")
+    !Dispersion relation in a normal state
+    DO i = -kx_steps, kx_steps
+        DO j = -ky_steps, ky_steps
+            kx = i*dkx * (2. * PI * 2./3.)
+            ky = j*dky * (2. * PI * 2./3.)
+
+            Hamiltonian(:,:) = DCMPLX(0. , 0.)
+            Energies(:) = 0.
+            CALL COMPUTE_TBA_TERM(Hamiltonian(:,:), kx, ky)
+            CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+            CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+            CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+            CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:))
+            !CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
+        
+            CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
+        
+            Hamiltonian(:,:) = Hamiltonian_const(:,:) + Hamiltonian(:,:) !Should by multiplied by 0.5 if in Nambu space
+        
+            CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:DIM_POSITIVE_K, :DIM_POSITIVE_K), Energies(:DIM_POSITIVE_K), DIM_POSITIVE_K)
+
+            !Check whether current wavevector is in the Fermi surface
+            IF (MINVAL(ABS(Energies(:DIM_POSITIVE_K))) < dE) THEN
+                IsFermiSurface(i,j) = 1
+            END IF
+            WRITE(9,*) kx, ky, IsFermiSurface(i,j)
+        END DO
+    END DO
+    CLOSE(9)
+
+    PRINT*, "Fermi surface done"
+
+    !Calculation of superconducting gap
+    CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(simulationPath)//"OutputData/Gamma_SC_final.dat")
+    !Gamma_SC(:, (N_NEIGHBOURS + 1):, :, :) = 2 * meV2au
+    OPEN(unit = 9, FILE= "./OutputData/SuperconductingGap"//TRIM(postfix)//".dat", FORM = "FORMATTED", ACTION = "WRITE")
+    DO i = -kx_steps, kx_steps
+        DO j = -ky_steps, ky_steps
+            IF (IsFermiSurface(i,j) == 1) THEN
+                kx = i*dkx * (2. * PI * 2./3.)
+                ky = j*dky * (2. * PI * 2./3.)
+
+                Hamiltonian(:,:) = DCMPLX(0. , 0.)
+                Energies(:) = 0.
+                CALL COMPUTE_TBA_TERM(Hamiltonian(:,:), kx, ky)
+                CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:))
+                CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
+                ! DO n = 1, DIM_POSITIVE_K
+                !     IF (n .le. DIM_POSITIVE_K - ORBITALS) THEN
+                !         Hamiltonian(n, ORBITALS + DIM_POSITIVE_K + n) = 1e-2 * meV2au
+                !     END IF
+                !     IF (n .ge. ORBITALS) THEN
+                !         Hamiltonian(n, DIM_POSITIVE_K + n - ORBITALS) = 1e-2 * meV2au
+                !     END IF
+                ! END DO
+
+
+                CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
+            
+                Hamiltonian(:,:) = 0.5*(Hamiltonian_const(:,:) + Hamiltonian(:,:)) !Should by multiplied by 0.5 if in Nambu space
+            
+                CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:,:), Energies(:), DIM)
+                !Write superconducting gap
+                WRITE(9,*) kx, ky, ABS(Energies(DIM_POSITIVE_K) - Energies(DIM_POSITIVE_K + 1)) / meV2au
+            END IF
+        END DO
+    END DO
+    CLOSE(9)
+
+
+END SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP
+
+
 SUBROUTINE HELLICAL_TEST_CHERN(potChem, B, Nk1, Nk2, i, j, U_transformation)
     INTEGER*4, PARAMETER :: HamDim = 4
     REAL*8, PARAMETER :: g = 5.0d0
@@ -547,6 +685,8 @@ SUBROUTINE LAO_STO_CHERN_ENERGIES(Nk1, Nk2, i, j, run_dir, U_transformation)
 
 END SUBROUTINE LAO_STO_CHERN_ENERGIES
 
+
+!########################### HELPER FUNCTIONS ###########################
 SUBROUTINE SORT_ENERGIES_AND_WAVEFUNCTIONS(Energies, Psi, HamDim)
     INTEGER*4, INTENT(IN) :: HamDim
     COMPLEX*16, INTENT(INOUT) :: Psi(HamDim, HamDim)

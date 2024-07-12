@@ -13,23 +13,28 @@ class GammaAndFillingPlotter(SymmetryResolver):
         self.symmetryKeys: list[tuple[int,int,int,str]] = []
         self.nnnSymmetryKeys: list[tuple[int,int,int,str]] = []
         self.orbitalNameMapping = list[str]
+        self.spinSymbolsMapping = list[str]
+        self.latticeNameMapping = list[str]
         self.maxval = np.float64
         self.__initializedSymmetryKeys()
-        self.__initializeOrbitalNameMapping()
+        self.__initializeMapping()
         plt.rcParams['text.usetex'] = True
         plt.rcParams['font.family'] = 'serif'
         plt.rcParams['font.serif'] = 'Computer Modern Roman'
         plt.rcParams['font.sans-serif'] = 'Computer Modern Sans serif'
         plt.rcParams['font.monospace'] = 'Computer Modern Typewriter'
-        plt.rcParams['axes.titlesize'] = 16
-        plt.rcParams['axes.labelsize'] = 16
-        plt.rcParams['xtick.labelsize'] = 14
-        plt.rcParams['ytick.labelsize'] = 14
+        plt.rcParams['axes.titlesize'] = 30
+        plt.rcParams['axes.labelsize'] = 30
+        plt.rcParams['xtick.labelsize'] = 26
+        plt.rcParams['ytick.labelsize'] = 26
+        plt.rcParams['legend.fontsize'] = 20
+        plt.rcParams['legend.title_fontsize'] = 24
         # Optionally, add custom LaTeX preamble
         plt.rcParams['text.latex.preamble'] = r'\usepackage{amsmath} \usepackage{amsfonts} \usepackage{amssymb}'
 
         # Choose a seaborn palette
-        palette = sns.color_palette('hsv', 7) #has to specify number of lines
+        palette = sns.color_palette('hsv', 3) #has to specify number of lines
+        self.palette = palette
 
         # Set the color cycle
         plt.rcParams['axes.prop_cycle'] = plt.cycler(color=palette)
@@ -47,9 +52,6 @@ class GammaAndFillingPlotter(SymmetryResolver):
         plt.rcParams['ytick.left'] = True
         plt.rcParams['xtick.top'] = True
         plt.rcParams['ytick.right'] = True
-
-        plt.rcParams['legend.fontsize'] = 12
-        plt.rcParams['legend.title_fontsize'] = 14
 
         plt.rcParams['axes.xmargin'] = 0.01
 
@@ -69,20 +71,29 @@ class GammaAndFillingPlotter(SymmetryResolver):
                     for symmetry in ('s','p+','d+', 'f', 'd-', 'p-'):
                         self.nnnSymmetryKeys.append((spin, sublat, orbital, symmetry))
 
-    def __initializeOrbitalNameMapping(self):
+    def __initializeMapping(self):
         self.orbitalNameMapping = ['yz', 'zx', 'xy']
-
+        self.spinSymbolsMapping = [r'\uparrow', r'\downarrow']
+        self.latticeNameMapping = [r'Ti_1', r'Ti_2']
     def getMaxvalSymmetrizedGamma(self):
         self.maxval = 0.
         for key in self.symmetryKeys:
             for i in range(len(self.symmetryGammaDict[key][:])):
                 if np.abs(self.symmetryGammaDict[key][i]) > self.maxval:
-                    self.maxval = np.abs(self.symmetryGammaDict[key][i])   
+                    self.maxval = np.abs(self.symmetryGammaDict[key][i])
+
+        if not self.nNextNeighbors == 0:
+            for key in self.nnnSymmetryKeys:
+                for i in range(len(self.nnnSymmetryGammaDict[key][:])):
+                    if np.abs(self.nnnSymmetryGammaDict[key][i]) > self.maxval:
+                        self.maxval = np.abs(self.nnnSymmetryGammaDict[key][i])
+
         print('Maxval is ', self.maxval)
     
     def plotGammasJ(self):
         E_fermi_tab = [-1030, -1040, -1050]
-
+        colors = ['black', 'blue', 'red']
+        colorIndex = 0
         for key in self.symmetryKeys:
             plt.figure()
             for ef in E_fermi_tab:
@@ -90,15 +101,17 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 j_plot = []
                 for i in range(len(self.params)):
                     if int(self.params[i][1]) == ef:
-                        j_plot.append(self.params[i][0] - self.eMinimal)
+                        j_plot.append(self.params[i][0])
                         gamma_plot.append(np.abs(self.symmetryGammaDict[key][i]))
-                plt.plot(j_plot, gamma_plot, '-', label = ef)
+                plt.plot(j_plot, gamma_plot, '-', label = ef - self.eMinimal, color = colors[colorIndex%3])
+                colorIndex += 1
 
             spin, sublat, orbital, symmetry = key
-            plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}')
+            #plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}')
             plt.legend(title = r"$E_{Fermi}$ (meV)")
-            plt.xlabel(r"$J_{SC}$ (meV)")
-            plt.ylabel(fr"$\Gamma_{{{symmetry}}}$ (meV)")
+            plt.xlabel(r"$J$ (meV)")
+            plt.ylabel(fr"$\Gamma_{{{self.latticeNameMapping[sublat - 1]} {self.latticeNameMapping[sublat % 2]},{self.orbitalNameMapping[orbital - 1]},{symmetry}}}^{{{self.spinSymbolsMapping[spin - 1]} {self.spinSymbolsMapping[spin % 2]}}}$ (meV)",
+                        labelpad= 20)
             #plt.grid()
             plt.ylim(0 , 0.2)
             plt.savefig(f"../Plots/GammaJ_{spin}_{sublat}_{self.orbitalNameMapping[orbital - 1]}_{symmetry}.png")
@@ -117,15 +130,16 @@ class GammaAndFillingPlotter(SymmetryResolver):
 
                 for i in range(len(self.params)):
                     if int(self.params[i][1]) == secondParam:
-                        ef_plot.append(self.params[i][0])
+                        ef_plot.append(self.params[i][0]  - self.eMinimal)
                         gamma_plot.append(np.abs(self.symmetryGammaDict[key][i]))
                 plt.plot(ef_plot, gamma_plot, '-', label = secondParam)
 
             spin, sublat, orbital, symmetry = key
-            plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}')
-            plt.legend(title = r"$U_{Hub}$ (meV)")
+            #plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}')
+            plt.legend(title = r"$J$ (meV)", loc = 'upper right')
             plt.xlabel(r"$E_{Fermi}$ (meV)")
-            plt.ylabel(fr"$\Gamma_{{{symmetry}}}$ (meV)")
+            plt.ylabel(fr"$\Gamma_{{{self.latticeNameMapping[sublat - 1]} {self.latticeNameMapping[sublat % 2]},{self.orbitalNameMapping[orbital - 1]},{symmetry}}}^{{{self.spinSymbolsMapping[spin - 1]} {self.spinSymbolsMapping[spin % 2]}}}$ (meV)",
+                        labelpad= 20)
             plt.ylim(top = 1.02*self.maxval)
             #plt.grid()
             #plt.xlim(0 , 0.1)
@@ -150,15 +164,54 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 plt.plot(n_total_plot, gamma_plot, '-', label = secondParam)
 
             spin, sublat, orbital, symmetry = key
-            plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}')
-            plt.legend(title = r"$U_{Hub}$ (meV)")
+            #plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}')
+            plt.legend(title = r"$U$ (meV)", loc = 'upper right')
             plt.xlabel(r"$n_{tot}$")
-            plt.ylabel(fr"$\Gamma_{{{symmetry}}}$ (meV)")
+            plt.ylabel(fr"$\Gamma_{{{self.latticeNameMapping[sublat - 1]} {self.latticeNameMapping[sublat % 2]},{self.orbitalNameMapping[orbital - 1]},{symmetry}}}^{{{self.spinSymbolsMapping[spin - 1]} {self.spinSymbolsMapping[spin % 2]}}}$ (meV)",
+                        labelpad= 20)
             plt.ylim(top = 1.02*self.maxval)
             #plt.grid()
             #plt.xlim(0 , 0.1)
             plt.savefig(f"../Plots/GammaFilling_{spin}_{sublat}_{self.orbitalNameMapping[orbital - 1]}_{symmetry}.png")
             plt.close() 
+
+    def plotGammasTemperature(self):
+        secondParamValues = [element[1] for element in self.params]
+        secondParamValues = sorted(list(set(secondParamValues)))
+
+        thirdParamValues = [element[2] for element in self.params]
+        thirdParamValues = sorted(list(set(thirdParamValues)))
+
+        thirdParamIterator = 0
+        linestyleTab = ['-', '--', ':']
+
+        for key in self.symmetryKeys:
+            plt.figure()
+            for thirdParam in thirdParamValues:
+                for secondParam in secondParamValues:
+                    gamma_plot = []
+                    T_plot= []
+
+                    for i in range(len(self.params)):
+                        #TODO: change those int(), they may lead to trouble in future
+                        if int(self.params[i][1]) == secondParam and int(self.params[i][2]) == thirdParam:
+                            T_plot.append(self.params[i][0])
+                            gamma_plot.append(np.abs(self.symmetryGammaDict[key][i]))
+                    plt.plot(T_plot, gamma_plot, linestyle = '-', label = secondParam)
+                thirdParamIterator += 1
+                spin, sublat, orbital, symmetry = key
+                #plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}')
+                plt.title(rf"$E_{{Fermi}} = {thirdParam - self.eMinimal}$ meV", pad = 10)
+                plt.legend(title = r"$J$ (meV)")
+                plt.xlabel(r"$T$ (K)")
+                plt.ylabel(fr"$\Gamma_{{{self.latticeNameMapping[sublat - 1]} {self.latticeNameMapping[sublat % 2]},{self.orbitalNameMapping[orbital - 1]},{symmetry}}}^{{{self.spinSymbolsMapping[spin - 1]} {self.spinSymbolsMapping[spin % 2]}}}$ (meV)",
+                           labelpad= 20)
+                plt.ylim(bottom = -0.02*self.maxval, top = 1.02*self.maxval)
+                plt.xlim(0, 0.6)
+                #plt.grid()
+                #plt.xlim(0 , 0.1)
+                plt.savefig(f"../Plots/GammaTemperatureEf{thirdParam}_{spin}_{sublat}_{self.orbitalNameMapping[orbital - 1]}_{symmetry}.png")
+                plt.close() 
 
     def plotNnnGammasFermi(self):
         secondParamValues = [element[1] for element in self.params]
@@ -172,16 +225,17 @@ class GammaAndFillingPlotter(SymmetryResolver):
 
                 for i in range(len(self.params)):
                     if int(self.params[i][1]) == secondParam:
-                        ef_plot.append(self.params[i][0])
+                        ef_plot.append(self.params[i][0]  - self.eMinimal)
                         gamma_plot.append(np.abs(self.nnnSymmetryGammaDict[key][i]))
                 plt.plot(ef_plot, gamma_plot, '-', label = secondParam)
 
             spin, sublat, orbital, symmetry = key
-            plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}')
-            plt.legend(title = r"$J_{SC}$ (meV)")
+            #plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}')
+            plt.legend(title = r"$J_{nnn}$ (meV)", loc = 'upper right')
             plt.xlabel(r"$E_{Fermi}$ (meV)")
-            plt.ylabel(fr"$\Gamma_{{{symmetry}}}$ (meV)")
+            plt.ylabel(fr"$\Gamma_{{{self.latticeNameMapping[sublat - 1]} {self.latticeNameMapping[sublat - 1]}, {self.orbitalNameMapping[orbital - 1]},{symmetry}}}^{{{self.spinSymbolsMapping[spin - 1]} {self.spinSymbolsMapping[spin % 2]}}}$ (meV)")
             plt.ylim(top = 1.02*self.maxval)
+            #plt.xlim(left = 0.0)
             #plt.grid()
             #plt.xlim(0 , 0.1)
             plt.savefig(f"../Plots/nnnGammaFermi_{spin}_{sublat}_{self.orbitalNameMapping[orbital - 1]}_{symmetry}.png")
@@ -204,10 +258,10 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 plt.plot(n_total_plot, gamma_plot, '-', label = secondParam)
 
             spin, sublat, orbital, symmetry = key
-            plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}')
-            plt.legend(title = r"$J_{SC}$ (meV)")
+            #plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}')
+            plt.legend(title = r"$J_{nnn}$ (meV)", loc = 'upper right')
             plt.xlabel(r"$n_{tot}$")
-            plt.ylabel(fr"$\Gamma_{{{symmetry}}}$ (meV)")
+            plt.ylabel(fr"$\Gamma_{{{self.latticeNameMapping[sublat - 1]} {self.latticeNameMapping[sublat - 1]},{self.orbitalNameMapping[orbital - 1]},{symmetry}}}^{{{self.spinSymbolsMapping[spin - 1]} {self.spinSymbolsMapping[spin % 2]}}}$ (meV)")
             plt.ylim(top = 1.02*self.maxval)
             #plt.grid()
             #plt.xlim(0 , 0.1)
@@ -218,24 +272,28 @@ class GammaAndFillingPlotter(SymmetryResolver):
         secondParamValues = [element[1] for element in self.params]
         secondParamValues = sorted(list(set(secondParamValues)))
 
+        colors = ['black', 'blue', 'red', 'magenta']
+        colorIndex = 0
         plt.figure(0)
         for secondParam in secondParamValues:
+            print(secondParam)
             ef_plot = []
             n_total_plot = []
             n_chosen_plot_lat1 = []
             n_chosen_plot_lat2 = []
 
             for i in range(len(self.params)):
-                if int(self.params[i][1]) == secondParam:
+                if int(self.params[i][1]) == int(secondParam):
                     n_total_plot.append(self.fillingTotal[i]/12.)
                     n_chosen_plot_lat1.append(self.filling[(1,1,1)][i]/12.) #key (spin,sublat,orbital)
                     n_chosen_plot_lat2.append(self.filling[(1,2,1)][i]/12.)
                     #gamma_plot.append(np.abs(symmetryResolver.symmetryGammaDict[key][i]))
                     ef_plot.append(self.params[i][0] - self.eMinimal)
-            plt.plot(ef_plot, n_chosen_plot_lat1, '-', label = secondParam)
-            plt.plot(ef_plot, n_chosen_plot_lat2, '--')
-        
-        plt.legend(title = r"$U_{Hub}$ (meV)")
+            plt.plot(ef_plot, n_chosen_plot_lat1, '-', label = format(secondParam, '.1f'), color = self.palette[colorIndex])
+            plt.plot(ef_plot, n_chosen_plot_lat2, '--', color = self.palette[colorIndex])
+            colorIndex += 1
+
+        plt.legend(title = r"$U$ (meV)")
         plt.xlabel(r"$E_{Fermi}$ (meV)")
         plt.ylabel(r"$n_{orb}$")
         #plt.grid()
@@ -244,7 +302,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
 
         plt.figure(1)
         plt.plot(ef_plot, n_total_plot, '-', label = secondParam)
-        plt.legend(title = r"$U_{Hub}$ (meV)")
+        plt.legend(title = r"$U$ (meV)")
         plt.xlabel(r"$E_{Fermi}$ (meV)")
         plt.ylabel(r"$n_{tot}$")
         plt.grid()
@@ -272,7 +330,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
 
                 for i in range(len(self.params)):
                     if int(self.params[i][1]) == secondParam:
-                        ef_plot.append(self.params[i][0])
+                        ef_plot.append(self.params[i][0]  - self.eMinimal)
                         gamma_plot.append(np.abs(self.gamma[key][i]))
                 plt.plot(ef_plot, gamma_plot, '-', label = secondParam)
 

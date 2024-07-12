@@ -34,6 +34,7 @@ class DataReader:
         self.params: list = []
         self.dispersionDataframe = pd.DataFrame()
         self.dosDataframe = pd.DataFrame()
+        self.superconductingGapDataframe = pd.DataFrame()
 
     def __str__(self) -> str:
         dataStr = {'matchPattern': self.matchPattern,
@@ -200,4 +201,14 @@ class DataReader:
             self.dosDataframe = pd.read_fwf(dosPath, skiprows = 1, infer_nrows=-100, colspecs=[(0,16), (17,31)], names = ['E', 'DOS'], dtype = np.float64 )
         else:
             print("No such file ", dosPath)
+
+    def LoadSuperconductingGap(self, gapPath: str):
+        """
+        Loads superconducting gap from gapPath.
+        """
+        print("---> Loading superconducting gap")
+        if os.path.exists(gapPath):
+            self.superconductingGapDataframe = pd.read_fwf(gapPath, skiprows = 1, infer_nrows=-100, colspecs=[(0,24), (25,49), (50, 73)], names = ['kx', 'ky', 'gap'], dtype = np.float64 )
+        else:
+            print("No such file ", gapPath)
 

@@ -16,10 +16,10 @@ class DispersionPlotter(DataReader):
         plt.rcParams['font.serif'] = 'Computer Modern Roman'
         plt.rcParams['font.sans-serif'] = 'Computer Modern Sans serif'
         plt.rcParams['font.monospace'] = 'Computer Modern Typewriter'
-        plt.rcParams['axes.titlesize'] = 16
-        plt.rcParams['axes.labelsize'] = 16
-        plt.rcParams['xtick.labelsize'] = 14
-        plt.rcParams['ytick.labelsize'] = 14
+        plt.rcParams['axes.titlesize'] = 24
+        plt.rcParams['axes.labelsize'] = 24
+        plt.rcParams['xtick.labelsize'] = 20
+        plt.rcParams['ytick.labelsize'] = 20
         # Optionally, add custom LaTeX preamble
         plt.rcParams['text.latex.preamble'] = r'\usepackage{amsmath} \usepackage{amsfonts} \usepackage{amssymb}'
 
@@ -136,17 +136,20 @@ class DispersionPlotter(DataReader):
         plt.figure()
         for i in range(len(self.dispersionDataframe.N)):
             if np.abs(self.dispersionDataframe.E[i] - eFermi) < dE:
-                plt.plot(self.dispersionDataframe.kx[i], self.dispersionDataframe.ky[i], marker = '.', color = (self.dispersionDataframe.P_yz[i], self.dispersionDataframe.P_zx[i], self.dispersionDataframe.P_xy[i]))
+                plt.plot(self.dispersionDataframe.kx[i], self.dispersionDataframe.ky[i], marker = '.', markersize = 0.6, color = (self.dispersionDataframe.P_yz[i], self.dispersionDataframe.P_zx[i], self.dispersionDataframe.P_xy[i]))
         
-        plt.title(r'$E_{Fermi} = $' + str(eFermi) + " (meV)")
+        plt.title(r'$E_{Fermi} = $ ' + str(eFermi) + " (meV)")
         plt.xlabel(r'$k_x~(\tilde{a}^{-1})$')
         plt.ylabel(r'$k_y~(\tilde{a}^{-1})$')
+        plt.xlim(-0.15, 0.15)
+        plt.ylim(-0.15, 0.15)
+        plt.gca().set_aspect('equal', adjustable= 'box')
         plt.savefig(plotOutputPath)
         plt.close()
 
     def plotDos(self, eMax: float, plotOutputPath: str):
         plt.figure()
-        plt.plot(self.dosDataframe.DOS, self.dosDataframe.E)
+        plt.plot(self.dosDataframe.DOS, self.dosDataframe.E, color = 'black', linewidth = 1)
         plt.ylim(bottom = 0, top=eMax)
         plt.xlabel(r'DOS')
         plt.ylabel(r"E (meV)")
@@ -154,4 +157,20 @@ class DispersionPlotter(DataReader):
         plt.savefig(plotOutputPath)
         plt.close()
 
+    def plotSuperconductingGap(self, postfix: str, title: str):
+        plt.figure()
+        plt.scatter(self.superconductingGapDataframe.kx, self.superconductingGapDataframe.ky, c = self.superconductingGapDataframe.gap, s = 0.5, cmap = 'inferno')
+        plt.colorbar(label = r'$\tilde{\Delta}$ (meV)')
+        ticks = plt.gca().get_xticks()
+        plt.xticks(ticks)
+        plt.yticks(ticks)
+        plt.xlim(-1.2, 1.2)
+        plt.ylim(-1.2, 1.2)
 
+        plt.title(title)
+        plt.xlabel(r'$k_x~(\tilde{a}^{-1})$')
+        plt.ylabel(r'$k_y~(\tilde{a}^{-1})$')
+        plt.gca().set_aspect('equal', adjustable='box')
+        #plt.grid()
+        plt.savefig('../Plots/SuperconductingGap' + postfix + '.png')
+        plt.close()

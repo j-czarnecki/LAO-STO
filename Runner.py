@@ -110,7 +110,7 @@ def run_slurm_param_value(paramValuePairs, isAres: bool = False):
     for pair in paramValuePairs:
         nml[pair[0]][pair[1]] = pair[2] #editing all key-value pairs
     nml['physical_params']['J_SC_PRIME'] = nml['physical_params']['J_SC'] / 10. #No need to specify J_SC_PRIME
-
+    nml['physical_params']['J_SC_PRIME_NNN'] = nml['physical_params']['J_SC_NNN'] / 10. #No need to specify J_SC_PRIME_NNN
     
     with open('input.nml', 'w') as nml_file:
         f90nml.write(nml, nml_file, sort = False)

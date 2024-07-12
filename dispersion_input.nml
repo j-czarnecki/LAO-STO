@@ -9,13 +9,13 @@
     V_pds = -0.065e3,
     J_SC = 0.175e3,
     J_SC_PRIME = 0.0175e3,
-    U_HUB = 0.0,
-    V_HUB = 0.0,
+    U_HUB = 2.0e3,
+    V_HUB = 2.0e3,
     E_Fermi = 0.0e3 /
 
 &discretization
-    k1_steps = 200,
-    k2_steps = 200 /
+    k1_steps = 3000,
+    k2_steps = 3000 /
 
 &self_consistency
     gamma_start = 1.,
