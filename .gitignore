@@ -6,4 +6,5 @@
 *.o
 *.x
 *.pyc
+*.log
 __pycache__/*
