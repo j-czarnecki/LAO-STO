@@ -1,7 +1,7 @@
 TARGET = LAO_STO.x
 SHELL = /bin/sh
 F90 = ifx
-F90FLAGS = -O3 -ipo
+F90FLAGS = -O3 -ipo -fpp
 LIBS = -llapack -lblas
 
 TEST_TARGET = TEST_LAO_STO.x
@@ -20,7 +20,8 @@ OBJS = 	main.o \
 		mod_reader.o \
 		mod_broydenV2.o \
 		mod_compute_hamiltonians.o \
-		mod_integrate.o
+		mod_integrate.o \
+		mod_logger.o
 
 # Rule to check if a library is available
 CHECK_LIB := $(shell $(TARGET) $(LIBS) -o /dev/null $(OBJS) 2>/dev/null && echo "yes" || echo "no")
@@ -44,7 +45,8 @@ TEST_OBJS = tests.o \
 			mod_reader.o \
 			mod_broydenV2.o \
 			mod_compute_hamiltonians.o \
-			mod_integrate.o
+			mod_integrate.o \
+			mod_logger.o
 
 $(TEST_TARGET): $(TEST_OBJS)
 	$(F90) -o $(TEST_TARGET) $(F90FLAGS) $^ $(LIBS)
@@ -60,7 +62,8 @@ POSTPROCESSING_OBJS = 	main_postprocessing.o \
 						mod_utilities.o \
 						mod_writers.o \
 						mod_reader.o \
-						mod_compute_hamiltonians.o
+						mod_compute_hamiltonians.o \
+						mod_logger.o
 
 $(POSTPROCESSING_TARGET): $(POSTPROCESSING_OBJS)
 	$(F90) -o $(POSTPROCESSING_TARGET) $(F90FLAGS) $^ $(LIBS)
@@ -80,10 +83,10 @@ gnu: F90 = gfortran
 gnu: F90FLAGS = -O3 -Wall -Wextra -ffree-line-length-none
 gnu: $(TARGET)
 
-debug: F90FLAGS = -O0 -g -check all -debug all -warn all -diag-enable sc
+debug: F90FLAGS = -O0 -g -fpp -DDEBUG #-check all -debug all -warn all -diag-enable sc
 debug: $(TARGET)
 
-test: F90FLAGS = -O0 -g -check all -debug all -warn all -diag-enable sc
+test: F90FLAGS = -O0 -g -fpp #-check all -debug all -warn all -diag-enable sc
 test: $(TEST_TARGET)
 
 postprocessing: $(POSTPROCESSING_TARGET)
@@ -110,7 +113,8 @@ main.o:	mod_hamiltonians.o \
 		mod_reader.o \
 		mod_broydenV2.o \
 		mod_compute_hamiltonians.o \
-		mod_integrate.o
+		mod_integrate.o \
+		mod_logger.o
 
 tests.o:	mod_hamiltonians.o \
 			mod_parameters.o \
@@ -150,7 +154,8 @@ mod_compute_hamiltonians.o: mod_parameters.o \
 							mod_writers.o
 
 mod_integrate.o: mod_parameters.o \
-				 mod_compute_hamiltonians.o
+				 mod_compute_hamiltonians.o \
+				 mod_logger.o
 
 mod_postprocessing.o: 	mod_hamiltonians.o \
 						mod_parameters.o \
@@ -158,6 +163,8 @@ mod_postprocessing.o: 	mod_hamiltonians.o \
 						mod_writers.o \
 						mod_reader.o \
 						mod_compute_hamiltonians.o
+
+mod_logger.o:
 
 
 

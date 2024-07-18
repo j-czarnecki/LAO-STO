@@ -20,11 +20,11 @@
     k2_steps = 10 /
 
 &self_consistency
-    read_gamma_from_file = .TRUE.,
+    read_gamma_from_file = .FALSE.,
     path_to_gamma_start = '/home/jczarnecki/LAO-STO-results/LAO-STO-Hub/RUN_E_Fermi_0.0_J_SC_150.0/OutputData/Gamma_SC_final.dat',
-    read_charge_from_file = .TRUE.,
+    read_charge_from_file = .FALSE.,
     path_to_charge_start = '/home/jczarnecki/LAO-STO-results/LAO-STO-Hub/RUN_E_Fermi_0.0_J_SC_150.0/OutputData/Charge_dens_final.dat',
-    gamma_start = 10.,
+    gamma_start = .01,
     gamma_nnn_start = 0.,
     charge_start = 0.1,
     max_sc_iter = 200,
@@ -34,12 +34,12 @@
     charge_eps_convergence = 1e-2 /
 
 &romberg_integration
-    romb_eps_x = 1e-1,
+    romb_eps_x = 1e-2,
     interpolation_deg_x = 4,
-    max_grid_refinements_x = 10,
-    romb_eps_y = 1e-1,
+    max_grid_refinements_x = 15,
+    romb_eps_y = 1e-2,
     interpolation_deg_y = 4,
-    max_grid_refinements_y = 10 /
+    max_grid_refinements_y = 15 /
 
 
 

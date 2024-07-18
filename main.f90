@@ -1,4 +1,8 @@
+#include "macros_def.f90"
+
 PROGRAM MAIN
+
+    USE mod_logger
     USE mod_hamiltonians
     USE mod_parameters
     USE mod_utilities
@@ -28,6 +32,8 @@ PROGRAM MAIN
     INTEGER*4 :: delta_real_elems
     INTEGER*4 :: broyden_index
 
+    CHARACTER(LEN=MAX_LOG_LEN) :: logStr
+
     !N_NEIGHBOURS + N_NEXT_NEIGHBOURS = 9, to implement both pairings
     !2 because spin up-down and down-up,
     !2 because of complex number
@@ -36,6 +42,8 @@ PROGRAM MAIN
     delta_real_elems = DIM_POSITIVE_K + ORBITALS*N_ALL_NEIGHBOURS*2*2*SUBLATTICES !SUBLATTICES should be excluded in absence of magnetic field
 
     CALL GET_INPUT("./input.nml")
+
+    CALL INIT_LOGGER()
 
     !Basis 
     !c_{k,yz,Ti1,up}, c_{k,zx,Ti1,up}, c_{k,xy,Ti1,up},
@@ -68,7 +76,8 @@ PROGRAM MAIN
     Delta_new(:,:,:,:) = DCMPLX(0. , 0.)
 
     IF (read_gamma_from_file) THEN
-        CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(path_to_gamma_start))    
+        LOG_INFO("Reading gamma from file: "//TRIM(path_to_gamma_start))
+        CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(path_to_gamma_start)) 
     ELSE
         !Breaking spin up-down down-up symmetry
         !coupling for nearest-neighbours
@@ -82,7 +91,8 @@ PROGRAM MAIN
     !Gamma_SC(:,:,:) = DCMPLX(0., 0.)
     Gamma_SC_new(:,:,:,:) = DCMPLX(0., 0.)
 
-    IF (read_gamma_from_file) THEN
+    IF (read_charge_from_file) THEN
+        LOG_INFO("Reading charge from file: "//TRIM(path_to_charge_start))
         CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(path_to_charge_start))
     ELSE
         Charge_dens(:) = charge_start
@@ -108,7 +118,10 @@ PROGRAM MAIN
     CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
     
     OPEN(unit = 99, FILE= "./OutputData/Convergence.dat", FORM = "FORMATTED", ACTION = "WRITE")
+    WRITE(99, *) '# sc_iter, Re(Gamma), Im(Gamma), Re(Gamma_new), Im(Gamma_new), n, n_new, gamma_max_err, charge_max_err'
     DO sc_iter = 1, max_sc_iter
+        WRITE(logStr,'(a, I0)') "==== SC_ITER: ", sc_iter
+        LOG_INFO(logStr)
         !PRINT*, "============= SC_ITER: ", sc_iter
         !PRINT*, "Gamma = ", Gamma_SC(1,1,1,1)/meV2au
         counter = 0
@@ -229,8 +242,10 @@ PROGRAM MAIN
         END DO
         !Change Broyden mixing parameter if simulation diverges between iterations
         !To avoid oscillations near convergence
-        IF (ABS(gamma_max_error) > ABS(gamma_max_error_prev)) THEN
+        IF (ABS(gamma_max_error) > ABS(gamma_max_error_prev) .AND. (sc_iter > 1)) THEN
             !PRINT*, "Adapted sc_alpha = ", sc_alpha
+            WRITE(logStr,'(a, E15.5)') "Divergent iteration. Adapted sc_alpha: ", sc_alpha
+            LOG_ABNORMAL(logStr)
             sc_alpha = sc_alpha*sc_alpha_adapt
         END IF
 
@@ -243,14 +258,20 @@ PROGRAM MAIN
             IF (charge_error > charge_max_error) charge_max_error = charge_error
         END DO
 
-        IF (sc_flag) THEN 
-            PRINT*, "Convergence reached!"
+        IF (sc_flag) THEN
+            LOG_INFO("Convergence reached!")  
             EXIT
         END IF
 
         WRITE(99,'(I0, 8E15.5)') sc_iter, REAL(Gamma_SC(1,1,1,1)/meV2au), AIMAG(Gamma_SC(1,1,1,1)/meV2au), &
         &                                 REAL(Gamma_SC_new(1,1,1,1)/meV2au), AIMAG(Gamma_SC_new(1,1,1,1)/meV2au), &
         &                                 Charge_dens(1), Charge_dens_new(1), gamma_max_error/meV2au, charge_max_error
+        WRITE(logStr,'(a, E15.5)') "gamma_max_error [meV]: ", gamma_max_error/meV2au
+        LOG_INFO(logStr)
+        WRITE(logStr,'(a, E15.5)') "charge_max_error: ", charge_max_error
+        LOG_INFO(logStr)
+
+        
         !PRINT*, "Gamma max error ", gamma_max_error
 
         !In the beginning of convergence use Broyden method to quickly find minimum
@@ -322,7 +343,7 @@ PROGRAM MAIN
     !Just for memory deallocation, the .TRUE. flag is crucial
     CALL mix_broyden(delta_real_elems, Delta_new_broyden(:), Delta_broyden(:), sc_alpha, sc_iter, 4, .TRUE.)
 
-
+    CALL CLOSE_LOGGER()
 
 
     DEALLOCATE(Hamiltonian)

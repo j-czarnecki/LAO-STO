@@ -1,7 +1,11 @@
 MODULE mod_integrate
 USE mod_parameters
 USE mod_compute_hamiltonians
-IMPLICIT NONE 
+USE mod_logger
+IMPLICIT NONE
+
+#include "macros_def.f90"
+
 CONTAINS
 
 !Adapted from "Numerical Recipes in Fortran Second Edition" 
@@ -30,6 +34,8 @@ SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chunk_min, k1_
     INTEGER*4 :: n,i,j, spin, orb, lat
     REAL*8 :: dk2_trap, k2_trap
     LOGICAL :: convergence
+
+    CHARACTER(LEN=MAX_LOG_LEN) :: logStr
 
     stepsize = DCMPLX(0. , 0.)
     Delta_iterations = DCMPLX(0. , 0.)
@@ -130,6 +136,8 @@ SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chunk_min, k1_
         END IF
 
         IF (convergence) THEN
+            WRITE(logStr,'(a, I15)') "Romberg Y converged after iteration: ", j
+            LOG_DEBUG(logStr)
             RETURN
         ELSE
             Delta_iterations(:,:,:,:,j+1) = Delta_iterations(:,:,:,:,j)
@@ -137,6 +145,11 @@ SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chunk_min, k1_
             stepsize(j + 1) = 0.25*stepsize(j)
         END IF
     END DO
+
+    WRITE(logStr,'(a, E15.8, a, E15.8, a, I15)') "Romberg Y did not converge for chunk &
+    & k1_chunk_min: ", k1_chunk_min, " k1_chunk_max: ", k1_chunk_max, " k2_chunk_min: ", k2_chunk_min, " k2_chunk_max: ", k2_chunk_max,  " after iteration: ", j
+    LOG_ABNORMAL(logStr)
+
 
 END SUBROUTINE ROMBERG_Y
 
@@ -167,6 +180,8 @@ SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chunk_min, k1_
     INTEGER*4 :: n,i,j, spin, orb, lat
     REAL*8 :: dk1_trap, k1_trap
     LOGICAL :: convergence
+
+    CHARACTER(LEN=MAX_LOG_LEN) :: logStr
 
     stepsize = DCMPLX(0. , 0.)
     Delta_iterations = DCMPLX(0. , 0.)
@@ -265,6 +280,9 @@ SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chunk_min, k1_
         END IF
 
         IF (convergence) THEN
+            !No log necessary, since Romberg Y will give info about this
+            WRITE(logStr,'(a, I15)') "Romberg X converged after iteration: ", j
+            LOG_DEBUG(logStr)
             RETURN
         ELSE
             Delta_iterations(:,:,:,:,j+1) = Delta_iterations(:,:,:,:,j)
@@ -273,6 +291,11 @@ SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chunk_min, k1_
         END IF
 
     END DO
+
+    WRITE(logStr,'(a, F, a, F, a, F, a, I15)') "Romberg X did not converge for &
+    & k1_chunk_min: ", k1_chunk_min, " k1_chunk_max: ", k1_chunk_max, " k2_actual: ", k2_actual, " after iteration: ", j
+    LOG_ABNORMAL(logStr)
+
 
 END SUBROUTINE ROMBERG_X
 
