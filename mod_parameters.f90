@@ -26,6 +26,8 @@ REAL*8, PARAMETER :: PI = 4*ATAN(1.0d0)
 ! REAL*8, PARAMETER :: K2_MAX = (2. * PI * 2./3.)/A_TILDE
 REAL*8, PARAMETER :: K1_MAX = 1. !Full Brillouin zone to integrate over
 REAL*8, PARAMETER :: K2_MAX = 1.
+REAL*8, PARAMETER :: KX_MAX = 4.0d0*PI/(3.0d0*SQRT(3.0d0)) !This defines maximum kx of hexagon corresponding to the first Brillouin Zone
+REAL*8, PARAMETER :: KY_MAX = 2.0d0*PI/3.0d0 !This defines maximum ky of hexagon corresponding to the first Brillouin Zone
 REAL*8, PARAMETER :: JACOBIAN = 8*PI**2/(3.*SQRT(3.0d0))
 
 

@@ -56,6 +56,18 @@ REAL*8 eta_p
 REAL*8 :: dk1, dk2, domega
 
 
+!Used for postprocessing
+!Superconducting gap calculation
+LOGICAL :: enable_sc_gap_calc
+CHARACTER(1000) :: path_to_run_dir_sc_gap
+REAL*8 :: dE_sc_gap
+INTEGER*4 :: Nk_points_sc_gap
+
+!For chern number calculation
+LOGICAL :: enable_chern_number_calc
+CHARACTER(1000) :: path_to_run_dir_chern_number
+INTEGER*4 :: Nk_points_chern_number
+
 NAMELIST /physical_params/  &
 & T,                        &
 & t_D,                      &
@@ -98,6 +110,17 @@ NAMELIST /romberg_integration/ &
 & romb_eps_y,                 &
 & interpolation_deg_y,        &
 & max_grid_refinements_y
+
+NAMELIST /sc_gap_calculation/ &
+& enable_sc_gap_calc,         &
+& path_to_run_dir_sc_gap,     &
+& dE_sc_gap,                  &
+& Nk_points_sc_gap
+
+NAMELIST /chern_number_calculation/ &
+& enable_chern_number_calc, &
+& path_to_run_dir_chern_number, &
+& Nk_points_chern_number
 
 CONTAINS
 SUBROUTINE GET_INPUT(nmlfile)
@@ -163,6 +186,32 @@ SUBROUTINE GET_INPUT(nmlfile)
     CLOSE(9)
 
 END SUBROUTINE GET_INPUT
+
+SUBROUTINE GET_POSTPROCESSING_INPUT(nmlfile)
+    IMPLICIT NONE
+    CHARACTER(LEN=*), INTENT(IN) :: nmlfile
+
+    OPEN(unit = 9, FILE=nmlfile, FORM = "FORMATTED", ACTION = "READ", STATUS="OLD")
+    READ(9, NML = sc_gap_calculation)
+    IF (enable_sc_gap_calc) THEN
+        IF (Nk_points_sc_gap .LE. 0) STOP "Nk_points_sc_gap must be > 0"
+        IF (path_to_run_dir_sc_gap == "") STOP "path_to_run_dir_sc_gap must not be empty"
+        IF (dE_sc_gap .LE. 0) STOP "dE_sc_gap must be > 0"
+
+        dE_sc_gap = dE_sc_gap * meV2au
+    END IF
+
+    READ(9, NML = chern_number_calculation)
+    IF (enable_chern_number_calc) THEN
+        IF (Nk_points_chern_number .LE. 0) STOP "Nk_points_chern_number must be > 0"
+        IF (path_to_run_dir_chern_number == "") STOP "path_to_run_dir_chern_number must not be empty"
+    END IF
+
+    
+    CLOSE(9)
+
+END SUBROUTINE GET_POSTPROCESSING_INPUT
+
 
 SUBROUTINE GET_GAMMA_SC(Gamma_SC, path)
     CHARACTER(LEN=*), INTENT(IN) :: path

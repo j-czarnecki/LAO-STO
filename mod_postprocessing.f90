@@ -41,6 +41,7 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, DOS_filename)
     PRINT*, DOS_filename
 
     !PRINT*, "READING INPUT"
+    !TODO: This should be specified as an input to this subroutine
     CALL GET_INPUT("dispersion_input.nml")
 
     ALLOCATE(Hamiltonian(DIM,DIM)) 
@@ -60,6 +61,8 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, DOS_filename)
 
     !Get self consistent gamma and charge density
     !CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), "OutputData/Gamma_SC_iter.dat")
+    
+    !TODO: This should be specified as an input to this subroutine
     CALL GET_CHARGE_DENS(Charge_dens(:), "/home/jczarnecki/LAO-STO-results/RUNS_low_U/RUN_E_Fermi_-905.0_U_HUB_166.66666666666666_V_HUB_166.66666666666666/OutputData/Chargen_dens_final.dat")
 
 
@@ -154,6 +157,8 @@ SUBROUTINE CALCULATE_DISPERSION(filename, brilouinZoneFraction)
     REAL*8 :: spin_up_contribution, spin_down_contribution
 
     !PRINT*, "READING INPUT"
+
+    !TODO: This should be specified as an input to this subroutine
     CALL GET_INPUT("dispersion_input.nml")
 
     yz_contribution = 0.
@@ -183,6 +188,8 @@ SUBROUTINE CALCULATE_DISPERSION(filename, brilouinZoneFraction)
     Energies(:,:,:) = 0.
     Gamma_SC(:,:,:,:) = DCMPLX(0. , 0.)*meV2au
     Charge_dens(:) = 0.
+
+    !TODO: This should be specified as an input to this subroutine
     CALL GET_CHARGE_DENS(Charge_dens(:), "/home/jczarnecki/LAO-STO-results/LAO-STO-Hub/RUN_E_Fermi_990.0_J_SC_150.0/OutputData/Charge_dens_final.dat")
 
     !Computing k-independent terms
@@ -270,10 +277,6 @@ SUBROUTINE CALCULATE_DISPERSION(filename, brilouinZoneFraction)
     END DO 
     CLOSE(9)   
 
-
-
-
-
     DEALLOCATE(Hamiltonian)
     DEALLOCATE(Hamiltonian_const)
     DEALLOCATE(U_transformation)
@@ -284,14 +287,15 @@ SUBROUTINE CALCULATE_DISPERSION(filename, brilouinZoneFraction)
 
 END SUBROUTINE CALCULATE_DISPERSION
 
-SUBROUTINE CALCULATE_CHERN_PARAMS(Nk1, Nk2, HamDim)
+SUBROUTINE CALCULATE_CHERN_PARAMS(Nk1, Nk2, inputPath)
     !! Calculates Chern Params, based on https://arxiv.org/abs/cond-mat/0503172
     INTEGER*4, INTENT(IN) :: Nk1 !! Number of divisions along k1
     INTEGER*4, INTENT(IN) :: Nk2 !! Number of divisions along k2
-    INTEGER*4, INTENT(IN) :: HamDim !! DImension of the hamiltonian to be diagonalized (e.g. 4 for simple hellical, 24 for LAO-STO)
-    
+    !INTEGER*4, INTENT(IN) :: HamDim !! DImension of the hamiltonian to be diagonalized (e.g. 4 for simple hellical, 24 for LAO-STO)
+    CHARACTER(LEN=*) :: inputPath
+
     COMPLEX*16, ALLOCATABLE :: Psi(:,:,:,:)
-    COMPLEX*16 :: U1_chern(HamDim/2, HamDim/2), U2_chern(HamDim/2, HamDim/2), U3_chern(HamDim/2, HamDim/2), U4_chern(HamDim/2, HamDim/2)
+    COMPLEX*16 :: U1_chern(DIM/2, DIM/2), U2_chern(DIM/2, DIM/2), U3_chern(DIM/2, DIM/2), U4_chern(DIM/2, DIM/2)
     INTEGER*4 :: i,j,a,b,m,n
     REAL*8 :: potChem
     REAL*8 :: Bfield(3)
@@ -299,7 +303,7 @@ SUBROUTINE CALCULATE_CHERN_PARAMS(Nk1, Nk2, HamDim)
 
     COMPLEX*16 :: f_12, det1, det2, det3, det4
 
-    ALLOCATE(Psi(-Nk1/2:Nk1/2, 2, HamDim, HamDim))
+    ALLOCATE(Psi(-Nk1/2:Nk1/2, 2, DIM, DIM))
     i = 0
     j = 0
     a = 0
@@ -307,13 +311,13 @@ SUBROUTINE CALCULATE_CHERN_PARAMS(Nk1, Nk2, HamDim)
     n = 0
     m = 0
 
-    potChem = 0*meV2au
-    Bfield = (/0.0*T2au, 0.0*T2au, 5.0*T2au/)
+    potChem = 0*meV2au !Only for testing in hellical gap
+    Bfield = (/0.0*T2au, 0.0*T2au, 0.0*T2au/)
 
-    PRINT*, "Entered chern params"
-    PRINT*, "Ham dim ", HamDim
-    PRINT*, "HamDim/2", HamDim/2
-    PRINT*, "Nk1/2", Nk1/2
+    !PRINT*, "Entered chern params"
+    !PRINT*, "Ham dim ", DIM
+    !PRINT*, "DIM/2", DIM/2
+    !PRINT*, "Nk1/2", Nk1/2
     f_12 = DCMPLX(0., 0.)
     !Calculate Chern numbers
     DO j = -Nk2/2, Nk2/2 - 1
@@ -342,8 +346,8 @@ SUBROUTINE CALCULATE_CHERN_PARAMS(Nk1, Nk2, HamDim)
         !It could be improved to keep Nk1 + 1 values, but for now I hope it is not necessary
         IF (j .EQ. 0) THEN
             DO n = -Nk1/2, Nk1/2
-                CALL LAO_STO_CHERN_ENERGIES(Nk1, Nk2, n, j, './', Psi(n, 1, :, :)) !First row
-                CALL LAO_STO_CHERN_ENERGIES(Nk1, Nk2, n, j+1, './', Psi(n, 2, :, :)) !Second row
+                CALL LAO_STO_CHERN_ENERGIES(Nk1, Nk2, n, j, inputPath, Psi(n, 1, :, :)) !First row
+                CALL LAO_STO_CHERN_ENERGIES(Nk1, Nk2, n, j+1, inputPath, Psi(n, 2, :, :)) !Second row
 
                 !CALL HELLICAL_TEST_CHERN(potChem, Bfield, Nk1, Nk2, n , j, Psi(n,1,:,:))
                 !CALL HELLICAL_TEST_CHERN(potChem, Bfield, Nk1, Nk2, n , j + 1, Psi(n,2,:,:))
@@ -351,7 +355,7 @@ SUBROUTINE CALCULATE_CHERN_PARAMS(Nk1, Nk2, HamDim)
         ELSE
             Psi(:,1,:,:) = Psi(:,2,:,:)
             DO n = -Nk1/2, Nk1/2
-                CALL LAO_STO_CHERN_ENERGIES(Nk1, Nk2,n,j+1, './', Psi(n,2,:,:)) !Next row
+                CALL LAO_STO_CHERN_ENERGIES(Nk1, Nk2,n,j+1, inputPath, Psi(n,2,:,:)) !Next row
                 !CALL HELLICAL_TEST_CHERN(potChem, Bfield, Nk1, Nk2, n , j+1, Psi(n,2,:,:)) !Next row    
             END DO
         END IF
@@ -364,8 +368,8 @@ SUBROUTINE CALCULATE_CHERN_PARAMS(Nk1, Nk2, HamDim)
             U3_chern = DCMPLX(0.0, 0.)
             U4_chern = DCMPLX(0.0, 0.)
 
-            DO a = 1, HamDim/2
-                DO b = 1, HamDim/2
+            DO a = 1, DIM/2
+                DO b = 1, DIM/2
                     U1_chern(a, b) = SUM(CONJG(Psi(i,1,:,a))*Psi(i+1,1,:,b))
                     U2_chern(a, b) = SUM(CONJG(Psi(i+1,1,:,a))*Psi(i+1,2,:,b))
                     U3_chern(a, b) = SUM(CONJG(Psi(i+1,2,:,a))*Psi(i,2,:,b))
@@ -373,24 +377,24 @@ SUBROUTINE CALCULATE_CHERN_PARAMS(Nk1, Nk2, HamDim)
                 END DO
             END DO
 
-            det1 = det(U1_chern(:, :), HamDim/2)
+            det1 = det(U1_chern(:, :), DIM/2)
             IF (det1 .ne. 0.) THEN
                 det1 = det1 / ABS(det1)
             END IF
 
-            det2 = det(U2_chern(:, :), HamDim/2)
+            det2 = det(U2_chern(:, :), DIM/2)
             IF (det2 .ne. 0.) THEN
                 det2 = det2 / ABS(det2)
             END IF
 
 
-            det3 = det(U3_chern(:, :), HamDim/2)
+            det3 = det(U3_chern(:, :), DIM/2)
             IF (det3 .ne. 0.) THEN
                 det3 = det3 / ABS(det3)
             END IF
 
 
-            det4 = det(U4_chern(:, :), HamDim/2)
+            det4 = det(U4_chern(:, :), DIM/2)
             IF (det4 .ne. 0.) THEN
                 det4 = det4 / ABS(det4)
             END IF
@@ -401,45 +405,59 @@ SUBROUTINE CALCULATE_CHERN_PARAMS(Nk1, Nk2, HamDim)
         END DO
     END DO
 
-    PRINT*, "Chern number is ", f_12/(2*PI)
+    OPEN(unit = 9, FILE= TRIM(inputPath)//"OutputData/ChernNumber.dat", FORM = "FORMATTED", ACTION = "WRITE")
+    WRITE(9,*) f_12/(2*PI)
+    CLOSE(9)
+    !PRINT*, "Chern number is ", f_12/(2*PI)
 
     DEALLOCATE(Psi)
 
 END SUBROUTINE CALCULATE_CHERN_PARAMS
 
-SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(simulationPath, postfix, brilouinZoneFraction, dE, nBrillouinPoints)
+SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
     
-    CHARACTER(LEN=*), INTENT(IN) :: postfix
-    CHARACTER(LEN=*), INTENT(IN) :: simulationPath
-    REAL*8, INTENT(IN) :: brilouinZoneFraction
+    CHARACTER(LEN=*), INTENT(IN) :: inputPath !! This should be a path to folder where input.nml resides
     REAL*8, INTENT(IN) :: dE
     INTEGER*4, INTENT(IN) :: nBrillouinPoints
     CHARACTER(LEN=20) :: output_format
  
-    COMPLEX*16, ALLOCATABLE :: Hamiltonian(:,:), Hamiltonian_const(:,:), U_transformation(:,:)
+    COMPLEX*16, ALLOCATABLE :: Hamiltonian(:,:), Hamiltonian_const(:,:)
     REAL*8, ALLOCATABLE :: Energies(:)
 
     COMPLEX*16, ALLOCATABLE :: Gamma_SC(:,:,:,:)
     REAL*8, ALLOCATABLE :: Charge_dens(:)
 
-    INTEGER*1, ALLOCATABLE :: IsFermiSurface(:,:) 
+    INTEGER*1, ALLOCATABLE :: IsFermiSurface(:,:) !! This indicates whether given (kx,ky) point is at Fermi surface
+    INTEGER*2, ALLOCATABLE :: OrbitalAtFermiSurface(:,:) !! This indicates which state consitutes to the Fermi surface.
+                                                         !! Because ZHEEV is used, energies are sorted from lowest to highest.
+                                                         !! This implies that we do not recognize which spin, orbital etc.
+                                                         !! constitutes to the Fermi surface, only "lowest", "second lowest" and so on.
+
+    REAL*8 :: brillouinZoneVertices(6,2)
 
     REAL*8 :: k1, k2, kx, ky, dkx, dky
     INTEGER*4 :: i,j,n
     INTEGER*4 :: kx_steps, ky_steps
 
+    LOGICAL :: fileExists
 
-    dkx = 1. / nBrillouinPoints
-    dky = 1. / nBrillouinPoints
+    brillouinZoneVertices(:,1) = (/ 4.*PI/(3*SQRT(3.0d0)), 2.*PI/(3*SQRT(3.0d0)), -2.*PI/(3*SQRT(3.0d0)), -4.*PI/(3*SQRT(3.0d0)), -2.*PI/(3*SQRT(3.0d0)), 2.*PI/(3*SQRT(3.0d0))/)
+    brillouinZoneVertices(:,2) = (/ 0.0d0, -2.*PI/3.0d0, -2.*PI/3.0d0, 0.0d0, 2.*PI/3.0d0, 2.*PI/3.0d0/)
 
-    kx_steps = INT(nBrillouinPoints/2 * brilouinZoneFraction)
-    ky_steps = INT(nBrillouinPoints/2 * brilouinZoneFraction)
+    dkx = KX_MAX / nBrillouinPoints
+    dky = KY_MAX / nBrillouinPoints
+
+    kx_steps = INT(nBrillouinPoints)
+    ky_steps = INT(nBrillouinPoints)
+
+
 
 
     ALLOCATE(Hamiltonian(DIM,DIM)) 
     ALLOCATE(Hamiltonian_const(DIM,DIM))
     ALLOCATE(Energies(DIM))
     ALLOCATE(IsFermiSurface(-kx_steps:kx_steps, -ky_steps:ky_steps))
+    ALLOCATE(OrbitalAtFermiSurface(-kx_steps:kx_steps, -ky_steps:ky_steps))
     ALLOCATE(Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES))
     ALLOCATE(Charge_dens(DIM_POSITIVE_K))
 
@@ -450,13 +468,19 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(simulationPath, postfix, brilouinZoneFr
     Gamma_SC(:,:,:,:) = DCMPLX(0. , 0.)*meV2au
     Charge_dens(:) = 0.
     IsFermiSurface(:,:) = 0
-    output_format = '(2E15.5, I10)'
+    OrbitalAtFermiSurface(:,:) = 0
+    output_format = '(2E15.5, 2I10)'
 
 
     !Get parameters from simulation
-    CALL GET_INPUT(TRIM(simulationPath)//"input.nml")
-    CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(simulationPath)//"OutputData/Charge_dens_final.dat")
+    CALL GET_INPUT(TRIM(inputPath)//"input.nml")
 
+    INQUIRE(FILE = TRIM(inputPath)//"OutputData/Charge_dens_final.dat", EXIST = fileExists)
+    IF (fileExists) THEN
+        CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
+    ELSE
+        CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
+    END IF
     !Computing k-independent terms
     CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:,:))
     CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:,:))
@@ -467,33 +491,38 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(simulationPath, postfix, brilouinZoneFr
     END DO
     CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
 
-    OPEN(unit = 9, FILE= "./OutputData/FermiSurface"//TRIM(postfix)//".dat", FORM = "FORMATTED", ACTION = "WRITE")
+    OPEN(unit = 9, FILE= TRIM(inputPath)//"OutputData/FermiSurface.dat", FORM = "FORMATTED", ACTION = "WRITE")
     !Dispersion relation in a normal state
     DO i = -kx_steps, kx_steps
         DO j = -ky_steps, ky_steps
-            kx = i*dkx * (2. * PI * 2./3.)
-            ky = j*dky * (2. * PI * 2./3.)
+            kx = i*dkx !* (2. * PI * 2./3.)
+            ky = j*dky !* (2. * PI * 2./3.)
 
-            Hamiltonian(:,:) = DCMPLX(0. , 0.)
-            Energies(:) = 0.
-            CALL COMPUTE_TBA_TERM(Hamiltonian(:,:), kx, ky)
-            CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-            CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-            CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-            CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:))
-            !CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
-        
-            CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
-        
-            Hamiltonian(:,:) = Hamiltonian_const(:,:) + Hamiltonian(:,:) !Should by multiplied by 0.5 if in Nambu space
-        
-            CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:DIM_POSITIVE_K, :DIM_POSITIVE_K), Energies(:DIM_POSITIVE_K), DIM_POSITIVE_K)
+            IF (is_inside_polygon(brillouinZoneVertices, 6, kx, ky)) THEN
 
-            !Check whether current wavevector is in the Fermi surface
-            IF (MINVAL(ABS(Energies(:DIM_POSITIVE_K))) < dE) THEN
-                IsFermiSurface(i,j) = 1
+                Hamiltonian(:,:) = DCMPLX(0. , 0.)
+                Energies(:) = 0.
+                CALL COMPUTE_TBA_TERM(Hamiltonian(:,:), kx, ky)
+                CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:))
+                !CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
+            
+                CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
+            
+                Hamiltonian(:,:) = Hamiltonian_const(:,:) + Hamiltonian(:,:) !Should by multiplied by 0.5 if in Nambu space
+            
+                CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:DIM_POSITIVE_K, :DIM_POSITIVE_K), Energies(:DIM_POSITIVE_K), DIM_POSITIVE_K)
+                !CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:DIM_POSITIVE_K, :DIM_POSITIVE_K), Energies(:DIM_POSITIVE_K), U_transformation(:DIM_POSITIVE_K, :DIM_POSITIVE_K), DIM_POSITIVE_K)
+
+                !Check whether current wavevector is in the Fermi surface
+                IF (MINVAL(ABS(Energies(:DIM_POSITIVE_K))) < dE) THEN
+                    IsFermiSurface(i,j) = 1
+                    OrbitalAtFermiSurface(i,j) = MINLOC(ABS(Energies(:DIM_POSITIVE_K)), 1)
+                END IF
+                WRITE(9, output_format) kx, ky, IsFermiSurface(i,j), OrbitalAtFermiSurface(i,j)
             END IF
-            WRITE(9,*) kx, ky, IsFermiSurface(i,j)
         END DO
     END DO
     CLOSE(9)
@@ -501,14 +530,19 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(simulationPath, postfix, brilouinZoneFr
     PRINT*, "Fermi surface done"
 
     !Calculation of superconducting gap
-    CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(simulationPath)//"OutputData/Gamma_SC_final.dat")
+    INQUIRE(FILE = TRIM(inputPath)//"OutputData/Gamma_SC__final.dat", EXIST = fileExists)
+    IF (fileExists) THEN
+        CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(inputPath)//"OutputData/Gamma_SC_final.dat")
+    ELSE
+        CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
+    END IF
     !Gamma_SC(:, (N_NEIGHBOURS + 1):, :, :) = 2 * meV2au
-    OPEN(unit = 9, FILE= "./OutputData/SuperconductingGap"//TRIM(postfix)//".dat", FORM = "FORMATTED", ACTION = "WRITE")
+    OPEN(unit = 9, FILE= TRIM(inputPath)//"OutputData/SuperconductingGap.dat", FORM = "FORMATTED", ACTION = "WRITE")
     DO i = -kx_steps, kx_steps
         DO j = -ky_steps, ky_steps
             IF (IsFermiSurface(i,j) == 1) THEN
-                kx = i*dkx * (2. * PI * 2./3.)
-                ky = j*dky * (2. * PI * 2./3.)
+                kx = i*dkx !* (2. * PI * 2./3.)
+                ky = j*dky !* (2. * PI * 2./3.)
 
                 Hamiltonian(:,:) = DCMPLX(0. , 0.)
                 Energies(:) = 0.
@@ -527,14 +561,13 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(simulationPath, postfix, brilouinZoneFr
                 !     END IF
                 ! END DO
 
-
                 CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
             
                 Hamiltonian(:,:) = 0.5*(Hamiltonian_const(:,:) + Hamiltonian(:,:)) !Should by multiplied by 0.5 if in Nambu space
             
                 CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:,:), Energies(:), DIM)
                 !Write superconducting gap
-                WRITE(9,*) kx, ky, ABS(Energies(DIM_POSITIVE_K) - Energies(DIM_POSITIVE_K + 1)) / meV2au
+                WRITE(9,output_format) kx, ky, ABS(Energies(DIM_POSITIVE_K) - Energies(DIM_POSITIVE_K + 1)) / meV2au, OrbitalAtFermiSurface(i,j)
             END IF
         END DO
     END DO
@@ -601,14 +634,14 @@ SUBROUTINE HELLICAL_TEST_CHERN(potChem, B, Nk1, Nk2, i, j, U_transformation)
 
 END SUBROUTINE HELLICAL_TEST_CHERN
 
-SUBROUTINE LAO_STO_CHERN_ENERGIES(Nk1, Nk2, i, j, run_dir, U_transformation)
+SUBROUTINE LAO_STO_CHERN_ENERGIES(Nk1, Nk2, i, j, inputPath, U_transformation)
     !! This subroutine calculates energies and wavefunctions of LAO-STO in [111] direction.
     !! Returns sorted wavefunctions in (i,j) point of the Brillouin zone.
     INTEGER*4, INTENT(IN) :: Nk1 !! Number of divisions of Brillouin zone in direction k1.
     INTEGER*4, INTENT(IN) :: Nk2 !! Number of divisions of Brillouin zone in direction k2.
     INTEGER*4, INTENT(IN) :: i !! Curent point k1_i in the Brillouin zone
     INTEGER*4, INTENT(IN) :: j !! Curent point k2_j in the Brillouin zone
-    CHARACTER(LEN=*), INTENT(IN) :: run_dir !! Directory of the run, where input.nml should be placed.
+    CHARACTER(LEN=*), INTENT(IN) :: inputPath !! Directory of the run, where input.nml should be placed.
                                             !! It contains material information and physical parameter of calculation:
                                             !! Fermi energy, temperature etc.
     COMPLEX*16, INTENT(OUT) :: U_transformation(DIM, DIM) !! Matrix containing eigenvectors stored in consecutive columns.
@@ -622,6 +655,7 @@ SUBROUTINE LAO_STO_CHERN_ENERGIES(Nk1, Nk2, i, j, run_dir, U_transformation)
     REAL*8 :: k1, k2, kx, ky
     REAL*8 :: dk1_Chern, dk2_Chern
     INTEGER*4 :: n
+    LOGICAL :: fileExists
 
     !PRINT*, "Allocation ended"
     dk1_Chern = K1_MAX/Nk1
@@ -634,13 +668,26 @@ SUBROUTINE LAO_STO_CHERN_ENERGIES(Nk1, Nk2, i, j, run_dir, U_transformation)
 
     !PRINT*, "Entered chern energies"
     !Get parameters from simulation
-    CALL GET_INPUT(TRIM(run_dir)//"input.nml")
+    CALL GET_INPUT(TRIM(inputPath)//"input.nml")
     !CHeck if units are correct
-    ! CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(run_dir)//"OutputData/Gamma_SC_final.dat")
-    ! CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(run_dir)//"OutputData/Chargen_dens_final.dat")
+    !Get Gammas from run
+    INQUIRE(FILE = TRIM(inputPath)//"OutputData/Gamma_SC__final.dat", EXIST = fileExists)
+    IF (fileExists) THEN
+        CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(inputPath)//"OutputData/Gamma_SC_final.dat")
+    ELSE
+        CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
+    END IF
+    
+    !Get cherge densities from file
+    INQUIRE(FILE = TRIM(inputPath)//"OutputData/Charge_dens_final.dat", EXIST = fileExists)
+    IF (fileExists) THEN
+        CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
+    ELSE
+        CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
+    END IF
 
-    Gamma_SC(:,:,1,:) = 100.0d0 * meV2au
-    Gamma_SC(:,:,2,:) = -100.0d0 * meV2au
+    !Gamma_SC(:,:,1,:) = 100.0d0 * meV2au
+    !Gamma_SC(:,:,2,:) = -100.0d0 * meV2au
 
 
     !Computing k-independent terms
@@ -741,6 +788,48 @@ COMPLEX*16 FUNCTION det(matrix, n)
     RETURN
 
 END FUNCTION det
+
+LOGICAL FUNCTION is_inside_polygon(verticesArray, nVertices, pointX, pointY)
+    !! This function returns true if the point (pointX, pointY) is inside the polygon
+    !! Where vertices are defined in array verticesArray, containing X and Y coordinates.
+    !! The assumption is that the polygon is two-dimensional
+    IMPLICIT NONE
+    INTEGER*4, INTENT(IN) :: nVertices !! Number of vertices of polygon
+    REAL*8, INTENT(IN) :: verticesArray(nVertices,2) !! X and Y coordinates of vertices
+    REAL*8, INTENT(IN) :: pointX, pointY !! X and Y coordinates of point to be tested
+    INTEGER*4 :: i, j
+    REAL*8 :: xIntersection
+
+    is_inside_polygon = .FALSE.
+
+    DO i = 1, nVertices
+
+        IF (pointX == verticesArray(i,1) .AND. pointY == verticesArray(i,2)) THEN
+            is_inside_polygon = .TRUE.
+            RETURN
+        END IF
+
+        j = MOD(i, nVertices) + 1 !! Index of next vertex
+        !! Check if horizontal line of y = pointY can cross the line joining two vertices
+        IF (pointY > MIN(verticesArray(i,2), verticesArray(j,2)) .AND. &
+        & pointY <= MAX(verticesArray(i,2), verticesArray(j,2))) THEN
+            IF (pointX <= MAX(verticesArray(i,1), verticesArray(j,1)) ) THEN
+                IF (verticesArray(i,2) /= verticesArray(j,2)) THEN !To avoid division by zero
+                    !Calculates intersection point of line connecting two vertices and horizontal line y = pointY
+                    xIntersection = (pointY - verticesArray(i,2)) * &
+                    & (verticesArray(j,1) - verticesArray(i,1))/(verticesArray(j,2) &
+                    & - verticesArray(i,2)) + verticesArray(i,1)
+
+                    IF (pointX <= xIntersection .OR. verticesArray(i,1) == verticesArray(j,1)) THEN
+                        is_inside_polygon = .NOT. is_inside_polygon
+                    END IF
+                END IF
+            END IF
+        END IF
+    END DO
+
+    RETURN
+END FUNCTION is_inside_polygon
 
     !MAKE THIS A SUBROUTINE
     !Plot this dispersion
