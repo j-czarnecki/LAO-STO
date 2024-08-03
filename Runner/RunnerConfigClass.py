@@ -1,38 +1,42 @@
 import f90nml
-
+import textwrap
 
 class RunnerConfig:
     def __init__(self):
 
-        self.job_header = f"#!/bin/bash\n\
-        #SBATCH --job-name=LAO_STO              # Job name\n\
-        #SBATCH --partition tera-cpu       # we specify to run the process on gpu nodes\n\
-        #SBATCH --ntasks-per-node=1        # Maximum number of tasks on each node\n\
-        #SBATCH --time=72:00:00            # Wall time limit (days-hrs:min:sec)\n\
-        #SBATCH --mem-per-cpu=3800MB         # Memory (i.e. RAM) per processor\n\
-        #SBATCH --output=\"output.out\"    # Path to the standard output and error files relative to the working directory\n"
+        #Using dedent to remove indentation and align every row with the first column of file
+        self.job_header = textwrap.dedent('''\
+        #!/bin/bash
+        #SBATCH --job-name=LAO_STO              # Job name
+        #SBATCH --partition tera-cpu       # we specify to run the process on gpu nodes
+        #SBATCH --ntasks-per-node=1        # Maximum number of tasks on each node
+        #SBATCH --time=72:00:00            # Wall time limit (days-hrs:min:sec)
+        #SBATCH --mem-per-cpu=3800MB         # Memory (i.e. RAM) per processor
+        #SBATCH --output=\"output.out\"    # Path to the standard output and error files relative to the working directory
+        ''')
 
 
-
-        self.job_header_ares = f'#!/bin/bash -l\n\
-        ## Job name\n\
-        #SBATCH -J LAO-STO\n\
-        ## Number of allocated nodes\n\
-        #SBATCH -N 1\n\
-        ## Number of tasks per node (by default this corresponds to the number of cores allocated per node)\n\
-        #SBATCH --ntasks-per-node=1\n\
-        ## Memory allocated per core (default is 5GB)\n\
-        #SBATCH --mem-per-cpu=3800MB\n\
-        ## Max task execution time (format is HH:MM:SS)\n\
-        #SBATCH --time=168:00:00\n\
-        ## Name of grant to which resource usage will be charged\n\
-        #SBATCH -A plglaosto111-cpu\n\
-        ## Name of partition\n\
-        #SBATCH -p plgrid-long\n\
-        ## Name of file to which standard output will be redirected\n\
-        #SBATCH --output="output.out"\n\
-        ## Name of file to which the standard error stream will be redirected\n\
-        #SBATCH --error="error.err"\n'
+        self.job_header_ares = textwrap.dedent('''\
+        #!/bin/bash -l
+        ## Job name
+        #SBATCH -J LAO-STO
+        ## Number of allocated nodes
+        #SBATCH -N 1
+        ## Number of tasks per node (by default this corresponds to the number of cores allocated per node)
+        #SBATCH --ntasks-per-node=1
+        ## Memory allocated per core (default is 5GB)
+        #SBATCH --mem-per-cpu=3800MB
+        ## Max task execution time (format is HH:MM:SS)
+        #SBATCH --time=168:00:00
+        ## Name of grant to which resource usage will be charged
+        #SBATCH -A plglaosto111-cpu
+        ## Name of partition
+        #SBATCH -p plgrid-long
+        ## Name of file to which standard output will be redirected
+        #SBATCH --output="output.out"
+        ## Name of file to which the standard error stream will be redirected
+        #SBATCH --error="error.err"
+        ''')
 
     def LAO_STO_default_nml(self):
         parser = f90nml.Parser()
