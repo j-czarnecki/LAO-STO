@@ -54,7 +54,7 @@ class Runner(RunnerConfig):
                 print(self.job_header, file = job_file)
 
             print('cd ' + path, file = job_file)
-            print(os.path.join('..', runner_cwd, 'LAO_STO.x'), file = job_file)
+            print(os.path.join(runner_cwd, '..', 'LAO_STO.x'), file = job_file)
 
         #queue slurm job
         #simulate = subprocess.run(["sbatch", "job.sh"])
@@ -83,7 +83,7 @@ class Runner(RunnerConfig):
                 print(self.job_header, file = job_file)
 
             print('cd ' + runDir, file = job_file)
-            print(os.path.join('..', runner_cwd, 'POSTPROCESSING_LAO_STO.x'), file = job_file)
+            print(os.path.join(runner_cwd, '..', 'POSTPROCESSING_LAO_STO.x'), file = job_file)
         
         #queue slurm job
         #simulate = subprocess.run(["sbatch", "job.sh"])
