@@ -13,7 +13,7 @@ def main():
     for dir in directories:
         nmlDirectorySC = ('sc_gap_calculation', 'path_to_run_dir_sc_gap', dir)
         nmlDirectoryChern = ('chern_number_calculation', 'path_to_run_dir_chern_number', dir)
-        runner.run_slurm_postprocessing(dir, [enable_sc, nmlDirectorySC, enable_chern, nmlDirectoryChern])
+        runner.run_slurm_postprocessing(dir, [enable_sc, nmlDirectorySC, enable_chern, nmlDirectoryChern], True)
 
 
     #runner.run_sequential()
