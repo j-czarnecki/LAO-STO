@@ -492,6 +492,7 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
     CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
 
     OPEN(unit = 9, FILE= TRIM(inputPath)//"OutputData/FermiSurface.dat", FORM = "FORMATTED", ACTION = "WRITE")
+    WRITE(9,*) '#kx[1/a] ky[1/a] is_fermi_surface N_orbital'
     !Dispersion relation in a normal state
     DO i = -kx_steps, kx_steps
         DO j = -ky_steps, ky_steps
@@ -538,6 +539,9 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
     END IF
     !Gamma_SC(:, (N_NEIGHBOURS + 1):, :, :) = 2 * meV2au
     OPEN(unit = 9, FILE= TRIM(inputPath)//"OutputData/SuperconductingGap.dat", FORM = "FORMATTED", ACTION = "WRITE")
+    WRITE(9,*) '#kx[1/a] ky[1/a] gap_SC[meV] N_orbital'
+    output_format = '(3E15.5, I10)'
+
     DO i = -kx_steps, kx_steps
         DO j = -ky_steps, ky_steps
             IF (IsFermiSurface(i,j) == 1) THEN
