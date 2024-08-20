@@ -35,6 +35,13 @@ class DataReader:
         self.dispersionDataframe = pd.DataFrame()
         self.dosDataframe = pd.DataFrame()
         self.superconductingGapDataframe = pd.DataFrame()
+        self.superconductingGapMap:  dict =\
+            {1: {'kx': [], 'ky': [], 'gap': []},\
+             2: {'kx': [], 'ky': [], 'gap': []},\
+             3: {'kx': [], 'ky': [], 'gap': []},\
+             4: {'kx': [], 'ky': [], 'gap': []},\
+             5: {'kx': [], 'ky': [], 'gap': []},\
+             6: {'kx': [], 'ky': [], 'gap': []}}
 
     def __str__(self) -> str:
         dataStr = {'matchPattern': self.matchPattern,
@@ -79,6 +86,12 @@ class DataReader:
                     self.filling[dictKey].append(pandasFile.filling[row])
                 else:
                    self.filling[dictKey].append(np.nan) 
+
+    def FillDictScGap(self, pandasFile: pd.DataFrame, fillNones: bool = False):
+        for row in range(len(pandasFile['kx'])):
+            self.superconductingGapMap[int(pandasFile['state'][row])]['kx'].append(pandasFile['kx'][row])
+            self.superconductingGapMap[int(pandasFile['state'][row])]['ky'].append(pandasFile['ky'][row])
+            self.superconductingGapMap[int(pandasFile['state'][row])]['gap'].append(pandasFile['gap'][row])
 
     def LoadFilling(self, loadUnfinished: bool):
         """
@@ -208,7 +221,19 @@ class DataReader:
         """
         print("---> Loading superconducting gap")
         if os.path.exists(gapPath):
-            self.superconductingGapDataframe = pd.read_fwf(gapPath, skiprows = 1, infer_nrows=-100, colspecs=[(0,24), (25,49), (50, 73)], names = ['kx', 'ky', 'gap'], dtype = np.float64 )
+            self.superconductingGapDataframe = pd.read_fwf(gapPath, skiprows = 1, infer_nrows=-100, colspecs=[(0,16), (17,31), (32, 46), (47, 56)], names = ['kx', 'ky', 'gap', 'state'], dtype = np.float64 )
         else:
             print("No such file ", gapPath)
 
+    def LoadSuperconductingGapMap(self, runsPathGap: str, matchPatternGap: str):
+        directories = [dir for dir in os.listdir(runsPathGap) if re.match(matchPatternGap, dir)]
+        isFirstIter = True
+
+        for dir in directories:
+            filePath = os.path.join(runsPathGap, dir, 'OutputData', 'SuperconductingGap.dat')
+            if os.path.exists(filePath):
+                currentGap = pd.read_fwf(filePath, skiprows = 1, infer_nrows=-100, colspecs=[(0,16), (17,31), (32, 46), (47, 56)], names = ['kx', 'ky', 'gap', 'state'], dtype = np.float64 )
+                self.FillDictScGap(currentGap)
+            else:
+                print("No such file ", filePath)
+            isFirstIter = False

@@ -1,5 +1,6 @@
 from DataReaderClass import *
 import matplotlib.pyplot as plt
+from matplotlib.patches import Polygon
 import numpy as np
 import seaborn as sns
 #TODO: self.lowestEnergy should not be used - all energies should be shown with respect to E_Fermi
@@ -158,14 +159,23 @@ class DispersionPlotter(DataReader):
         plt.close()
 
     def plotSuperconductingGap(self, postfix: str, title: str):
+        brillouinZoneVertices = np.zeros((7, 2)) #One more to close the polygon
+
+        brillouinZoneVertices[:, 0] = np.array([4.*np.pi/(3*np.sqrt(3.0)), 2.*np.pi/(3*np.sqrt(3.0)), 
+                                                -2.*np.pi/(3*np.sqrt(3.0)), -4.*np.pi/(3*np.sqrt(3.0)), 
+                                                -2.*np.pi/(3*np.sqrt(3.0)), 2.*np.pi/(3*np.sqrt(3.0)), 4.*np.pi/(3*np.sqrt(3.0))])
+
+        brillouinZoneVertices[:, 1] = np.array([0.0, -2.*np.pi/3.0, -2.*np.pi/3.0, 
+                                                0.0, 2.*np.pi/3.0, 2.*np.pi/3.0, 0.0])
         plt.figure()
+        plt.plot(brillouinZoneVertices[:,0], brillouinZoneVertices[:, 1], '--', color = 'black', linewidth = 0.8)
         plt.scatter(self.superconductingGapDataframe.kx, self.superconductingGapDataframe.ky, c = self.superconductingGapDataframe.gap, s = 0.5, cmap = 'inferno')
         plt.colorbar(label = r'$\tilde{\Delta}$ (meV)')
         ticks = plt.gca().get_xticks()
         plt.xticks(ticks)
         plt.yticks(ticks)
-        plt.xlim(-1.2, 1.2)
-        plt.ylim(-1.2, 1.2)
+        plt.xlim(-2.5, 2.5)
+        plt.ylim(-2.5, 2.5)
 
         plt.title(title)
         plt.xlabel(r'$k_x~(\tilde{a}^{-1})$')
@@ -174,3 +184,33 @@ class DispersionPlotter(DataReader):
         #plt.grid()
         plt.savefig('../Plots/SuperconductingGap' + postfix + '.png')
         plt.close()
+
+    def plotSuperconductingGapMap(self):
+        brillouinZoneVertices = np.zeros((7, 2)) #One more to close the polygon
+
+        brillouinZoneVertices[:, 0] = np.array([4.*np.pi/(3*np.sqrt(3.0)), 2.*np.pi/(3*np.sqrt(3.0)), 
+                                                -2.*np.pi/(3*np.sqrt(3.0)), -4.*np.pi/(3*np.sqrt(3.0)), 
+                                                -2.*np.pi/(3*np.sqrt(3.0)), 2.*np.pi/(3*np.sqrt(3.0)), 4.*np.pi/(3*np.sqrt(3.0))])
+
+        brillouinZoneVertices[:, 1] = np.array([0.0, -2.*np.pi/3.0, -2.*np.pi/3.0, 
+                                                0.0, 2.*np.pi/3.0, 2.*np.pi/3.0, 0.0])
+        
+        #print(self.superconductingGapMap[1][1][1])
+        for state in range(1,7):
+            plt.figure()
+            plt.plot(brillouinZoneVertices[:,0], brillouinZoneVertices[:, 1], '--', color = 'black', linewidth = 0.8)
+            plt.scatter(self.superconductingGapMap[state]['kx'], self.superconductingGapMap[state]['ky'], c = self.superconductingGapMap[state]['gap'], s = 0.5, cmap = 'inferno')
+            plt.colorbar(label = r'$\tilde{\Delta}$ (meV)')
+            ticks = plt.gca().get_xticks()
+            plt.xticks(ticks)
+            plt.yticks(ticks)
+            plt.xlim(-2.5, 2.5)
+            plt.ylim(-2.5, 2.5)
+
+            plt.title(fr'n = {state}')
+            plt.xlabel(r'$k_x~(\tilde{a}^{-1})$')
+            plt.ylabel(r'$k_y~(\tilde{a}^{-1})$')
+            plt.gca().set_aspect('equal', adjustable='box')
+            #plt.grid()
+            plt.savefig(f'../Plots/SuperconductingGapMap_n{state}.png')
+            plt.close()

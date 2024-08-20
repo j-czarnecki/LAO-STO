@@ -49,19 +49,25 @@ def main():
     # gammaAndFillingPlotter.plotFillingFermi()
     # gammaAndFillingPlotter.plotGammasTemperature()
 
-
     dispersionPlotter = DispersionPlotter()
-    dispersionPlotter.LoadSuperconductingGap('../OutputData/SuperconductingGap_NN_J175.dat')
-    dispersionPlotter.plotSuperconductingGap(postfix = 'NN_EF1000_J175', title = r'$J = 175$ (meV)')
-    
-    dispersionPlotter.LoadSuperconductingGap('../OutputData/SuperconductingGap_NN_J150.dat')
-    dispersionPlotter.plotSuperconductingGap(postfix = 'NN_EF1000_J160', title = r'$J = 160$ (meV)')
-    
-    dispersionPlotter.LoadSuperconductingGap('../OutputData/SuperconductingGap_NNN_J175.dat')
-    dispersionPlotter.plotSuperconductingGap(postfix = 'NNN_EF1000_J175', title = r'$J_{nnn} = 175$ (meV)')
+    dispersionPlotter.LoadSuperconductingGapMap('/home/jczarnecki/LAO-STO-results/LAO-STO-v0', 'RUN_.*')
+    dispersionPlotter.plotSuperconductingGapMap()
 
-    dispersionPlotter.LoadSuperconductingGap('../OutputData/SuperconductingGap_NNN_J150.dat')
-    dispersionPlotter.plotSuperconductingGap(postfix = 'NNN_EF1000_J125', title = r'$J_{nnn} = 125$ (meV)')
+    # Ef_tab = [-1000.0, -995.0, -990.0, -985.0, -980.0, -975.0, -970.0, -965.0, -960.0, -955.0, -950.0]
+
+    # for ef in Ef_tab:
+    #     dispersionPlotter = DispersionPlotter()
+    #     dispersionPlotter.LoadSuperconductingGap(f'/home/jczarnecki/LAO-STO-results/LAO-STO-v0/RUN_E_Fermi_{ef}/OutputData/SuperconductingGap.dat')
+    #     dispersionPlotter.plotSuperconductingGap(postfix = '_J170_'+str(ef), title = fr'$E_{{Fermi}} = {ef}$ (meV)')
+    
+    # dispersionPlotter.LoadSuperconductingGap('../OutputData/SuperconductingGap_NN_J150.dat')
+    # dispersionPlotter.plotSuperconductingGap(postfix = 'NN_EF1000_J160', title = r'$J = 160$ (meV)')
+    
+    # dispersionPlotter.LoadSuperconductingGap('../OutputData/SuperconductingGap_NNN_J175.dat')
+    # dispersionPlotter.plotSuperconductingGap(postfix = 'NNN_EF1000_J175', title = r'$J_{nnn} = 175$ (meV)')
+
+    # dispersionPlotter.LoadSuperconductingGap('../OutputData/SuperconductingGap_NNN_J150.dat')
+    # dispersionPlotter.plotSuperconductingGap(postfix = 'NNN_EF1000_J125', title = r'$J_{nnn} = 125$ (meV)')
 
     # dispersionPlotter.LoadDispersion("../OutputData/Energies.dat")
     # dispersionPlotter.LoadDos("../OutputData/DOS.dat")
