@@ -10,9 +10,9 @@
 ! One has to specify -fpp flag during compilation to include preprocessor directives
 ! -DDEBUG to include debug traces
 #ifdef DEBUG
-    #define LOG_DEBUG(logMsg) CALL LOG_STRING_DEBUG(logMsg)
+#define LOG_DEBUG(logMsg) CALL LOG_STRING_DEBUG(logMsg)
 #else
-    #define LOG_DEBUG(logMsg)
+#define LOG_DEBUG(logMsg)
 #endif
 
 ! Always define info traces
