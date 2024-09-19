@@ -3,6 +3,15 @@ SHELL = /bin/sh
 F90 = ifx
 F90FLAGS = -O3 -ipo -fpp
 LIBS = -llapack -lblas
+LIBS_MKL = -I${MKLROOT}/include \
+					 -I/opt/intel/mkl/include \
+					 -Wl,--start-group \
+           ${MKLROOT}/lib/intel64/libmkl_gf_lp64.so \
+           ${MKLROOT}/lib/intel64/libmkl_gnu_thread.so \
+           ${MKLROOT}/lib/intel64/libmkl_core.so \
+           -Wl,--end-group \
+           -lgomp -lpthread -lm -ldl
+
 
 TEST_TARGET = TEST_LAO_STO.x
 POSTPROCESSING_TARGET = POSTPROCESSING_LAO_STO.x
@@ -24,13 +33,13 @@ OBJS = 	main.o \
 		mod_logger.o
 
 # Rule to check if a library is available
-CHECK_LIB := $(shell $(TARGET) $(LIBS) -o /dev/null $(OBJS) 2>/dev/null && echo "yes" || echo "no")
+CHECK_LIB := $(shell $(TARGET) $(LIBS) $(LIBS_MKL) -o /dev/null $(OBJS) 2>/dev/null && echo "yes" || echo "no")
 
 # Rule to check if an alternative library is available
 CHECK_ARES_LIB := $(shell $(TARGET) $(ARES_LIBS) -o /dev/null $(OBJS) 2>/dev/null && echo "yes" || echo "no")
 
 $(TARGET): $(OBJS)
-	$(F90) -o $(TARGET) $(F90FLAGS) $^ $(LIBS)
+	$(F90) -o $(TARGET) $(F90FLAGS) $^ $(LIBS) $(LIBS_MKL)
 
 %.o : %.f90
 	$(F90) $(F90FLAGS) -c $< -o $@
@@ -49,7 +58,7 @@ TEST_OBJS = tests.o \
 			mod_logger.o
 
 $(TEST_TARGET): $(TEST_OBJS)
-	$(F90) -o $(TEST_TARGET) $(F90FLAGS) $^ $(LIBS)
+	$(F90) -o $(TEST_TARGET) $(F90FLAGS) $^ $(LIBS) $(LIBS_MKL)
 
 %.o : %.f90
 	$(F90) $(F90FLAGS) -c $< -o $@
@@ -66,7 +75,7 @@ POSTPROCESSING_OBJS = 	main_postprocessing.o \
 						mod_logger.o
 
 $(POSTPROCESSING_TARGET): $(POSTPROCESSING_OBJS)
-	$(F90) -o $(POSTPROCESSING_TARGET) $(F90FLAGS) $^ $(LIBS)
+	$(F90) -o $(POSTPROCESSING_TARGET) $(F90FLAGS) $^ $(LIBS) $(LIBS_MKL)
 
 %.o : %.f90
 	$(F90) $(F90FLAGS) -c $< -o $@
@@ -83,7 +92,7 @@ gnu: F90 = gfortran
 gnu: F90FLAGS = -O3 -Wall -Wextra -ffree-line-length-none
 gnu: $(TARGET)
 
-debug: F90FLAGS = -O0 -g -fpp -DDEBUG #-check all -debug all -warn all -diag-enable sc
+debug: F90FLAGS = -O0 -g -fpp -DDEBUG #-check all -debug all -warn all #-diag-enable sc
 debug: $(TARGET)
 
 test: F90FLAGS = -O0 -g -fpp #-check all -debug all -warn all -diag-enable sc

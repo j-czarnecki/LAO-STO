@@ -436,7 +436,7 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
     REAL*8 :: brillouinZoneVertices(6,2)
 
     REAL*8 :: k1, k2, kx, ky, dkx, dky
-    INTEGER*4 :: i,j,n
+    INTEGER*4 :: i,j,n, m
     INTEGER*4 :: kx_steps, ky_steps
 
     LOGICAL :: fileExists
@@ -531,13 +531,13 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
     PRINT*, "Fermi surface done"
 
     !Calculation of superconducting gap
-    INQUIRE(FILE = TRIM(inputPath)//"OutputData/Gamma_SC__final.dat", EXIST = fileExists)
+    INQUIRE(FILE = TRIM(inputPath)//"OutputData/Gamma_SC_final.dat", EXIST = fileExists)
     IF (fileExists) THEN
         CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(inputPath)//"OutputData/Gamma_SC_final.dat")
     ELSE
         CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
     END IF
-    !Gamma_SC(:, (N_NEIGHBOURS + 1):, :, :) = 2 * meV2au
+
     OPEN(unit = 9, FILE= TRIM(inputPath)//"OutputData/SuperconductingGap.dat", FORM = "FORMATTED", ACTION = "WRITE")
     WRITE(9,*) '#kx[1/a] ky[1/a] gap_SC[meV] N_orbital'
     output_format = '(3E15.5, I10)'
@@ -558,17 +558,16 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
                 CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
                 ! DO n = 1, DIM_POSITIVE_K
                 !     IF (n .le. DIM_POSITIVE_K - ORBITALS) THEN
-                !         Hamiltonian(n, ORBITALS + DIM_POSITIVE_K + n) = 1e-2 * meV2au
+                !         Hamiltonian(n, ORBITALS + DIM_POSITIVE_K + n) = 20 * meV2au
                 !     END IF
                 !     IF (n .ge. ORBITALS) THEN
-                !         Hamiltonian(n, DIM_POSITIVE_K + n - ORBITALS) = 1e-2 * meV2au
+                !         Hamiltonian(n, DIM_POSITIVE_K + n - ORBITALS) = 20 * meV2au
                 !     END IF
                 ! END DO
-
                 CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
             
                 Hamiltonian(:,:) = 0.5*(Hamiltonian_const(:,:) + Hamiltonian(:,:)) !Should by multiplied by 0.5 if in Nambu space
-            
+
                 CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:,:), Energies(:), DIM)
                 !Write superconducting gap
                 WRITE(9,output_format) kx, ky, ABS(Energies(DIM_POSITIVE_K) - Energies(DIM_POSITIVE_K + 1)) / meV2au, OrbitalAtFermiSurface(i,j)
@@ -580,6 +579,139 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
 
 END SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP
 
+
+SUBROUTINE TRANSFORM_DELTA_MATRIX(inputPath, nBrillouinPoints)
+    CHARACTER(LEN=*), INTENT(IN) :: inputPath !! This should be a path to folder where input.nml resides
+    INTEGER*4, INTENT(IN) :: nBrillouinPoints
+
+    CHARACTER(LEN=20) :: output_format
+ 
+    COMPLEX*16, ALLOCATABLE :: Hamiltonian(:,:), Hamiltonian_const(:,:), Gamma_matrix(:,:), Gamma_matrix_temp(:,:), Gamma_matrix_diagonal(:,:)
+    COMPLEX*16, ALLOCATABLE :: U_transformation(:,:)
+    REAL*8, ALLOCATABLE :: Energies(:)
+
+    COMPLEX*16, ALLOCATABLE :: Gamma_SC(:,:,:,:)
+    REAL*8, ALLOCATABLE :: Charge_dens(:)
+    REAL*8 :: brillouinZoneVertices(6,2)
+
+    REAL*8 :: k1, k2, kx, ky, dkx, dky
+    INTEGER*4 :: i,j,n, m
+    INTEGER*4 :: kx_steps, ky_steps
+
+    LOGICAL :: fileExists
+
+    brillouinZoneVertices(:,1) = (/ 4.*PI/(3*SQRT(3.0d0)), 2.*PI/(3*SQRT(3.0d0)), -2.*PI/(3*SQRT(3.0d0)), -4.*PI/(3*SQRT(3.0d0)), -2.*PI/(3*SQRT(3.0d0)), 2.*PI/(3*SQRT(3.0d0))/)
+    brillouinZoneVertices(:,2) = (/ 0.0d0, -2.*PI/3.0d0, -2.*PI/3.0d0, 0.0d0, 2.*PI/3.0d0, 2.*PI/3.0d0/)
+
+    dkx = KX_MAX / nBrillouinPoints
+    dky = KY_MAX / nBrillouinPoints
+
+    kx_steps = INT(nBrillouinPoints)
+    ky_steps = INT(nBrillouinPoints)
+
+    ALLOCATE(Hamiltonian(DIM,DIM)) 
+    ALLOCATE(Hamiltonian_const(DIM,DIM))
+    ALLOCATE(U_transformation(DIM,DIM))
+    ALLOCATE(Gamma_matrix(DIM,DIM))
+    ALLOCATE(Gamma_matrix_diagonal(DIM,DIM))
+    ALLOCATE(Gamma_matrix_temp(DIM,DIM))
+    ALLOCATE(Energies(DIM))
+    ALLOCATE(Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES))
+    ALLOCATE(Charge_dens(DIM_POSITIVE_K))
+
+    Gamma_SC = DCMPLX(0.0d0,0.0d0)
+    Charge_dens = 0.0d0
+
+    !Get parameters from simulation
+    CALL GET_INPUT(TRIM(inputPath)//"input.nml")
+    !Charge densities
+    ! INQUIRE(FILE = TRIM(inputPath)//"OutputData/Charge_dens_final.dat", EXIST = fileExists)
+    ! IF (fileExists) THEN
+    !     CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
+    ! ELSE
+    !     CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
+    ! END IF
+    ! !Superconducting gap parameters
+    ! INQUIRE(FILE = TRIM(inputPath)//"OutputData/Gamma_SC__final.dat", EXIST = fileExists)
+    ! IF (fileExists) THEN
+    !     CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(inputPath)//"OutputData/Gamma_SC_final.dat")
+    ! ELSE
+    !     CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
+    ! END IF
+
+    Gamma_SC(:,:,1,:) = 999. * meV2au
+    Gamma_SC(:,:,2,:) = -999. * meV2au
+
+    !Initialize constant hamiltonian
+    CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:,:))
+    CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:,:))
+    CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian_const(:,:))
+    DO n = 1, DIM_POSITIVE_K
+        Hamiltonian_const(n,n) = Hamiltonian_const(n,n) - E_Fermi
+        Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) = Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) + E_Fermi
+    END DO
+    CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
+
+    DO i = -kx_steps, kx_steps
+        DO j = -ky_steps, ky_steps
+            kx = i*dkx !* (2. * PI * 2./3.)
+            ky = j*dky !* (2. * PI * 2./3.)
+            
+            IF (is_inside_polygon(brillouinZoneVertices, 6, kx, ky)) THEN
+
+                Hamiltonian(:,:) = DCMPLX(0. , 0.)
+                Energies(:) = 0.
+                CALL COMPUTE_TBA_TERM(Hamiltonian(:,:), kx, ky)
+                CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:))
+                CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
+                CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
+
+                Hamiltonian(:,:) = 0.5*(Hamiltonian_const(:,:) + Hamiltonian(:,:)) !Should by multiplied by 0.5 if in Nambu space
+                ! DO n = 1, DIM
+                !     WRITE(*,'(24E12.4)') (ABS(Hamiltonian(n,m))**2/meV2au, m = 1, DIM)
+                ! END DO
+                ! WRITE(*,*)
+                ! WRITE(*,*)
+
+                !CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:, :), Energies(:), DIM)
+                CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:,:), Energies(:), U_transformation(:,:), DIM)
+
+                !Compute current superconducing coupling matrix separately
+                Gamma_matrix(:,:) = DCMPLX(0.0d0, 0.0d0)
+                Gamma_matrix_diagonal(:,:) = DCMPLX(0.0d0, 0.0d0)
+                Gamma_matrix_temp(:,:) = DCMPLX(0.0d0, 0.0d0)
+                CALL COMPUTE_SC(Gamma_matrix(:,:), kx, ky, Gamma_SC(:,:,:,:))
+                CALL COMPUTE_CONJUGATE_ELEMENTS(Gamma_matrix(:,:), DIM)
+                Gamma_matrix = 0.5 * Gamma_matrix
+                DO n = 1, DIM
+                    DO m = 1, DIM
+                        Gamma_matrix_temp(n,m) = SUM(Gamma_matrix(n,:)*U_transformation(:,m))
+                    END DO
+                END DO
+                
+                DO n = 1, DIM
+                    DO m = 1, DIM
+                        Gamma_matrix_diagonal(n,m) = SUM(CONJG(U_transformation(:,n))*Gamma_matrix_temp(:,m))
+                    END DO
+                END DO
+
+                !Gamma_matrix_diagonal = MATMUL(MATMUL(Gamma_matrix, U_transformation), TRANSPOSE(CONJG(U_transformation)))
+
+                WRITE(*,'(A, 24F10.4)') 'Energies: ', (Energies(m)/meV2au, m = 1, DIM)
+                DO n = 1, DIM
+                    WRITE(*,'(24F10.4)') (REAL(Gamma_matrix_diagonal(n,m))/meV2au, m = 1, DIM)
+                END DO
+                WRITE(*,*)
+                WRITE(*,*)
+
+            END IF
+        END DO
+    END DO
+
+END SUBROUTINE TRANSFORM_DELTA_MATRIX
 
 SUBROUTINE HELLICAL_TEST_CHERN(potChem, B, Nk1, Nk2, i, j, U_transformation)
     INTEGER*4, PARAMETER :: HamDim = 4

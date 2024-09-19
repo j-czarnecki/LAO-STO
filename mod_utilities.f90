@@ -83,26 +83,49 @@ SUBROUTINE COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, N)
     END DO
 END SUBROUTINE COMPUTE_CONJUGATE_ELEMENTS
 
+! !dir$ attributes forceinline :: epsilon_yz
+! PURE COMPLEX*16 FUNCTION epsilon_yz(kx, ky)
+!     REAL*8, INTENT(IN) :: kx, ky
+!     epsilon_yz = -t_D*(1. + EXP(imag*(SQRT(3.)/2.*kx - 3./2.*ky))) &
+!                 - t_I*EXP(-imag*(SQRT(3.)/2.*kx + 3./2.*ky ))
+!     RETURN 
+! END FUNCTION epsilon_yz 
+
+! !dir$ attributes forceinline :: epsilon_zx
+! PURE COMPLEX*16 FUNCTION epsilon_zx(kx, ky)
+!     REAL*8, INTENT(IN) :: kx, ky
+!     epsilon_zx = -t_D*(1. + EXP(-imag*(SQRT(3.)/2.*kx + 3./2.*ky))) &
+!                 - t_I*EXP(imag*(SQRT(3.)/2.*kx - 3./2.*ky ))
+!     RETURN
+! END FUNCTION epsilon_zx
+
+! !dir$ attributes forceinline :: epsilon_xy
+! PURE COMPLEX*16 FUNCTION epsilon_xy(kx, ky)
+!     REAL*8, INTENT(IN) :: kx, ky
+!     epsilon_xy = -2.*t_D*COS( SQRT(3.)/2.*kx )*EXP(-imag*3./2.*ky) - t_I
+!     RETURN
+! END FUNCTION epsilon_xy
+
 !dir$ attributes forceinline :: epsilon_yz
 PURE COMPLEX*16 FUNCTION epsilon_yz(kx, ky)
     REAL*8, INTENT(IN) :: kx, ky
-    epsilon_yz = -t_D*(1. + EXP(imag*(SQRT(3.)/2.*kx - 3./2.*ky))) &
-                - t_I*EXP(-imag*(SQRT(3.)/2.*kx + 3./2.*ky ))
+    epsilon_yz = -t_D*(EXP(imag*ky) + EXP(imag*(SQRT(3.)/2.*kx - 1./2.*ky))) &
+                - t_I*EXP(-imag*(SQRT(3.)/2.*kx + 1./2.*ky ))
     RETURN 
 END FUNCTION epsilon_yz 
 
 !dir$ attributes forceinline :: epsilon_zx
 PURE COMPLEX*16 FUNCTION epsilon_zx(kx, ky)
     REAL*8, INTENT(IN) :: kx, ky
-    epsilon_zx = -t_D*(1. + EXP(-imag*(SQRT(3.)/2.*kx + 3./2.*ky))) &
-                - t_I*EXP(imag*(SQRT(3.)/2.*kx - 3./2.*ky ))
+    epsilon_zx = -t_D*(EXP(imag*ky) + EXP(-imag*(SQRT(3.)/2.*kx + 1./2.*ky))) &
+                - t_I*EXP(imag*(SQRT(3.)/2.*kx - 1./2.*ky ))
     RETURN
 END FUNCTION epsilon_zx
 
 !dir$ attributes forceinline :: epsilon_xy
 PURE COMPLEX*16 FUNCTION epsilon_xy(kx, ky)
     REAL*8, INTENT(IN) :: kx, ky
-    epsilon_xy = -2.*t_D*DCOS( SQRT(3.)/2.*kx )*EXP(-imag*3./2.*ky) - t_I
+    epsilon_xy = -2.*t_D*COS( SQRT(3.)/2.*kx )*EXP(-imag*1./2.*ky) - t_I*EXP(imag*ky)
     RETURN
 END FUNCTION epsilon_xy
 
