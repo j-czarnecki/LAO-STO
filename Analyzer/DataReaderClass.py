@@ -52,6 +52,12 @@ class DataReader:
         """
         Extracts proper key from simulation files, converts gamma back to complex value and writes do dict
         """
+        if (len(pandasFile.spin) == 0):
+            print("ERROR: empty gamma file")
+            for key in list(self.gamma.keys()):
+                self.gamma[key].append(np.nan)
+            return
+
         for row in range(len(pandasFile.spin)):
             dictKey = (int(pandasFile.spin[row]) , int(pandasFile.neighbor[row]) , int(pandasFile.sublat[row]) , int(pandasFile.orbital[row]))
             if firstIter:
@@ -72,6 +78,13 @@ class DataReader:
         """
         Extracts proper key from simulation files and appends to filling dict
         """
+        if (len(pandasFile.spin) == 0):
+            print("ERROR: empty filling file")
+            for key in list(self.filling.keys()):
+                self.filling[key].append(np.nan)
+            self.fillingTotal.append(np.nan)
+            return
+
         self.fillingTotal.append(sum(pandasFile.filling[:]))
         for row in range(len(pandasFile.spin)):
             dictKey = (int(pandasFile.spin[row]) , int(pandasFile.sublat[row]) , int(pandasFile.orbital[row]))
@@ -151,7 +164,6 @@ class DataReader:
 
         print("---> Loading gamma data")
         directories = [dir for dir in os.listdir(self.runsPath) if re.match(self.matchPattern, dir)]
-        #print(directories)
 
         firstIter = True
 

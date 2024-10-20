@@ -32,24 +32,26 @@ def main():
     # symmetryResolver = SymmetryResolver(3)
     # symmetryResolver.CalculateSymmetryGamma(simulationData.gamma)
 
-    # gammaAndFillingPlotter = GammaAndFillingPlotter(runsPath= '../../LAO-STO-results/LAO-STO-Hub', matchPattern= 'RUN_.*', nNeighbors=3, nNextNeighbors=0, eMinimal = -1053)
+    #gammaAndFillingPlotter = GammaAndFillingPlotter(runsPath= '../../LAO-STO-results/LAO-STO-Hub', matchPattern= 'RUN_.*', nNeighbors=3, nNextNeighbors=0, eMinimal = -1053)
+    gammaAndFillingPlotter = GammaAndFillingPlotter(runsPath = '/net/ascratch/people/plgjczarnecki/LAO-STO-E_Fermi_T', matchPattern = 'RUN_.*', nNeighbors = 3, nNextNeighbors=0, eMinimal=-1053)
 
-    # gammaAndFillingPlotter.LoadFilling(loadUnfinished=True)
-    # gammaAndFillingPlotter.LoadGamma(xKeywords=('e_fermi', 'j_sc'), loadUnfinished=True)
-    # gammaAndFillingPlotter.sortData()
-    # gammaAndFillingPlotter.CalculateSymmetryGamma()
-    # gammaAndFillingPlotter.getMaxvalSymmetrizedGamma()
+    gammaAndFillingPlotter.LoadFilling(loadUnfinished=True)
+    gammaAndFillingPlotter.LoadGamma(xKeywords=('t', 'j_sc', 'e_fermi'), loadUnfinished=True)
+    gammaAndFillingPlotter.sortData()
+    gammaAndFillingPlotter.CalculateSymmetryGamma()
+    gammaAndFillingPlotter.getMaxvalSymmetrizedGamma()
     # gammaAndFillingPlotter.plotGammasFermi()
-    # gammaAndFillingPlotter.plotGammasFilling()
-    # gammaAndFillingPlotter.plotNnnGammasFermi()
+    #gammaAndFillingPlotter.plotGammasFilling()
+    #gammaAndFillingPlotter.plotNnnGammasFermi()
     # gammaAndFillingPlotter.plotNnnGammasFilling()
     # gammaAndFillingPlotter.plotGammaFermiUnsymmetrized()
     # gammaAndFillingPlotter.plotFillingFermi()
     # gammaAndFillingPlotter.plotGammasJ()
     # gammaAndFillingPlotter.plotFillingFermi()
-    # gammaAndFillingPlotter.plotGammasTemperature()
+    #gammaAndFillingPlotter.plotGammasTemperature()
+    gammaAndFillingPlotter.plotGammasTemperatureMap()
 
-    dispersionPlotter = DispersionPlotter()
+    #dispersionPlotter = DispersionPlotter()
     # dispersionPlotter.LoadSuperconductingGapMap('/home/jczarnecki/LAO-STO-results/LAO-STO-v0', 'RUN_.*')
     # dispersionPlotter.plotSuperconductingGapMap()
 
@@ -60,14 +62,45 @@ def main():
     #     dispersionPlotter.LoadSuperconductingGap(f'/home/jczarnecki/LAO-STO-results/LAO-STO-v0/RUN_E_Fermi_{ef}/OutputData/SuperconductingGap.dat')
     #     dispersionPlotter.plotSuperconductingGap(postfix = '_J170_'+str(ef), title = fr'$E_{{Fermi}} = {ef}$ (meV)')
 
-    # dispersionPlotter.LoadSuperconductingGap("../OutputData/SuperconductingGap.dat")
-    dispersionPlotter.LoadSuperconductingGap(
-        "/home/jczarnecki/LAO-STO-results/LAO-STO/RUN_E_Fermi_-990.0_J_SC_180.0/OutputData/SuperconductingGap.dat"
-    )
-    dispersionPlotter.plotSuperconductingGap(
-        postfix="_test", title=r"$\Gamma = 20$ (meV)"
-    )
+    #dispersionPlotter.LoadSuperconductingGap("../OutputData/SuperconductingGap.dat")
+    # dispersionPlotter.LoadSuperconductingGap(
+    #     "/net/ascratch/people/plgjczarnecki/LAO-STO-NNN-only-kinetic/RUN_E_Fermi_-1000.0_J_SC_NNN_100.0/OutputData/SuperconductingGap.dat"
+    # )
+    # dispersionPlotter.plotSuperconductingGap(
+    #     postfix="_only_kinetic", title=r"$J_{nnn} = 100$ (meV)"
+    # )
 
+    # dispersionPlotter.LoadSuperconductingGap(
+    #     "/net/ascratch/people/plgjczarnecki/LAO-STO-vpds-J_SC/RUN_E_Fermi_-975.0_J_SC_180.0/OutputData/SuperconductingGap.dat"
+    # )
+    # dispersionPlotter.plotSuperconductingGap(
+    #     postfix="_J_180_Ef_975", title=r"$J = 180$ (meV)"
+    # )
+
+    # dispersionPlotter.LoadSuperconductingGap(
+    #     "/net/ascratch/people/plgjczarnecki/LAO-STO-vpds-J_SC/RUN_E_Fermi_-1000.0_J_SC_150.0/OutputData/SuperconductingGap.dat"
+    # )
+    # dispersionPlotter.plotSuperconductingGap(
+    #     postfix="_J_150_Ef_1000", title=r"$J = 150$ (meV)"
+    # )
+    # dispersionPlotter.LoadSuperconductingGap(
+    #     "/net/ascratch/people/plgjczarnecki/LAO-STO-vpds-J_SC/RUN_E_Fermi_-1000.0_J_SC_130.0/OutputData/SuperconductingGap.dat"
+    # )
+    # dispersionPlotter.plotSuperconductingGap(
+    #     postfix="_J_130_Ef_1000", title=r"$J = 130$ (meV)"
+    # )
+    # dispersionPlotter.LoadSuperconductingGap(
+    #     "/net/ascratch/people/plgjczarnecki/LAO-STO-vpds-J_SC/RUN_E_Fermi_-1000.0_J_SC_150.0/OutputData/SuperconductingGap.dat"
+    # )
+    # dispersionPlotter.plotSuperconductingGap(
+    #     postfix="_J_150_Ef_1000", title=r"$J = 180$ (meV)"
+    # )
+    # dispersionPlotter.LoadSuperconductingGap(
+    #     "/net/ascratch/people/plgjczarnecki/LAO-STO-nnn/RUN_E_Fermi_-1000.0/OutputData/SuperconductingGap.dat"
+    # )
+    # dispersionPlotter.plotSuperconductingGap(
+    #     postfix="_SUperconductingGapNNN_J_175_EF_-1000", title=r"$J_{nnn} = 175$ (meV)"
+    # )
     # dispersionPlotter.LoadSuperconductingGap('../OutputData/SuperconductingGap_NNN_J175.dat')
     # dispersionPlotter.plotSuperconductingGap(postfix = 'NNN_EF1000_J175', title = r'$J_{nnn} = 175$ (meV)')
 

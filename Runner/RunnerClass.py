@@ -2,64 +2,70 @@ import multiprocessing
 import subprocess
 import os
 import sys
-if os.path.exists('/net/home/pwojcik/.local/lib/python2.7/site-packages'):
-    sys.path.insert(0, '/net/home/pwojcik/.local/lib/python2.7/site-packages')
+
+if os.path.exists("/net/home/pwojcik/.local/lib/python2.7/site-packages"):
+    sys.path.insert(0, "/net/home/pwojcik/.local/lib/python2.7/site-packages")
 import time
 from RunnerConfigClass import *
+
 
 class Runner(RunnerConfig):
     def __init__(self):
         RunnerConfig.__init__(self)
-    
+
     def run_slurm_param_value(self, paramValuePairs, isAres: bool = False):
-        '''
+        """
         Sets all parameters given in key-value pairs.
         No need to specify J_SC_PRIME, since it is always set
         to be J_SC / 10
-        '''
+        """
         if isAres:
-            pathToAppend = f'/net/ascratch/people/plgjczarnecki/LAO-STO/RUN'
+            pathToAppend = f"/net/ascratch/people/plgjczarnecki/LAO-STO-E_Fermi_T/RUN"
         else:
-            pathToAppend = f'RUN'
+            pathToAppend = f"RUN"
 
         for pair in paramValuePairs:
-            if pair[0] != 'self_consistency':
-                pathToAppend = pathToAppend + f'_{pair[1]}_{pair[2]}'
-        
+            if pair[0] != "self_consistency":
+                pathToAppend = pathToAppend + f"_{pair[1]}_{pair[2]}"
+
         runner_cwd = os.getcwd()
         if isAres:
             path = pathToAppend
         else:
             path = os.path.join(runner_cwd, pathToAppend)
 
-        output_dir = f'OutputData'
+        output_dir = f"OutputData"
         if not os.path.exists(path):
             os.mkdir(path)
-            os.mkdir(os.path.join(path,output_dir))
+            os.mkdir(os.path.join(path, output_dir))
         os.chdir(path)
 
-        nml = self.LAO_STO_default_nml() #creating default namelist
+        nml = self.LAO_STO_default_nml()  # creating default namelist
         for pair in paramValuePairs:
-            nml[pair[0]][pair[1]] = pair[2] #editing all key-value pairs
-        nml['physical_params']['J_SC_PRIME'] = nml['physical_params']['J_SC'] / 10. #No need to specify J_SC_PRIME
-        nml['physical_params']['J_SC_PRIME_NNN'] = nml['physical_params']['J_SC_NNN'] / 10. #No need to specify J_SC_PRIME_NNN
-        
-        with open('input.nml', 'w') as nml_file:
-            f90nml.write(nml, nml_file, sort = False)
-        #setting up slurm script
-        with open('job.sh', 'w') as job_file:
+            nml[pair[0]][pair[1]] = pair[2]  # editing all key-value pairs
+        nml["physical_params"]["J_SC_PRIME"] = (
+            nml["physical_params"]["J_SC"] / 10.0
+        )  # No need to specify J_SC_PRIME
+        nml["physical_params"]["J_SC_PRIME_NNN"] = (
+            nml["physical_params"]["J_SC_NNN"] / 10.0
+        )  # No need to specify J_SC_PRIME_NNN
+
+        with open("input.nml", "w") as nml_file:
+            f90nml.write(nml, nml_file, sort=False)
+        # setting up slurm script
+        with open("job.sh", "w") as job_file:
             if isAres:
-                print(self.job_header_ares, file = job_file)
+                print(self.job_header_ares, file=job_file)
             else:
-                print(self.job_header, file = job_file)
+                print(self.job_header, file=job_file)
 
-            print('cd ' + path, file = job_file)
-            print(os.path.join(runner_cwd, '..', 'LAO_STO.x'), file = job_file)
+            print("cd " + path, file=job_file)
+            print(os.path.join(runner_cwd, "..", "LAO_STO.x"), file=job_file)
 
-        #queue slurm job
-        #simulate = subprocess.run(["sbatch", "job.sh"])
+        # queue slurm job
+        simulate = subprocess.run(["sbatch", "job.sh"])
         os.chdir(runner_cwd)
-        return path #for sequential runner
+        return path  # for sequential runner
 
     def run_slurm_postprocessing(self, runDir, paramValuePairs, isAres: bool = False):
 
@@ -69,65 +75,90 @@ class Runner(RunnerConfig):
         nml = self.LAO_STO_postprocessing_default_nml()
 
         for pair in paramValuePairs:
-            nml[pair[0]][pair[1]] = pair[2] #editing all key-value pairs
-        
-        with open('postprocessing_input.nml', 'w') as nml_file:
-            f90nml.write(nml, nml_file, sort = False)
-        
-        #setting up slurm script
-        os.chdir(runDir)
-        with open('job.sh', 'w') as job_file:
-            if isAres:
-                print(self.job_header_ares, file = job_file)
-            else:
-                print(self.job_header, file = job_file)
+            nml[pair[0]][pair[1]] = pair[2]  # editing all key-value pairs
 
-            print('cd ' + runDir, file = job_file)
-            print(os.path.join(runner_cwd, '..', 'POSTPROCESSING_LAO_STO.x'), file = job_file)
-        
-        #queue slurm job
-        #simulate = subprocess.run(["sbatch", "job.sh"])
+        with open("postprocessing_input.nml", "w") as nml_file:
+            f90nml.write(nml, nml_file, sort=False)
+
+        # setting up slurm script
+        os.chdir(runDir)
+        with open("job.sh", "w") as job_file:
+            if isAres:
+                print(self.job_header_ares, file=job_file)
+            else:
+                print(self.job_header, file=job_file)
+
+            print("cd " + runDir, file=job_file)
+            print(
+                os.path.join(runner_cwd, "..", "POSTPROCESSING_LAO_STO.x"),
+                file=job_file,
+            )
+
+        # queue slurm job
+        simulate = subprocess.run(["sbatch", "job.sh"])
         os.chdir(runner_cwd)
 
     def run_sequential(self):
-        '''
+        """
         Runs jobs sequentialy i.e. output of first job is the starting point for the second etc.
-        '''
-        nml_name = 'physical_params'
-        param_name = 'E_Fermi'
+        """
+        nml_name = "physical_params"
+        param_name = "E_Fermi"
         Ef_min = -1.1e3
         Ef_max = 0e3
         Ef_steps = 150
-        dE = abs(Ef_max - Ef_min)/Ef_steps
-        Fermi_table = [(nml_name, param_name, Ef_min + i*dE) for i in range(Ef_steps + 1)]
+        dE = abs(Ef_max - Ef_min) / Ef_steps
+        Fermi_table = [
+            (nml_name, param_name, Ef_min + i * dE) for i in range(Ef_steps + 1)
+        ]
 
         isFirstIter = True
-        previousPathRun = ''
+        previousPathRun = ""
 
         for Ef in Fermi_table:
-            
+
             if isFirstIter:
                 pathRun = self.run_slurm_param_value(
-                    [Ef,
-                    ('self_consistency', 'read_gamma_from_file', False),
-                    ('self_consistency', 'read_charge_from_file', False)],
-                    isAres=False)
+                    [
+                        Ef,
+                        ("self_consistency", "read_gamma_from_file", False),
+                        ("self_consistency", "read_charge_from_file", False),
+                    ],
+                    isAres=False,
+                )
                 isFirstIter = False
             else:
                 pathRun = self.run_slurm_param_value(
-                    [Ef,
-                    ('self_consistency', 'read_gamma_from_file', True),
-                    ('self_consistency', 'path_to_gamma_start', os.path.join(previousPathRun, 'OutputData/Gamma_SC_final.dat')),
-                    ('self_consistency', 'read_charge_from_file', True),
-                    ('self_consistency', 'path_to_charge_start', os.path.join(previousPathRun, 'OutputData/Charge_dens_final.dat'))],
-                    isAres=False)
+                    [
+                        Ef,
+                        ("self_consistency", "read_gamma_from_file", True),
+                        (
+                            "self_consistency",
+                            "path_to_gamma_start",
+                            os.path.join(
+                                previousPathRun, "OutputData/Gamma_SC_final.dat"
+                            ),
+                        ),
+                        ("self_consistency", "read_charge_from_file", True),
+                        (
+                            "self_consistency",
+                            "path_to_charge_start",
+                            os.path.join(
+                                previousPathRun, "OutputData/Charge_dens_final.dat"
+                            ),
+                        ),
+                    ],
+                    isAres=False,
+                )
 
             previousPathRun = pathRun
 
             while True:
-                if os.path.exists(os.path.join(previousPathRun, 'OutputData/Gamma_SC_final.dat')):
+                if os.path.exists(
+                    os.path.join(previousPathRun, "OutputData/Gamma_SC_final.dat")
+                ):
                     break
                 else:
                     time.sleep(30)
 
-        print('!!! ALL SEQUENTIAL JOBS FINISHED !!!')
+        print("!!! ALL SEQUENTIAL JOBS FINISHED !!!")

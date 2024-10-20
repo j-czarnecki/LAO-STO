@@ -33,7 +33,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
         plt.rcParams['text.latex.preamble'] = r'\usepackage{amsmath} \usepackage{amsfonts} \usepackage{amssymb}'
 
         # Choose a seaborn palette
-        palette = sns.color_palette('hsv', 3) #has to specify number of lines
+        palette = sns.color_palette('hsv', 4) #has to specify number of lines
         self.palette = palette
 
         # Set the color cycle
@@ -137,10 +137,13 @@ class GammaAndFillingPlotter(SymmetryResolver):
             spin, sublat, orbital, symmetry = key
             #plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}')
             plt.legend(title = r"$J$ (meV)", loc = 'upper right')
+            #plt.legend(title = r"$E_{Fermi}$ (meV)", loc = 'upper right')
             plt.xlabel(r"$E_{Fermi}$ (meV)")
+            #plt.xlabel(r"$J$ (meV)")
             plt.ylabel(fr"$\Gamma_{{{self.latticeNameMapping[sublat - 1]} {self.latticeNameMapping[sublat % 2]},{self.orbitalNameMapping[orbital - 1]},{symmetry}}}^{{{self.spinSymbolsMapping[spin - 1]} {self.spinSymbolsMapping[spin % 2]}}}$ (meV)",
                         labelpad= 20)
             plt.ylim(top = 1.02*self.maxval)
+            #plt.xlim(100, 250)
             #plt.grid()
             #plt.xlim(0 , 0.1)
             #plt.show()
@@ -176,6 +179,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
             plt.close() 
 
     def plotGammasTemperature(self):
+        '''Here temperature has to be passed as 0-th argument to GammaAndFilling plotter object, j_sc as the 1-st and e_fermi: 2-nd.'''
         secondParamValues = [element[1] for element in self.params]
         secondParamValues = sorted(list(set(secondParamValues)))
 
@@ -213,6 +217,64 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 plt.savefig(f"../Plots/GammaTemperatureEf{thirdParam}_{spin}_{sublat}_{self.orbitalNameMapping[orbital - 1]}_{symmetry}.png")
                 plt.close() 
 
+    def plotGammasTemperatureMap(self):
+        '''Temperature has to be passed a 0-th argument to this method'''
+        #J_SC
+        secondParamValues = [element[1] for element in self.params]
+        secondParamValues = sorted(list(set(secondParamValues)))
+
+        #E_Fermi
+        thirdParamValues = [element[2] for element in self.params]
+        thirdParamValues = sorted(list(set(thirdParamValues)))
+        
+
+        for key in self.symmetryKeys:
+            plt.figure()
+            for secondParam in secondParamValues:
+                T = []
+                Ef = []
+                Gap = []
+                for thirdParam in thirdParamValues:
+                    for i in range(len(self.params)):
+                        if int(self.params[i][1]) == secondParam:
+                            T.append(self.params[i][0])
+                            Ef.append(self.params[i][2] - self.eMinimal)
+                            Gap.append(np.abs(self.symmetryGammaDict[key][i]))
+
+
+                T_unique = np.unique(T)  # Find unique T values
+                Ef_unique = np.unique(Ef)  # Find unique Ef values
+                Ef_grid, T_grid = np.meshgrid(Ef_unique, T_unique)
+                Gap_grid = np.zeros_like(T_grid)
+
+                for i in range(len(T)):
+                    row = np.where(T_unique == T[i])[0][0]
+                    col = np.where(Ef_unique == Ef[i])[0][0]
+                    Gap_grid[row, col] = Gap[i]
+
+                plt.pcolormesh(Ef_grid,
+                                T_grid,
+                                Gap_grid,
+                                cmap = 'inferno')
+
+                spin, sublat, orbital, symmetry = key
+                plt.title(rf"$J = {secondParam}$ meV", pad = 10)
+                plt.xlabel(fr"$E_{{Fermi}}$ (meV)")
+                plt.ylabel(fr'T (K)')
+                plt.colorbar(label = fr"$\Gamma_{{{self.latticeNameMapping[sublat - 1]} {self.latticeNameMapping[sublat % 2]},{self.orbitalNameMapping[orbital - 1]},{symmetry}}}^{{{self.spinSymbolsMapping[spin - 1]} {self.spinSymbolsMapping[spin % 2]}}}$ (meV)")
+                #plt.ylabel(fr"$\Gamma_{{{self.latticeNameMapping[sublat - 1]} {self.latticeNameMapping[sublat % 2]},{self.orbitalNameMapping[orbital - 1]},{symmetry}}}^{{{self.spinSymbolsMapping[spin - 1]} {self.spinSymbolsMapping[spin % 2]}}}$ (meV)",
+                #           labelpad= 20)
+                #plt.ylim(bottom = -0.02*self.maxval, top = 1.02*self.maxval)
+                #plt.xlim(0, 0.6)
+                #plt.grid()
+                #plt.xlim(0 , 0.1)
+                plt.savefig(f"../Plots/GammaTemperatureMap{secondParam}_{spin}_{sublat}_{self.orbitalNameMapping[orbital - 1]}_{symmetry}.png")
+                plt.close() 
+                          
+                
+
+
+
     def plotNnnGammasFermi(self):
         secondParamValues = [element[1] for element in self.params]
         secondParamValues = sorted(list(set(secondParamValues)))
@@ -231,8 +293,10 @@ class GammaAndFillingPlotter(SymmetryResolver):
 
             spin, sublat, orbital, symmetry = key
             #plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}')
-            plt.legend(title = r"$J_{nnn}$ (meV)", loc = 'upper right')
-            plt.xlabel(r"$E_{Fermi}$ (meV)")
+            #plt.legend(title = r"$J_{nnn}$ (meV)", loc = 'upper right')
+            plt.legend(title = r"$E_{Fermi}$ (meV)", loc = 'upper right')
+            #plt.xlabel(r"$E_{Fermi}$ (meV)")
+            plt.xlabel(r"$J_{nnn}$ (meV)")
             plt.ylabel(fr"$\Gamma_{{{self.latticeNameMapping[sublat - 1]} {self.latticeNameMapping[sublat - 1]}, {self.orbitalNameMapping[orbital - 1]},{symmetry}}}^{{{self.spinSymbolsMapping[spin - 1]} {self.spinSymbolsMapping[spin % 2]}}}$ (meV)")
             plt.ylim(top = 1.02*self.maxval)
             #plt.xlim(left = 0.0)
