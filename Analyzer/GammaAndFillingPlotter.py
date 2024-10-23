@@ -3,6 +3,8 @@ import numpy as np
 from DataReaderClass import *
 from SymmetryResolverClass import *
 import seaborn as sns
+from scipy.interpolate import griddata
+from matplotlib.colors import PowerNorm
 #TODO: this class should be improved to be more general and possibly plot more symmetries of gamma
 # self.eMinimal should not be used, as all energies must be calculated with respect to E_Fermi
 class GammaAndFillingPlotter(SymmetryResolver):
@@ -245,17 +247,23 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 T_unique = np.unique(T)  # Find unique T values
                 Ef_unique = np.unique(Ef)  # Find unique Ef values
                 Ef_grid, T_grid = np.meshgrid(Ef_unique, T_unique)
-                Gap_grid = np.zeros_like(T_grid)
 
-                for i in range(len(T)):
-                    row = np.where(T_unique == T[i])[0][0]
-                    col = np.where(Ef_unique == Ef[i])[0][0]
-                    Gap_grid[row, col] = Gap[i]
+                points = np.array([Ef, T]).T
+                values = Gap
+                Gap_grid = griddata(points, values, (Ef_grid, T_grid), method = 'linear', fill_value=0)
+
+                # Gap_grid = np.zeros_like(T_grid)
+
+                # for i in range(len(T)):
+                #     row = np.where(T_unique == T[i])[0][0]
+                #     col = np.where(Ef_unique == Ef[i])[0][0]
+                #     Gap_grid[row, col] = Gap[i]
 
                 plt.pcolormesh(Ef_grid,
                                 T_grid,
                                 Gap_grid,
-                                cmap = 'inferno')
+                                cmap = 'inferno',
+                                norm = PowerNorm(gamma = 0.6))
 
                 spin, sublat, orbital, symmetry = key
                 plt.title(rf"$J = {secondParam}$ meV", pad = 10)
