@@ -22,7 +22,7 @@ class RunnerConfig:
             """\
         #!/bin/bash -l
         ## Job name
-        #SBATCH -J LAO-STO-T
+        #SBATCH -J LAO-STO-GAP
         ## Number of allocated nodes
         #SBATCH -N 1
         ## Number of tasks per node (by default this corresponds to the number of cores allocated per node)

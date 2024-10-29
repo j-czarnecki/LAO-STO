@@ -36,10 +36,10 @@
 &romberg_integration
     romb_eps_x = 1e-2,
     interpolation_deg_x = 4,
-    max_grid_refinements_x = 15,
+    max_grid_refinements_x = 6,
     romb_eps_y = 1e-2,
     interpolation_deg_y = 4,
-    max_grid_refinements_y = 15 /
+    max_grid_refinements_y = 6 /
 
 
 

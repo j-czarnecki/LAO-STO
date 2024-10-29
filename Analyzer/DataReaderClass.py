@@ -98,7 +98,7 @@ class DataReader:
                 if not fillNones:
                     self.filling[dictKey].append(pandasFile.filling[row])
                 else:
-                   self.filling[dictKey].append(np.nan) 
+                   self.filling[dictKey].append(np.nan)
 
     def FillDictScGap(self, pandasFile: pd.DataFrame, fillNones: bool = False):
         for row in range(len(pandasFile['kx'])):
@@ -136,7 +136,7 @@ class DataReader:
                 print("No Charge dens file in ", dir)
                 continue
             isFirstIter = False
-                
+
     def sortData(self):
         """
         Sorts datafrom self.gamma, self.filling and self.fillingTotal dicts.
@@ -145,7 +145,7 @@ class DataReader:
         sortedIndexes = sorted(range(len(self.params)), key = lambda x: self.params[x])
         for key, yList in self.gamma.items():
             self.gamma[key] = [yList[i] for i in sortedIndexes]
-        
+
         for key, yList in self.filling.items():
             self.filling[key] = [yList[i] for i in sortedIndexes]
 
@@ -197,8 +197,8 @@ class DataReader:
                     self.FillDictGamma(currentGamma, firstIter, fillNones=True)
             else:
                 print("No Gamma file in ", dir)
-                # shutil.rmtree(os.path.join(self.runsPath, dir))
-                # print('Direcotry removed')
+                #shutil.rmtree(os.path.join(self.runsPath, dir))
+                #print('Direcotry removed')
                 continue
             firstIter = False
 

@@ -1,3 +1,4 @@
+# 1 "/net/people/plgrid/plgjczarnecki/LAO-STO/mod_logger.f90"
 MODULE mod_logger
 IMPLICIT NONE
 SAVE
@@ -8,7 +9,7 @@ CONTAINS
 SUBROUTINE INIT_LOGGER()
     OPEN(unit = LOGGER_UNIT, FILE = "./log.log", FORM = "FORMATTED", ACTION = "WRITE")
     WRITE(LOGGER_UNIT, *) "==== START ===="
-    !Print some info about simulation
+!Print some info about simulation
 
 END SUBROUTINE
 
@@ -24,7 +25,7 @@ SUBROUTINE LOG_STRING_DEBUG(logMsg)
     INTEGER*4 :: Values(8)
 
     CALL DATE_AND_TIME(VALUES = Values)
-    !Add time printing
+!Add time printing
     WRITE(LOGGER_UNIT, '(I0, a, I0, a, I0, a, I0, a, I0, a, I0, a, I0, a)', ADVANCE = 'NO') Values(1), '-', Values(2), '-', Values(3), ' ', Values(5), ':', Values(6), ':', Values(7), '.', Values(8), ' '
     WRITE(LOGGER_UNIT, '(a)') TRIM(logMsg)
 END SUBROUTINE
@@ -35,7 +36,7 @@ SUBROUTINE LOG_STRING_INFO(logMsg)
     INTEGER*4 :: Values(8)
 
     CALL DATE_AND_TIME(VALUES = Values)
-    !Add time printing
+!Add time printing
     WRITE(LOGGER_UNIT, '(I0, a, I0, a, I0, a, I0, a, I0, a, I0, a, I0, a)', ADVANCE = 'NO') Values(1), '-', Values(2), '-', Values(3), ' ', Values(5), ':', Values(6), ':', Values(7), '.', Values(8), ' '
     WRITE(LOGGER_UNIT, '(a)') "INFO: " // TRIM(logMsg)
 END SUBROUTINE
@@ -45,7 +46,7 @@ SUBROUTINE LOG_STRING_ABNORMAL(logMsg)
     INTEGER*4 :: Values(8)
 
     CALL DATE_AND_TIME(VALUES = Values)
-    !Add time printing
+!Add time printing
     WRITE(LOGGER_UNIT, '(I0, a, I0, a, I0, a, I0, a, I0, a, I0, a, I0, a)', ADVANCE = 'NO') Values(1), '-', Values(2), '-', Values(3), ' ', Values(5), ':', Values(6), ':', Values(7), '.', Values(8), ' '
     WRITE(LOGGER_UNIT, '(a)') "ABNORMAL: " // TRIM(logMsg)
 END SUBROUTINE
@@ -55,7 +56,7 @@ SUBROUTINE LOG_STRING_ERROR(logMsg)
     INTEGER*4 :: Values(8)
 
     CALL DATE_AND_TIME(VALUES = Values)
-    !Add time printing
+!Add time printing
     WRITE(LOGGER_UNIT, '(I0, a, I0, a, I0, a, I0, a, I0, a, I0, a, I0, a)', ADVANCE = 'NO') Values(1), '-', Values(2), '-', Values(3), ' ', Values(5), ':', Values(6), ':', Values(7), '.', Values(8), ' '
     WRITE(LOGGER_UNIT, '(a)') "ERROR: " // TRIM(logMsg)
 END SUBROUTINE
