@@ -11,6 +11,7 @@ PROGRAM MAIN
     USE mod_broydenV2
     USE mod_compute_hamiltonians
     USE mod_integrate
+    USE omp_lib
 
     IMPLICIT NONE 
 
@@ -33,6 +34,20 @@ PROGRAM MAIN
     INTEGER*4 :: broyden_index
 
     CHARACTER(LEN=MAX_LOG_LEN) :: logStr
+
+    !OMP specific
+    INTEGER*4 :: max_num_threads, used_threads
+
+
+    max_num_threads = omp_get_max_threads()
+    WRITE (*,*) "Max num threads", max_num_threads
+    ! CALL omp_set_num_threads(max_num_threads)
+    ! !$omp parallel
+    ! PRINT*, "Hello from process", omp_get_thread_num()
+    ! used_threads = omp_get_num_threads()
+    ! CALL SLEEP(3)
+    ! !$omp end parallel
+    ! PRINT*, "Allocated threads", used_threads
 
     !N_NEIGHBOURS + N_NEXT_NEIGHBOURS = 9, to implement both pairings
     !2 because spin up-down and down-up,
@@ -124,24 +139,27 @@ PROGRAM MAIN
         LOG_INFO(logStr)
         !PRINT*, "============= SC_ITER: ", sc_iter
         !PRINT*, "Gamma = ", Gamma_SC(1,1,1,1)/meV2au
-        counter = 0
 
         !Those loops are only for slicing and future parallelization
         !Integration over chunks is computed via Romberg algorithm.
+        !$omp parallel do private(Delta_local, Charge_dens_local)
         DO i = 0, k1_steps-1
-            DO j = 0, k2_steps-1    
-                counter = counter + 1
-                !PRINT*, counter
-                
+            DO j = 0, k2_steps-1
+                PRINT*, "Hello from process", omp_get_thread_num(), 'executing chunk', i, j
+
                 CALL ROMBERG_Y(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), Charge_dens(:), i*dk1, (i + 1)*dk1, j*dk2, (j + 1)*dk2, &
                 & Delta_local(:,:,:,:), Charge_dens_local(:), romb_eps_x, interpolation_deg_x, max_grid_refinements_x, &
                 & romb_eps_y, interpolation_deg_y, max_grid_refinements_y)
 
                 !This has to be atomic operations, since Delta_new and Charge_dens would be global variables for all threads
+                !$omp critical
                 Delta_new(:,:,:,:) = Delta_new(:,:,:,:) + Delta_local(:,:,:,:)
                 Charge_dens_new(:) = Charge_dens_new(:) + Charge_dens_local(:)
+                !$omp end critical
             END DO
         END DO !End of k-loop
+        !$omp end parallel do
+
         !Due to change of sum to integral one has to divide by Brillouin zone volume
         !Jacobian and volume of Brillouin zone cancel out thus no multiplier
         Delta_new(:,:,:,:) = Delta_new(:,:,:,:)

@@ -34,12 +34,12 @@
     charge_eps_convergence = 1e-2 /
 
 &romberg_integration
-    romb_eps_x = 1e-2,
+    romb_eps_x = 1e-3,
     interpolation_deg_x = 4,
-    max_grid_refinements_x = 6,
-    romb_eps_y = 1e-2,
+    max_grid_refinements_x = 8,
+    romb_eps_y = 1e-3,
     interpolation_deg_y = 4,
-    max_grid_refinements_y = 6 /
+    max_grid_refinements_y = 8 /
 
 
 

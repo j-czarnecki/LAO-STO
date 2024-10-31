@@ -1,7 +1,8 @@
 TARGET = LAO_STO.x
 SHELL = /bin/sh
 F90 = ifx
-F90FLAGS = -O3 -ipo -fpp
+LIB_OPENMP = -qopenmp
+F90FLAGS = -O3 -fpp -ipo $(LIB_OPENMP)
 LIBS = -llapack -lblas
 LIBS_MKL = -I${MKLROOT}/include \
 					 -I/opt/intel/mkl/include \
@@ -10,8 +11,7 @@ LIBS_MKL = -I${MKLROOT}/include \
            ${MKLROOT}/lib/intel64/libmkl_gnu_thread.so \
            ${MKLROOT}/lib/intel64/libmkl_core.so \
            -Wl,--end-group \
-           -lgomp -lpthread -lm -ldl
-
+           -lpthread -lm -ldl #-lgomp
 
 TEST_TARGET = TEST_LAO_STO.x
 POSTPROCESSING_TARGET = POSTPROCESSING_LAO_STO.x
