@@ -89,11 +89,18 @@ ares_postprocessing: LIBS = -lscalapack -lflexiblas
 ares_postprocessing: $(POSTPROCESSING_TARGET)
 
 gnu: F90 = gfortran
-gnu: F90FLAGS = -O3 -Wall -Wextra -ffree-line-length-none
+gnu: F90FLAGS = -O3 -Wall -Wextra -ffree-line-length-none $(LIB_OPENMP)
 gnu: $(TARGET)
 
-debug: F90FLAGS = -O0 -g -fpp -DDEBUG #-check all -debug all -warn all #-diag-enable sc
+debug: F90FLAGS = -O0 -g -fpp -DDEBUG $(LIB_OPENMP)#-check all -debug all -warn all #-diag-enable sc
 debug: $(TARGET)
+
+#To avoid Thread Sanitizer error about bad memory mapping
+#echo 0 | sudo tee /proc/sys/kernel/randomize_va_space
+#To include suppressions run as
+#TSAN_OPTIONS="suppressions=thread_suppressions.txt:history_size=7" bin/lao_sto_qd.x
+tsan: F90FLAGS = -O0 -g -fpp -DDEBUG -fsanitize=thread $(LIB_OPENMP)
+tsan: $(TARGET)
 
 test: F90FLAGS = -O0 -g -fpp #-check all -debug all -warn all -diag-enable sc
 test: $(TEST_TARGET)

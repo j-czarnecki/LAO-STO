@@ -22,11 +22,11 @@ class RunnerConfig:
             """\
         #!/bin/bash -l
         ## Job name
-        #SBATCH -J LAO-STO-GAP
+        #SBATCH -J LAO-STO-SC
         ## Number of allocated nodes
         #SBATCH -N 1
         ## Number of tasks per node (by default this corresponds to the number of cores allocated per node)
-        #SBATCH --ntasks-per-node=1
+        #SBATCH --ntasks-per-node=20
         ## Memory allocated per core (default is 5GB)
         #SBATCH --mem-per-cpu=3800MB
         ## Max task execution time (format is HH:MM:SS)
@@ -62,8 +62,8 @@ class RunnerConfig:
                                         V_HUB = 0e3, \
                                         E_Fermi = -1.0e3 / \
                                     &discretization \
-                                        k1_steps = 10, \
-                                        k2_steps = 10 / \
+                                        k1_steps = 100, \
+                                        k2_steps = 100 / \
                                     &self_consistency \
                                         read_gamma_from_file = .FALSE., \
                                         path_to_gamma_start = , \
@@ -78,12 +78,12 @@ class RunnerConfig:
                                         gamma_eps_convergence = 1e-4, \
                                         charge_eps_convergence = 1e-4 / \
                                     &romberg_integration \
-                                        romb_eps_x = 1e-6, \
-                                        interpolation_deg_x = 4, \
-                                        max_grid_refinements_x = 11, \
-                                        romb_eps_y = 1e-6, \
-                                        interpolation_deg_y = 4, \
-                                        max_grid_refinements_y = 11 /"
+                                        romb_eps_x = 1e-4, \
+                                        interpolation_deg_x = 3, \
+                                        max_grid_refinements_x = 14, \
+                                        romb_eps_y = 1e-4, \
+                                        interpolation_deg_y = 3, \
+                                        max_grid_refinements_y = 14 /"
         )
         return params_nml
 
