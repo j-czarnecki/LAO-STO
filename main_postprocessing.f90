@@ -10,14 +10,14 @@ PROGRAM main_postprocessing
 
     REAL*8 :: zeta
 
-    zeta = 1e-6
+    zeta = 1e-3
 
 
     CALL GET_POSTPROCESSING_INPUT('./postprocessing_input.nml')
 
-    !CALL CALCULATE_DISPERSION("Energies.dat", 3)
-    !CALL CALCULATE_DOS(-1.1e3*meV2au, -0.9e3*meV2au, 0.01*meV2au, zeta, "OutputData/DOS.dat")
-    
+    CALL CALCULATE_DISPERSION("Energies.dat", 3)
+    CALL CALCULATE_DOS(-2.1e3*meV2au, 2.1e3*meV2au, 1.0e3*meV2au, zeta, "OutputData/DOS.dat")
+
     IF (enable_chern_number_calc) THEN
         CALL CALCULATE_CHERN_PARAMS(Nk_points_chern_number, Nk_points_chern_number, path_to_run_dir_chern_number)
     END IF

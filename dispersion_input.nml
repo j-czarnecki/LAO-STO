@@ -1,21 +1,22 @@
 &physical_params
     T = 0.0,
-    t_D = 0.5e3,
-    t_I = 0.04e3,
-    lambda_SOC = 0.01e3,
-    DELTA_TRI = -0.005e3,
-    v = 0.2e3,
-    V_pdp = 0.028e3,
-    V_pds = -0.065e3,
+    t_D = 1.0e3,
+    t_I = 0.0e3,
+    t_Rashba = 0.002e3,
+    lambda_SOC = 0.265e3,
+    DELTA_TRI = 0.01e3,
+    v = 0.0e3,
+    V_pdp = 0.0e3,
+    V_pds = 0.0e3,
     J_SC = 0.175e3,
     J_SC_PRIME = 0.0175e3,
-    U_HUB = 2.0e3,
-    V_HUB = 2.0e3,
+    U_HUB = 0.0e3,
+    V_HUB = 0.0e3,
     E_Fermi = 0.0e3 /
 
 &discretization
-    k1_steps = 3000,
-    k2_steps = 3000 /
+    k1_steps = 1000,
+    k2_steps = 1000 /
 
 &self_consistency
     gamma_start = 1.,

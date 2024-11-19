@@ -63,7 +63,7 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, DOS_filename)
     !CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), "OutputData/Gamma_SC_iter.dat")
     
     !TODO: This should be specified as an input to this subroutine
-    CALL GET_CHARGE_DENS(Charge_dens(:), "/home/jczarnecki/LAO-STO-results/RUNS_low_U/RUN_E_Fermi_-905.0_U_HUB_166.66666666666666_V_HUB_166.66666666666666/OutputData/Chargen_dens_final.dat")
+    !CALL GET_CHARGE_DENS(Charge_dens(:), "/home/jczarnecki/LAO-STO-results/RUNS_low_U/RUN_E_Fermi_-905.0_U_HUB_166.66666666666666_V_HUB_166.66666666666666/OutputData/Chargen_dens_final.dat")
 
 
     !Computing k-independent terms
@@ -88,6 +88,7 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, DOS_filename)
             CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
             CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
             CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+            CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:,:), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
             CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:))
             CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
         
@@ -174,7 +175,7 @@ SUBROUTINE CALCULATE_DISPERSION(filename, brilouinZoneFraction)
     ky_steps = INT(k2_steps/2 / brilouinZoneFraction)
     output_format = '(I5, 10E15.5)'
 
-    ALLOCATE(Hamiltonian(DIM,DIM)) 
+    ALLOCATE(Hamiltonian(DIM,DIM))
     ALLOCATE(Hamiltonian_const(DIM,DIM))
     ALLOCATE(U_transformation(DIM_POSITIVE_K, DIM_POSITIVE_K))
     ALLOCATE(Probability(-kx_steps:kx_steps, -ky_steps:ky_steps, DIM_POSITIVE_K, DIM_POSITIVE_K))
@@ -212,19 +213,20 @@ SUBROUTINE CALCULATE_DISPERSION(filename, brilouinZoneFraction)
             CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
             CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
             CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+            CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:,:), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
             CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:))
             CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
-        
+
             CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
-        
+
             Hamiltonian(:,:) = Hamiltonian_const(:,:) + Hamiltonian(:,:) !Should by multiplied by 0.5 if in Nambu space
-        
+
             !CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:DIM_POSITIVE_K,:DIM_POSITIVE_K), Energies(i,j,:), U_transformation(:,:), DIM_POSITIVE_K)
             !Probability(i,j,:,:) = ABS(U_transformation)**2
 
             CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:DIM_POSITIVE_K, :DIM_POSITIVE_K), Energies(i,j,:), DIM_POSITIVE_K)
             Probability(i,j,:,:) = ABS(Hamiltonian(:DIM_POSITIVE_K,:DIM_POSITIVE_K))**2
-            
+
         END DO
     END DO
 
@@ -250,7 +252,7 @@ SUBROUTINE CALCULATE_DISPERSION(filename, brilouinZoneFraction)
 
                 !Distinguishing lattice contributions
                 lat1_contribution = 0.
-                lat2_contribution = 0.                
+                lat2_contribution = 0.
                 DO n = 1, 3
                     DO m = 0, 1
                         lat1_contribution = lat1_contribution + Probability(i,j,m*TBA_DIM + n,l)
@@ -274,8 +276,8 @@ SUBROUTINE CALCULATE_DISPERSION(filename, brilouinZoneFraction)
         END DO
         WRITE(9,*)
         WRITE(9,*)
-    END DO 
-    CLOSE(9)   
+    END DO
+    CLOSE(9)
 
     DEALLOCATE(Hamiltonian)
     DEALLOCATE(Hamiltonian_const)
@@ -415,12 +417,12 @@ SUBROUTINE CALCULATE_CHERN_PARAMS(Nk1, Nk2, inputPath)
 END SUBROUTINE CALCULATE_CHERN_PARAMS
 
 SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
-    
+
     CHARACTER(LEN=*), INTENT(IN) :: inputPath !! This should be a path to folder where input.nml resides
     REAL*8, INTENT(IN) :: dE
     INTEGER*4, INTENT(IN) :: nBrillouinPoints
     CHARACTER(LEN=20) :: output_format
- 
+
     COMPLEX*16, ALLOCATABLE :: Hamiltonian(:,:), Hamiltonian_const(:,:)
     REAL*8, ALLOCATABLE :: Energies(:)
 
@@ -453,7 +455,7 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
 
 
 
-    ALLOCATE(Hamiltonian(DIM,DIM)) 
+    ALLOCATE(Hamiltonian(DIM,DIM))
     ALLOCATE(Hamiltonian_const(DIM,DIM))
     ALLOCATE(Energies(DIM))
     ALLOCATE(IsFermiSurface(-kx_steps:kx_steps, -ky_steps:ky_steps))
@@ -494,6 +496,8 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
     OPEN(unit = 9, FILE= TRIM(inputPath)//"OutputData/FermiSurface.dat", FORM = "FORMATTED", ACTION = "WRITE")
     WRITE(9,*) '#kx[1/a] ky[1/a] is_fermi_surface N_orbital'
     !Dispersion relation in a normal state
+    !$omp parallel private(kx, ky, Hamiltonian, Energies)
+    !$omp do
     DO i = -kx_steps, kx_steps
         DO j = -ky_steps, ky_steps
             kx = i*dkx !* (2. * PI * 2./3.)
@@ -507,13 +511,14 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
                 CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
                 CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
                 CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:,:), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
                 CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:))
                 !CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
-            
+
                 CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
-            
+
                 Hamiltonian(:,:) = Hamiltonian_const(:,:) + Hamiltonian(:,:) !Should by multiplied by 0.5 if in Nambu space
-            
+
                 CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:DIM_POSITIVE_K, :DIM_POSITIVE_K), Energies(:DIM_POSITIVE_K), DIM_POSITIVE_K)
                 !CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:DIM_POSITIVE_K, :DIM_POSITIVE_K), Energies(:DIM_POSITIVE_K), U_transformation(:DIM_POSITIVE_K, :DIM_POSITIVE_K), DIM_POSITIVE_K)
 
@@ -526,6 +531,8 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
             END IF
         END DO
     END DO
+    !$omp end do
+    !$omp end parallel
     CLOSE(9)
 
     PRINT*, "Fermi surface done"
@@ -538,10 +545,20 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
         CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
     END IF
 
+    ! Gamma_SC(:,:,:,:) = DCMPLX(0.0d0, 0.0d0)
+    ! Gamma_SC(:, 4:, 1, :) = DCMPLX(10*meV2au, 10*meV2au)
+    ! Gamma_SC(:, 4:, 2, :) = DCMPLX(-10*meV2au, 10*meV2au)
+    ! Gamma_SC(:, 4, 1, :) = DCMPLX(40*meV2au, 40*meV2au)
+    ! Gamma_SC(:, 4, 2, :) = DCMPLX(-40*meV2au, 40*meV2au)
+    ! Gamma_SC(:, 7, 1, :) = DCMPLX(40*meV2au, 40*meV2au)
+    ! Gamma_SC(:, 7, 2, :) = DCMPLX(-40*meV2au, 40*meV2au)
+
     OPEN(unit = 9, FILE= TRIM(inputPath)//"OutputData/SuperconductingGap.dat", FORM = "FORMATTED", ACTION = "WRITE")
     WRITE(9,*) '#kx[1/a] ky[1/a] gap_SC[meV] N_orbital'
     output_format = '(3E15.5, I10)'
 
+    !$omp parallel private(kx, ky, Hamiltonian, Energies)
+    !$omp do
     DO i = -kx_steps, kx_steps
         DO j = -ky_steps, ky_steps
             IF (IsFermiSurface(i,j) == 1) THEN
@@ -554,6 +571,7 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
                 CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
                 CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
                 CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:,:), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
                 CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:))
                 CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
                 ! DO n = 1, DIM_POSITIVE_K
@@ -565,7 +583,7 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
                 !     END IF
                 ! END DO
                 CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
-            
+
                 Hamiltonian(:,:) = 0.5*(Hamiltonian_const(:,:) + Hamiltonian(:,:)) !Should by multiplied by 0.5 if in Nambu space
 
                 CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:,:), Energies(:), DIM)
@@ -574,6 +592,8 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
             END IF
         END DO
     END DO
+    !$omp end do
+    !$omp end parallel
     CLOSE(9)
 
 
@@ -665,6 +685,7 @@ SUBROUTINE TRANSFORM_DELTA_MATRIX(inputPath, nBrillouinPoints)
                 CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
                 CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
                 CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:,:), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
                 CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:))
                 CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
                 CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
@@ -850,6 +871,7 @@ SUBROUTINE LAO_STO_CHERN_ENERGIES(Nk1, Nk2, i, j, inputPath, U_transformation)
     CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
     CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
     CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+    CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:,:), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
     CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:))
     CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
 

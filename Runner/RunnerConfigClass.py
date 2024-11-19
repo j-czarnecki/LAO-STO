@@ -49,6 +49,7 @@ class RunnerConfig:
                                         T = 0.0, \
                                         t_D = 0.5e3, \
                                         t_I = 0.04e3, \
+                                        t_Rashba = 0.0e3, \
                                         lambda_SOC = 0.01e3, \
                                         DELTA_TRI = -0.005e3, \
                                         v = 0.2e3, \

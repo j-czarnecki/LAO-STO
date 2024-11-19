@@ -9,6 +9,7 @@ SAVE
 REAL*8 :: T = 0.
 REAL*8 :: t_D = 0.
 REAL*8 :: t_I = 0.
+REAL*8 :: t_Rashba = 0.
 REAL*8 :: lambda_SOC = 0.
 REAL*8 :: DELTA_TRI = 0.
 REAL*8 :: v = 0.
@@ -72,6 +73,7 @@ NAMELIST /physical_params/  &
 & T,                        &
 & t_D,                      &
 & t_I,                      &
+& t_Rashba,                 &
 & lambda_SOC,               &
 & DELTA_TRI,                &
 & v,                        &
@@ -137,6 +139,7 @@ SUBROUTINE GET_INPUT(nmlfile)
     !Change to atomic units
     t_D = t_D * meV2au           
     t_I = t_I * meV2au
+    t_Rashba = t_Rashba * meV2au
     lambda_SOC = lambda_SOC * meV2au
     DELTA_TRI = DELTA_TRI * meV2au 
     v = v * meV2au 

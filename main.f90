@@ -144,8 +144,8 @@ PROGRAM MAIN
         !$omp parallel do collapse(2) schedule(dynamic, 1) private(Delta_local, Charge_dens_local)
         DO i = 0, k1_steps-1
             DO j = 0, k2_steps-1
-                WRITE(log_string, *) 'Integrating over chunk: ', i, j
-                LOG_INFO(log_string)
+                ! WRITE(log_string, *) 'Integrating over chunk: ', i, j
+                ! LOG_INFO(log_string)
 
                 CALL ROMBERG_Y(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), Charge_dens(:), i*dk1, (i + 1)*dk1, j*dk2, (j + 1)*dk2, &
                 & Delta_local(:,:,:,:), Charge_dens_local(:), romb_eps_x, interpolation_deg_x, max_grid_refinements_x, &
@@ -169,12 +169,12 @@ PROGRAM MAIN
         ! DO i = 0, k1_steps
         !     counter = counter + 1
         !     PRINT*, counter
-            
+
         !     DO j = 0, k2_steps
 
         !         CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), &
         !         & Charge_dens(:), i*dk1, j*dk2, Delta_local(:,:,:,:), Charge_dens_local(:))
-            
+
         !         Delta_new(:,:,:,:) = Delta_new(:,:,:,:) + Delta_local(:,:,:,:)*dk1*dk2
         !         Charge_dens_new(:) = Charge_dens_new(:) + Charge_dens_local(:)*dk1*dk2
 
@@ -302,10 +302,19 @@ PROGRAM MAIN
                 DO orb = 1, ORBITALS
                     DO n = 1, N_ALL_NEIGHBOURS
                         DO lat = 1, SUBLATTICES !to 1 in absence of magnetic field to SUBLATTICES if else
+                            ! Delta_broyden(broyden_index) = REAL(Gamma_SC(orb,n,spin,lat))
+                            ! Delta_broyden(INT((delta_real_elems - DIM_POSITIVE_K)/2) + broyden_index) = AIMAG(Gamma_SC(orb,n,spin,lat))
+                            ! Delta_new_broyden(broyden_index) = REAL(Gamma_SC_new(orb,n,spin,lat))
+                            ! Delta_new_broyden(INT((delta_real_elems - DIM_POSITIVE_K)/2) + broyden_index) = AIMAG(Gamma_SC_new(orb,n,spin,lat))
+                            ! broyden_index = broyden_index + 1
+
+                            !Changed order of elements
                             Delta_broyden(broyden_index) = REAL(Gamma_SC(orb,n,spin,lat))
-                            Delta_broyden(INT((delta_real_elems - DIM_POSITIVE_K)/2) + broyden_index) = AIMAG(Gamma_SC(orb,n,spin,lat))
                             Delta_new_broyden(broyden_index) = REAL(Gamma_SC_new(orb,n,spin,lat))
-                            Delta_new_broyden(INT((delta_real_elems - DIM_POSITIVE_K)/2) + broyden_index) = AIMAG(Gamma_SC_new(orb,n,spin,lat))
+                            broyden_index = broyden_index + 1
+
+                            Delta_broyden(broyden_index) = AIMAG(Gamma_SC(orb,n,spin,lat))
+                            Delta_new_broyden(broyden_index) = AIMAG(Gamma_SC_new(orb,n,spin,lat))
                             broyden_index = broyden_index + 1
                         END DO
                     END DO
@@ -313,11 +322,22 @@ PROGRAM MAIN
             END DO
 
             !Must be +1!!!
-            Delta_broyden((delta_real_elems - DIM_POSITIVE_K + 1) : delta_real_elems) = Charge_dens(:)
-            Delta_new_broyden((delta_real_elems - DIM_POSITIVE_K + 1) : delta_real_elems) = Charge_dens_new(:)
+            !Delta_broyden((delta_real_elems - DIM_POSITIVE_K + 1) : delta_real_elems) = Charge_dens(:)
+            !Delta_new_broyden((delta_real_elems - DIM_POSITIVE_K + 1) : delta_real_elems) = Charge_dens_new(:)
+            DO n = 1, DIM_POSITIVE_K
+                Delta_broyden(broyden_index) = Charge_dens(n)
+                Delta_new_broyden(broyden_index) = Charge_dens_new(n)
+                broyden_index = broyden_index + 1
+            END DO
+
+            !Sanity check
+            IF (broyden_index - 1 /= delta_real_elems) THEN
+                WRITE(log_string,*) 'Broyden index - 1 /= delta_real_elems', broyden_index - 1, delta_real_elems
+                LOG_ERROR(log_string)
+            END IF
 
             !PRINT*, "Filled table for broyden mixing, calling mix_broyden"
-            CALL mix_broyden(delta_real_elems, Delta_new_broyden(:), Delta_broyden(:), sc_alpha, sc_iter, 4, .FALSE.)        
+            CALL mix_broyden(delta_real_elems, Delta_new_broyden(:), Delta_broyden(:), sc_alpha, sc_iter, 4, .FALSE.)
 
             !PRINT*, "Finished mix_broyden, rewriting to Gamma"
             broyden_index = 1
@@ -325,14 +345,24 @@ PROGRAM MAIN
                 DO orb = 1, ORBITALS
                     DO n = 1, N_ALL_NEIGHBOURS
                         DO lat = 1, SUBLATTICES !to 1 in absence of magnetic field to SUBLATTICES if else
-                            Gamma_SC(orb,n,spin,lat) = DCMPLX(Delta_broyden(broyden_index), Delta_broyden(INT((delta_real_elems - DIM_POSITIVE_K)/2) + broyden_index))
-                            broyden_index = broyden_index + 1
+                            !Gamma_SC(orb,n,spin,lat) = DCMPLX(Delta_broyden(broyden_index), Delta_broyden(INT((delta_real_elems - DIM_POSITIVE_K)/2) + broyden_index))
+                            Gamma_SC(orb,n,spin,lat) = DCMPLX(Delta_broyden(broyden_index), Delta_broyden(broyden_index + 1))
+                            broyden_index = broyden_index + 2
                         END DO
                     END DO
                 END DO
             END DO
 
-            Charge_dens(:) = Delta_broyden((delta_real_elems - DIM_POSITIVE_K + 1):delta_real_elems)
+            DO n = 1, DIM_POSITIVE_K
+                Charge_dens(n) = Delta_broyden(broyden_index)
+                broyden_index = broyden_index + 1
+            END DO
+
+            !Sanity check
+            IF (broyden_index - 1 /= delta_real_elems) THEN
+                WRITE(log_string,*) 'Broyden index - 1 /= delta_real_elems', broyden_index - 1, delta_real_elems
+                LOG_ERROR(log_string)
+            END IF
         !In the last phase of convergence use linear mixing to avoid spare oscillations
         ! ELSE
         !     PRINT*, "Linear mixing"
