@@ -40,7 +40,7 @@ SUBROUTINE DIAGONALIZE_GENERALIZED(Hamiltonian, Eigenvalues, U_transformation, N
     COMPLEX*16, ALLOCATABLE :: WORK(:)
     REAL*8, ALLOCATABLE :: RWORK(:)
     INTEGER*4 :: LWORK
-    INTEGER*4 :: INFO
+    INTEGER*4 :: INFO, i
 
     LWORK = 10*N
     INFO = 0
@@ -58,10 +58,15 @@ SUBROUTINE DIAGONALIZE_GENERALIZED(Hamiltonian, Eigenvalues, U_transformation, N
     CALL ZGEEV('N', 'V', N, Hamiltonian, N, W, VL, N, U_transformation, N,&
     & WORK, LWORK, RWORK, INFO)
 
-    IF (INFO .ne. 0) THEN 
+    IF (INFO .ne. 0) THEN
         PRINT*, 'ZGEEV INFO ', INFO
         STOP
-    END IF 
+    END IF
+
+    !Removing phase ambiguity
+    DO i = 1, N
+        U_transformation(:,i) = U_transformation(:,i) * CONJG(U_transformation(1,i))/ABS(U_transformation(1,i))
+    END DO
     Eigenvalues(:) = REAL(W(:))
 
     DEALLOCATE(W)
@@ -88,6 +93,8 @@ PURE COMPLEX*16 FUNCTION epsilon_yz(kx, ky)
     REAL*8, INTENT(IN) :: kx, ky
     epsilon_yz = -t_D*(EXP(imag*ky) + EXP(imag*(SQRT(3.)/2.*kx - 1./2.*ky))) &
                 - t_I*EXP(-imag*(SQRT(3.)/2.*kx + 1./2.*ky ))
+    ! epsilon_yz = -t_D*EXP(-imag*ky)*(1.0 + EXP(-imag*(SQRT(3.)/2.*kx - 3./2.*ky))) &
+    !         - t_I*EXP(-imag*(-SQRT(3.)/2.*kx - 1./2.*ky ))
     RETURN
 END FUNCTION epsilon_yz
 
@@ -96,6 +103,8 @@ PURE COMPLEX*16 FUNCTION epsilon_zx(kx, ky)
     REAL*8, INTENT(IN) :: kx, ky
     epsilon_zx = -t_D*(EXP(imag*ky) + EXP(-imag*(SQRT(3.)/2.*kx + 1./2.*ky))) &
                 - t_I*EXP(imag*(SQRT(3.)/2.*kx - 1./2.*ky ))
+    ! epsilon_zx = -t_D*EXP(-imag*ky)*(1. + EXP(-imag*(-SQRT(3.)/2.*kx - 3./2.*ky))) &
+    !             - t_I*EXP(-imag*(SQRT(3.)/2.*kx - 1./2.*ky ))
     RETURN
 END FUNCTION epsilon_zx
 
@@ -103,27 +112,28 @@ END FUNCTION epsilon_zx
 PURE COMPLEX*16 FUNCTION epsilon_xy(kx, ky)
     REAL*8, INTENT(IN) :: kx, ky
     epsilon_xy = -2.*t_D*COS( SQRT(3.)/2.*kx )*EXP(-imag*1./2.*ky) - t_I*EXP(imag*ky)
+    ! epsilon_xy = -2.*t_D*COS(SQRT(3.)/2.*kx )*EXP(imag*1./2.*ky) - t_I*EXP(-imag*ky)
     RETURN
 END FUNCTION epsilon_xy
 
 !dir$ attributes forceinline :: rashba_yz_xz
-PURE COMPLEX*16 FUNCTION rashba_yz_xz(kx, ky)
+PURE COMPLEX*16 FUNCTION rashba_yz_zx(kx, ky)
     REAL*8, INTENT(IN) :: kx, ky
-    rashba_yz_xz = 2 * imag * t_Rashba * SIN(SQRT(3.)/2. * kx) * EXP(-imag * 1./2.*ky)
+    rashba_yz_zx = 2 * imag * t_Rashba * SIN(-SQRT(3.)/2. * kx) * EXP(-imag * 1./2.*ky)
     RETURN
-END FUNCTION rashba_yz_xz
+END FUNCTION rashba_yz_zx
 
 !dir$ attributes forceinline :: rashba_yz_xy
 PURE COMPLEX*16 FUNCTION rashba_yz_xy(kx, ky)
     REAL*8, INTENT(IN) :: kx, ky
-    rashba_yz_xy = t_Rashba * EXP(imag * ky) * (1. - EXP(-imag*(SQRT(3.)/2.*kx - 1./2.*ky)))
+    rashba_yz_xy = -t_Rashba * EXP(imag * ky) * (1. - EXP(imag*(-SQRT(3.)/2.*kx - 3./2.*ky)))
     RETURN
 END FUNCTION rashba_yz_xy
 
 !dir$ attributes forceinline :: rashba_zx_xy
 PURE COMPLEX*16 FUNCTION rashba_zx_xy(kx, ky)
     REAL*8, INTENT(IN) :: kx, ky
-    rashba_zx_xy = t_Rashba * EXP(imag * ky) * (1. - EXP(imag*(SQRT(3.)/2.*kx - 1./2.*ky)))
+    rashba_zx_xy = -t_Rashba * EXP(imag * ky) * (1. - EXP(imag*(SQRT(3.)/2.*kx - 3./2.*ky)))
     RETURN
 END FUNCTION rashba_zx_xy
 
@@ -158,7 +168,7 @@ END FUNCTION pairing_nnn_1
 !dir$ attributes forceinline :: pairing_nnn_2
 PURE COMPLEX*16 FUNCTION pairing_nnn_2(kx, ky)
     REAL*8, INTENT(IN) :: kx, ky
-    pairing_nnn_2 = EXP(-imag*(3.*SQRT(3.)/2.*kx + 3./2.*ky))
+    pairing_nnn_2 = EXP(-imag*(SQRT(3.)/2.*kx + 3./2.*ky))
     RETURN
 END FUNCTION pairing_nnn_2
 

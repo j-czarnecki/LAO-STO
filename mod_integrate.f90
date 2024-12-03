@@ -145,7 +145,7 @@ RECURSIVE SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chun
     END DO
 
     WRITE(log_string,'(a, F10.6, a, F10.6, a, I15)') "Romberg Y did not converge for chunk &
-    & k1_chunk_min: ", k1_chunk_min, " k2_chunk_min: ", k1_chunk_min, " after iteration: ", j - 1
+    & k1_chunk_min: ", k1_chunk_min, " k2_chunk_min: ", k2_chunk_min, " after iteration: ", j - 1
     LOG_ABNORMAL(log_string)
 
 
@@ -287,6 +287,7 @@ RECURSIVE SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chun
         END IF
 
     END DO
+
 
     WRITE(log_string,'(a, F10.6, a, F10.6, a, I15)') "Romberg X did not converge for &
     & k1_chunk_min: ", k1_chunk_min, " k2_actual: ", k2_actual, " after iteration: ", j - 1

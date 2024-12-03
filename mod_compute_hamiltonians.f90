@@ -45,7 +45,7 @@ SUBROUTINE GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge_dens, 
     ! STOP 'Hamiltonian printed'
 
     CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:,:), Energies(:), U_transformation(:,:), DIM)
-    !After DIAGONALIZE HERMITIAN, U contains eigenvectors, so it corresponds to transformation matrix U                
+    !After DIAGONALIZE HERMITIAN, U contains eigenvectors, so it corresponds to transformation matrix U
 
     !Here it has to be set to zero, to avoid artifacts from previous iteration / chunk
     Delta_local(:,:,:,:) = DCMPLX(0. , 0.)
@@ -103,101 +103,35 @@ SUBROUTINE GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge_dens, 
         !### NEXT NEAREST NEIGHBOURS PAIRING ############################################
         !Electrons
         DO n = 1, DIM_POSITIVE_K
-            !Up - down Ti1 - Ti2 delta
-            Delta_local(orb,4,1,1) = Delta_local(orb,4,1,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K, n))*U_transformation(orb + ORBITALS + TBA_DIM, n)*fd_distribution(Energies(n), 0d0, T)*pairing_nnn_1(kx)
-            Delta_local(orb,5,1,1) = Delta_local(orb,5,1,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K, n))*U_transformation(orb + ORBITALS + TBA_DIM, n)*fd_distribution(Energies(n), 0d0, T)*pairing_nnn_2(kx,ky)
-            Delta_local(orb,6,1,1) = Delta_local(orb,6,1,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K, n))*U_transformation(orb + ORBITALS + TBA_DIM, n)*fd_distribution(Energies(n), 0d0, T)*pairing_nnn_3(kx,ky)
-            Delta_local(orb,7,1,1) = Delta_local(orb,7,1,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K, n))*U_transformation(orb + ORBITALS + TBA_DIM, n)*fd_distribution(Energies(n), 0d0, T)*pairing_nnn_4(kx)
-            Delta_local(orb,8,1,1) = Delta_local(orb,8,1,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K, n))*U_transformation(orb + ORBITALS + TBA_DIM, n)*fd_distribution(Energies(n), 0d0, T)*pairing_nnn_5(kx,ky)
-            Delta_local(orb,9,1,1) = Delta_local(orb,9,1,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K, n))*U_transformation(orb + ORBITALS + TBA_DIM, n)*fd_distribution(Energies(n), 0d0, T)*pairing_nnn_6(kx,ky)
-
-            !Up - down Ti2 - Ti1 delta
-            Delta_local(orb,4,1,2) = Delta_local(orb,4,1,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + TBA_DIM, n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_1(kx))
-            Delta_local(orb,5,1,2) = Delta_local(orb,5,1,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + TBA_DIM, n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_2(kx,ky))
-            Delta_local(orb,6,1,2) = Delta_local(orb,6,1,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + TBA_DIM, n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_3(kx,ky))
-            Delta_local(orb,7,1,2) = Delta_local(orb,7,1,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + TBA_DIM, n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_4(kx))
-            Delta_local(orb,8,1,2) = Delta_local(orb,8,1,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + TBA_DIM, n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_5(kx,ky))
-            Delta_local(orb,9,1,2) = Delta_local(orb,9,1,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + TBA_DIM, n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_6(kx,ky))
-
-            !Down - up Ti1 - Ti2 delta
-            Delta_local(orb,4,2,1) = Delta_local(orb,4,2,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + ORBITALS, n)*fd_distribution(Energies(n), 0d0, T)*pairing_nnn_1(kx)
-            Delta_local(orb,5,2,1) = Delta_local(orb,5,2,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + ORBITALS, n)*fd_distribution(Energies(n), 0d0, T)*pairing_nnn_2(kx,ky)
-            Delta_local(orb,6,2,1) = Delta_local(orb,6,2,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + ORBITALS, n)*fd_distribution(Energies(n), 0d0, T)*pairing_nnn_3(kx,ky)
-            Delta_local(orb,7,2,1) = Delta_local(orb,7,2,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + ORBITALS, n)*fd_distribution(Energies(n), 0d0, T)*pairing_nnn_4(kx)
-            Delta_local(orb,8,2,1) = Delta_local(orb,8,2,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + ORBITALS, n)*fd_distribution(Energies(n), 0d0, T)*pairing_nnn_5(kx,ky)
-            Delta_local(orb,9,2,1) = Delta_local(orb,9,2,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + ORBITALS, n)*fd_distribution(Energies(n), 0d0, T)*pairing_nnn_6(kx,ky)
-
-            !Down - up Ti2 - Ti1 delta
-            Delta_local(orb,4,2,2) = Delta_local(orb,4,2,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb, n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_1(kx))
-            Delta_local(orb,5,2,2) = Delta_local(orb,5,2,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb, n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_2(kx,ky))
-            Delta_local(orb,6,2,2) = Delta_local(orb,6,2,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb, n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_3(kx,ky))
-            Delta_local(orb,7,2,2) = Delta_local(orb,7,2,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb, n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_4(kx))
-            Delta_local(orb,8,2,2) = Delta_local(orb,8,2,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb, n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_5(kx,ky))
-            Delta_local(orb,9,2,2) = Delta_local(orb,9,2,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb, n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_6(kx,ky))
+            !Up - down Ti1 - Ti1 delta, Ti2 - Ti2 delta
+            !No conjugation in phase factor, since next nearest neighbours have the same relative positions in both sublattices
+            DO lat = 0, SUBLATTICES - 1
+                DO spin = 0, 1
+                    Delta_local(orb,N_NEIGHBOURS + 1,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 1,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_1(kx))
+                    Delta_local(orb,N_NEIGHBOURS + 2,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 2,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_2(kx,ky))
+                    Delta_local(orb,N_NEIGHBOURS + 3,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 3,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_3(kx, ky))
+                    Delta_local(orb,N_NEIGHBOURS + 4,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 4,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_4(kx))
+                    Delta_local(orb,N_NEIGHBOURS + 5,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 5,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_5(kx, ky))
+                    Delta_local(orb,N_NEIGHBOURS + 6,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 6,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_6(kx, ky))
+                END DO
+            END DO
         END DO
-        ! DO n = 1, DIM_POSITIVE_K
-        !     !Up - down Ti1 - Ti1 delta, Ti2 - Ti2 delta
-        !     !No conjugation in phase factor, since next nearest neighbours have the same relative positions in both sublattices
-        !     DO lat = 0, SUBLATTICES - 1
-        !         DO spin = 0, 1
-        !             Delta_local(orb,N_NEIGHBOURS + 1,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 1,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_1(kx))
-        !             Delta_local(orb,N_NEIGHBOURS + 2,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 2,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_2(kx,ky))
-        !             Delta_local(orb,N_NEIGHBOURS + 3,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 3,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_3(kx, ky))
-        !             Delta_local(orb,N_NEIGHBOURS + 4,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 4,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_4(kx))
-        !             Delta_local(orb,N_NEIGHBOURS + 5,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 5,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_5(kx, ky))
-        !             Delta_local(orb,N_NEIGHBOURS + 6,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 6,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*fd_distribution(Energies(n), 0d0, T)*CONJG(pairing_nnn_6(kx, ky))
-        !         END DO
-        !     END DO
-        ! END DO
 
-        ! !Holes
+        !Holes
         DO n = DIM_POSITIVE_K + 1, DIM
-            !Up - down Ti1 - Ti2 delta
-            Delta_local(orb,4,1,1) = Delta_local(orb,4,1,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K, n))*U_transformation(orb + ORBITALS + TBA_DIM, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_nnn_1(kx)
-            Delta_local(orb,5,1,1) = Delta_local(orb,5,1,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K, n))*U_transformation(orb + ORBITALS + TBA_DIM, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_nnn_2(kx,ky)
-            Delta_local(orb,6,1,1) = Delta_local(orb,6,1,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K, n))*U_transformation(orb + ORBITALS + TBA_DIM, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_nnn_3(kx,ky)
-            Delta_local(orb,7,1,1) = Delta_local(orb,7,1,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K, n))*U_transformation(orb + ORBITALS + TBA_DIM, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_nnn_4(kx)
-            Delta_local(orb,8,1,1) = Delta_local(orb,8,1,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K, n))*U_transformation(orb + ORBITALS + TBA_DIM, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_nnn_5(kx,ky)
-            Delta_local(orb,9,1,1) = Delta_local(orb,9,1,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K, n))*U_transformation(orb + ORBITALS + TBA_DIM, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_nnn_6(kx,ky)
-
-            !Up - down Ti2 - Ti1 delta
-            Delta_local(orb,4,1,2) = Delta_local(orb,4,1,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + TBA_DIM, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_1(kx))
-            Delta_local(orb,5,1,2) = Delta_local(orb,5,1,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + TBA_DIM, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_2(kx,ky))
-            Delta_local(orb,6,1,2) = Delta_local(orb,6,1,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + TBA_DIM, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_3(kx,ky))
-            Delta_local(orb,7,1,2) = Delta_local(orb,7,1,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + TBA_DIM, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_4(kx))
-            Delta_local(orb,8,1,2) = Delta_local(orb,8,1,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + TBA_DIM, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_5(kx,ky))
-            Delta_local(orb,9,1,2) = Delta_local(orb,9,1,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K, n))*U_transformation(orb + TBA_DIM, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_6(kx,ky))
-
-            !Down - up Ti1 - Ti2 delta
-            Delta_local(orb,4,2,1) = Delta_local(orb,4,2,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + ORBITALS, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_nnn_1(kx)
-            Delta_local(orb,5,2,1) = Delta_local(orb,5,2,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + ORBITALS, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_nnn_2(kx,ky)
-            Delta_local(orb,6,2,1) = Delta_local(orb,6,2,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + ORBITALS, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_nnn_3(kx,ky)
-            Delta_local(orb,7,2,1) = Delta_local(orb,7,2,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + ORBITALS, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_nnn_4(kx)
-            Delta_local(orb,8,2,1) = Delta_local(orb,8,2,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + ORBITALS, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_nnn_5(kx,ky)
-            Delta_local(orb,9,2,1) = Delta_local(orb,9,2,1) + CONJG(U_transformation(orb + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb + ORBITALS, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*pairing_nnn_6(kx,ky)
-
-            !Down - up Ti2 - Ti1 delta
-            Delta_local(orb,4,2,2) = Delta_local(orb,4,2,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_1(kx))
-            Delta_local(orb,5,2,2) = Delta_local(orb,5,2,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_2(kx,ky))
-            Delta_local(orb,6,2,2) = Delta_local(orb,6,2,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_3(kx,ky))
-            Delta_local(orb,7,2,2) = Delta_local(orb,7,2,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_4(kx))
-            Delta_local(orb,8,2,2) = Delta_local(orb,8,2,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_5(kx,ky))
-            Delta_local(orb,9,2,2) = Delta_local(orb,9,2,2) + CONJG(U_transformation(orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM, n))*U_transformation(orb, n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_6(kx,ky))
+            !Up - down Ti1 - Ti1 delta, Ti2 - Ti2 delta
+            !No conjugation in phase factor, since next nearest neighbours have the same relative positions in both sublattices
+            DO lat = 0, SUBLATTICES - 1
+                DO spin = 0, 1
+                    Delta_local(orb,N_NEIGHBOURS + 1,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 1,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_1(kx))
+                    Delta_local(orb,N_NEIGHBOURS + 2,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 2,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_2(kx,ky))
+                    Delta_local(orb,N_NEIGHBOURS + 3,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 3,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_3(kx, ky))
+                    Delta_local(orb,N_NEIGHBOURS + 4,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 4,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_4(kx))
+                    Delta_local(orb,N_NEIGHBOURS + 5,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 5,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_5(kx, ky))
+                    Delta_local(orb,N_NEIGHBOURS + 6,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 6,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_6(kx, ky))
+                END DO
+            END DO
         END DO
-        ! DO n = DIM_POSITIVE_K + 1, DIM
-        !     !Up - down Ti1 - Ti1 delta, Ti2 - Ti2 delta
-        !     !No conjugation in phase factor, since next nearest neighbours have the same relative positions in both sublattices
-        !     DO lat = 0, SUBLATTICES - 1
-        !         DO spin = 0, 1
-        !             Delta_local(orb,N_NEIGHBOURS + 1,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 1,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_1(kx))
-        !             Delta_local(orb,N_NEIGHBOURS + 2,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 2,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_2(kx,ky))
-        !             Delta_local(orb,N_NEIGHBOURS + 3,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 3,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_3(kx, ky))
-        !             Delta_local(orb,N_NEIGHBOURS + 4,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 4,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_4(kx))
-        !             Delta_local(orb,N_NEIGHBOURS + 5,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 5,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_5(kx, ky))
-        !             Delta_local(orb,N_NEIGHBOURS + 6,spin + 1,lat + 1) = Delta_local(orb,N_NEIGHBOURS + 6,spin + 1,lat + 1) + CONJG(U_transformation(orb + lat*ORBITALS + DIM_POSITIVE_K + TBA_DIM*spin, n))*U_transformation(orb + lat*ORBITALS + TBA_DIM*MOD(spin + 1, 2), n)*(1. - fd_distribution(-Energies(n), 0d0, T))*CONJG(pairing_nnn_6(kx, ky))
-        !         END DO
-        !     END DO
-        ! END DO
         !### END OF NEXT NEAREST NEIGHBOURS PAIRING #####################################
 
     END DO

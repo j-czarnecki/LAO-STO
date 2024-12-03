@@ -303,26 +303,40 @@ SUBROUTINE COMPUTE_RASHBA_HOPPING(Hamiltonian, kx, ky)
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
     REAL*8, INTENT(INOUT) :: kx, ky
 
-    !First-second sublattice, spin up-down
-    Hamiltonian(1, ORBITALS + TBA_DIM + 2) = Hamiltonian(1, ORBITALS + TBA_DIM + 2) + rashba_yz_xz(kx, ky)
-    Hamiltonian(1, ORBITALS + TBA_DIM + 3) = Hamiltonian(1, ORBITALS + TBA_DIM + 3) + rashba_yz_xy(kx, ky)
-    Hamiltonian(2, ORBITALS + TBA_DIM + 3) = Hamiltonian(2, ORBITALS + TBA_DIM + 3) + rashba_zx_xy(kx, ky)
-    ! !Second-first sublattice, spin up-down
-    ! Hamiltonian(ORBITALS + 1, TBA_DIM + 2) = Hamiltonian(ORBITALS + 1, TBA_DIM + 2) + rashba_yz_xz(kx, ky)
-    ! Hamiltonian(ORBITALS + 1, TBA_DIM + 3) = Hamiltonian(ORBITALS + 1, TBA_DIM + 3) + rashba_yz_xy(kx, ky)
-    ! Hamiltonian(ORBITALS + 2, TBA_DIM + 3) = Hamiltonian(ORBITALS + 2, TBA_DIM + 3) + rashba_zx_xy(kx, ky)
+    !First-second sublattice, spin up
+    Hamiltonian(1, ORBITALS + 2) = Hamiltonian(1, ORBITALS + 2) + rashba_yz_zx(kx, ky)
+    Hamiltonian(1, ORBITALS + 3) = Hamiltonian(1, ORBITALS + 3) + rashba_yz_xy(kx, ky)
+    Hamiltonian(2, ORBITALS + 1) = Hamiltonian(2, ORBITALS + 1) - rashba_yz_zx(kx, ky)
+    Hamiltonian(2, ORBITALS + 3) = Hamiltonian(2, ORBITALS + 3) + rashba_zx_xy(kx, ky)
+    Hamiltonian(3, ORBITALS + 1) = Hamiltonian(3, ORBITALS + 1) - rashba_yz_xy(kx, ky)
+    Hamiltonian(3, ORBITALS + 2) = Hamiltonian(3, ORBITALS + 2) - rashba_zx_xy(kx, ky)
+    !First-second sublattice, spin down
+    Hamiltonian(1 + TBA_DIM, TBA_DIM + ORBITALS + 2) = Hamiltonian(1 + TBA_DIM, TBA_DIM + ORBITALS + 2) + rashba_yz_zx(kx, ky)
+    Hamiltonian(1 + TBA_DIM, TBA_DIM + ORBITALS + 3) = Hamiltonian(1 + TBA_DIM, TBA_DIM + ORBITALS + 3) + rashba_yz_xy(kx, ky)
+    Hamiltonian(2 + TBA_DIM, TBA_DIM + ORBITALS + 1) = Hamiltonian(2 + TBA_DIM, TBA_DIM + ORBITALS + 1) - rashba_yz_zx(kx, ky)
+    Hamiltonian(2 + TBA_DIM, TBA_DIM + ORBITALS + 3) = Hamiltonian(2 + TBA_DIM, TBA_DIM + ORBITALS + 3) + rashba_zx_xy(kx, ky)
+    Hamiltonian(3 + TBA_DIM, TBA_DIM + ORBITALS + 1) = Hamiltonian(3 + TBA_DIM, TBA_DIM + ORBITALS + 1) - rashba_yz_xy(kx, ky)
+    Hamiltonian(3 + TBA_DIM, TBA_DIM + ORBITALS + 2) = Hamiltonian(3 + TBA_DIM, TBA_DIM + ORBITALS + 2) - rashba_zx_xy(kx, ky)
 
     !Nambu space
     kx = -kx
     ky = -ky
-    !First-second sublattice, spin up-down
-    Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + ORBITALS + TBA_DIM + 2) = Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + ORBITALS + TBA_DIM + 2) - CONJG(rashba_yz_xz(kx, ky))
-    Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + ORBITALS + TBA_DIM + 3) = Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + ORBITALS + TBA_DIM + 3) - CONJG(rashba_yz_xy(kx, ky))
-    Hamiltonian(DIM_POSITIVE_K + 2, DIM_POSITIVE_K + ORBITALS + TBA_DIM + 3) = Hamiltonian(DIM_POSITIVE_K + 2, DIM_POSITIVE_K + ORBITALS + TBA_DIM + 3) - CONJG(rashba_zx_xy(kx, ky))
-    ! !Second-first sublattice, spin up-down
-    ! Hamiltonian(DIM_POSITIVE_K + ORBITALS + 1, DIM_POSITIVE_K + TBA_DIM + 2) = Hamiltonian(DIM_POSITIVE_K + ORBITALS + 1, DIM_POSITIVE_K + TBA_DIM + 2) - CONJG(rashba_yz_xz(kx, ky))
-    ! Hamiltonian(DIM_POSITIVE_K + ORBITALS + 1, DIM_POSITIVE_K + TBA_DIM + 3) = Hamiltonian(DIM_POSITIVE_K + ORBITALS + 1, DIM_POSITIVE_K + TBA_DIM + 3) - CONJG(rashba_yz_xy(kx, ky))
-    ! Hamiltonian(DIM_POSITIVE_K + ORBITALS + 2, DIM_POSITIVE_K + TBA_DIM + 3) = Hamiltonian(DIM_POSITIVE_K + ORBITALS + 2, DIM_POSITIVE_K + TBA_DIM + 3) - CONJG(rashba_zx_xy(kx, ky))
+
+    !First-second sublattice, spin up
+    Hamiltonian(1 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 2) = Hamiltonian(1 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 2) - CONJG(rashba_yz_zx(kx, ky))
+    Hamiltonian(1 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 3) = Hamiltonian(1 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 3) - CONJG(rashba_yz_xy(kx, ky))
+    Hamiltonian(2 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 1) = Hamiltonian(2 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 1) + CONJG(rashba_yz_zx(kx, ky))
+    Hamiltonian(2 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 3) = Hamiltonian(2 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 3) - CONJG(rashba_zx_xy(kx, ky))
+    Hamiltonian(3 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 1) = Hamiltonian(3 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 1) + CONJG(rashba_yz_xy(kx, ky))
+    Hamiltonian(3 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 2) = Hamiltonian(3 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 2) + CONJG(rashba_zx_xy(kx, ky))
+    !First-second sublattice, spin down
+    Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 2) = Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 2) - CONJG(rashba_yz_zx(kx, ky))
+    Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 3) = Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 3) - CONJG(rashba_yz_xy(kx, ky))
+    Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 1) = Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 1) + CONJG(rashba_yz_zx(kx, ky))
+    Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 3) = Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 3) - CONJG(rashba_zx_xy(kx, ky))
+    Hamiltonian(3 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 1) = Hamiltonian(3 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 1) + CONJG(rashba_yz_xy(kx, ky))
+    Hamiltonian(3 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 2) = Hamiltonian(3 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 2) + CONJG(rashba_zx_xy(kx, ky))
+
     kx = -kx
     ky = -ky
 END SUBROUTINE COMPUTE_RASHBA_HOPPING

@@ -95,11 +95,11 @@ PROGRAM MAIN
     ELSE
         !Breaking spin up-down down-up symmetry
         !coupling for nearest-neighbours
-        Gamma_SC(:,:N_NEIGHBOURS,1,:) = DCMPLX(gamma_start, 0.)
-        Gamma_SC(:,:N_NEIGHBOURS,2,:) = DCMPLX(-gamma_start, 0.)
+        Gamma_SC(:, :N_NEIGHBOURS, 1, :) = DCMPLX(gamma_start, 0.)
+        Gamma_SC(:, :N_NEIGHBOURS, 2, :) = DCMPLX(-gamma_start, 0.)
         !coupling for next nearest neighbours
-        Gamma_SC(:,(N_NEIGHBOURS + 1):N_ALL_NEIGHBOURS,1,:) = DCMPLX(gamma_nnn_start, 0.)
-        Gamma_SC(:,(N_NEIGHBOURS + 1):N_ALL_NEIGHBOURS,2,:) = DCMPLX(-gamma_nnn_start, 0.)
+        Gamma_SC(:, (N_NEIGHBOURS + 1):, 1, :) = DCMPLX(gamma_nnn_start, 0.)
+        Gamma_SC(:, (N_NEIGHBOURS + 1):, 2, :) = DCMPLX(-gamma_nnn_start, 0.)
     END IF
 
     !Gamma_SC(:,:,:) = DCMPLX(0., 0.)
@@ -138,19 +138,17 @@ PROGRAM MAIN
         LOG_INFO(log_string)
         !PRINT*, "============= SC_ITER: ", sc_iter
         !PRINT*, "Gamma = ", Gamma_SC(1,1,1,1)/meV2au
-
         !Those loops are only for slicing and future parallelization
         !Integration over chunks is computed via Romberg algorithm.
         !$omp parallel do collapse(2) schedule(dynamic, 1) private(Delta_local, Charge_dens_local)
-        DO i = 0, k1_steps-1
-            DO j = 0, k2_steps-1
+        DO i = -k1_steps/2, k1_steps/2 - 1
+            DO j = -k2_steps/2, k2_steps/2 - 1
                 ! WRITE(log_string, *) 'Integrating over chunk: ', i, j
                 ! LOG_INFO(log_string)
 
                 CALL ROMBERG_Y(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), Charge_dens(:), i*dk1, (i + 1)*dk1, j*dk2, (j + 1)*dk2, &
                 & Delta_local(:,:,:,:), Charge_dens_local(:), romb_eps_x, interpolation_deg_x, max_grid_refinements_x, &
                 & romb_eps_y, interpolation_deg_y, max_grid_refinements_y)
-
                 !This has to be atomic operations, since Delta_new and Charge_dens would be global variables for all threads
                 !$omp critical (update_delta_and_charge)
                 Delta_new(:,:,:,:) = Delta_new(:,:,:,:) + Delta_local(:,:,:,:)
@@ -228,10 +226,10 @@ PROGRAM MAIN
                 END DO
             END DO
         END DO
-       
+
 
         !PRINT*, "Gamma new = ", Gamma_SC_new(1,1,1,1)/meV2au
-        !PRINT*, "Filling ", SUM(Charge_dens(:)) / DIM_POSITIVE_K 
+        !PRINT*, "Filling ", SUM(Charge_dens(:)) / DIM_POSITIVE_K
 
         gamma_max_error_prev = gamma_max_error
         charge_max_error_prev = charge_max_error
@@ -246,11 +244,11 @@ PROGRAM MAIN
                         !It should be considered whether relative or absolute error must be checked
                         gamma_error = ABS( ABS(Gamma_SC_new(orb,n,spin,lat)) - ABS(Gamma_SC(orb,n,spin,lat)) )
                         !Gamma convergence checking
-                        IF (gamma_error > gamma_eps_convergence) THEN                   
+                        IF (gamma_error > gamma_eps_convergence) THEN
                             sc_flag = .FALSE.
                             !EXIT !Maybe go to???
                         END IF
-                        
+
                         !Find biggest error in current iteration
                         IF (gamma_error > gamma_max_error) gamma_max_error = gamma_error
 
@@ -277,7 +275,7 @@ PROGRAM MAIN
         END DO
 
         IF (sc_flag) THEN
-            LOG_INFO("Convergence reached!")  
+            LOG_INFO("Convergence reached!")
             EXIT
         END IF
 
@@ -289,11 +287,10 @@ PROGRAM MAIN
         WRITE(log_string,'(a, E15.5)') "charge_max_error: ", charge_max_error
         LOG_INFO(log_string)
 
-        
         !PRINT*, "Gamma max error ", gamma_max_error
 
         !In the beginning of convergence use Broyden method to quickly find minimum
-        ! IF (gamma_max_error  > 1e-3) THEN 
+        ! IF (gamma_max_error  > 1e-3) THEN
             !PRINT*, "Broyden mixing"
             !Broyden mixing
             !Flatten arrays for Broyden mixing
