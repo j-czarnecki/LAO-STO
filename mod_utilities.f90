@@ -201,8 +201,8 @@ PURE COMPLEX*16 FUNCTION pairing_nnn_6(kx, ky)
 END FUNCTION pairing_nnn_6
 
 !dir$ attributes forceinline :: fd_distribution
-PURE REAL*8 FUNCTION fd_distribution(E, E_Fermi, T)
-    IMPLICIT NONE 
+RECURSIVE PURE REAL*8 FUNCTION fd_distribution(E, E_Fermi, T)
+    IMPLICIT NONE
     REAL*8, INTENT(IN) :: E, E_Fermi, T
     IF (T .ne. 0) THEN
         fd_distribution = 1./(EXP((E - E_Fermi)/(k_B*T)) + 1.)
@@ -219,42 +219,11 @@ PURE REAL*8 FUNCTION fd_distribution(E, E_Fermi, T)
 END FUNCTION fd_distribution
 
 !dir$ attributes forceinline :: dirac_delta
-REAL*8 FUNCTION dirac_delta(E, omega, zeta)
-    IMPLICIT NONE 
+RECURSIVE PURE REAL*8 FUNCTION dirac_delta(E, omega, zeta)
+    IMPLICIT NONE
     REAL*8, INTENT(IN) :: E, omega, zeta
     dirac_delta = zeta / (PI * ((E-omega)**2 + zeta**2))
     RETURN
 END FUNCTION dirac_delta
-
-REAL*8 FUNCTION meV_to_au(x)
-    IMPLICIT NONE
-    REAL*8 :: x
-    meV_to_au = x / 27211.
-    RETURN 
-END FUNCTION meV_to_au
-
-
-
-REAL*8 FUNCTION nm_to_au(x)
-    IMPLICIT NONE
-    REAL*8 :: x 
-    nm_to_au = x/0.05292
-    RETURN
-END FUNCTION nm_to_au
-
-REAL*8 FUNCTION au_to_meV(x)
-    IMPLICIT NONE
-    REAL*8 :: x
-    au_to_meV = x * 27211
-    RETURN 
-END FUNCTION au_to_meV
-
-REAL*8 FUNCTION au_to_nm(x)
-    IMPLICIT NONE
-    REAL*8 :: x 
-    au_to_nm = x*0.05292
-    RETURN
-END FUNCTION au_to_nm
-
 
 END MODULE mod_utilities

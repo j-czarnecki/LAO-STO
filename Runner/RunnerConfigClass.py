@@ -46,45 +46,45 @@ class RunnerConfig:
         parser = f90nml.Parser()
         params_nml = parser.reads(
             f"&physical_params \
-                                        T = 0.0, \
-                                        t_D = 0.5e3, \
-                                        t_I = 0.04e3, \
-                                        t_Rashba = 0.0e3, \
-                                        lambda_SOC = 0.01e3, \
-                                        DELTA_TRI = -0.005e3, \
-                                        v = 0.2e3, \
-                                        V_pdp = 0.028e3, \
-                                        V_pds = -0.065e3, \
-                                        J_SC = 0.0e3, \
-                                        J_SC_PRIME = 0.0e3, \
-                                        J_SC_NNN = 0.0e3, \
-                                        J_SC_PRIME_NNN = 0.0e3, \
-                                        U_HUB = 0e3, \
-                                        V_HUB = 0e3, \
-                                        E_Fermi = -1.0e3 / \
-                                    &discretization \
-                                        k1_steps = 100, \
-                                        k2_steps = 100 / \
-                                    &self_consistency \
-                                        read_gamma_from_file = .FALSE., \
-                                        path_to_gamma_start = , \
-                                        read_charge_from_file = .FALSE., \
-                                        path_to_charge_start = , \
-                                        gamma_start = 0., \
-                                        gamma_nnn_start = 1., \
-                                        charge_start = 0.1, \
-                                        max_sc_iter = 200, \
-                                        sc_alpha = 0.2, \
-                                        sc_alpha_adapt = 1., \
-                                        gamma_eps_convergence = 1e-4, \
-                                        charge_eps_convergence = 1e-4 / \
-                                    &romberg_integration \
-                                        romb_eps_x = 1e-4, \
-                                        interpolation_deg_x = 3, \
-                                        max_grid_refinements_x = 14, \
-                                        romb_eps_y = 1e-4, \
-                                        interpolation_deg_y = 3, \
-                                        max_grid_refinements_y = 14 /"
+                T = 0.0, \
+                t_D = 0.5e3, \
+                t_I = 0.04e3, \
+                t_Rashba = 0.0e3, \
+                lambda_SOC = 0.01e3, \
+                DELTA_TRI = -0.005e3, \
+                v = 0.2e3, \
+                V_pdp = 0.028e3, \
+                V_pds = -0.065e3, \
+                J_SC = 0.0e3, \
+                J_SC_PRIME = 0.0e3, \
+                J_SC_NNN = 0.0e3, \
+                J_SC_PRIME_NNN = 0.0e3, \
+                U_HUB = 0e3, \
+                V_HUB = 0e3, \
+                E_Fermi = -1.0e3 / \
+            &discretization \
+                k1_steps = 100, \
+                k2_steps = 100 / \
+            &self_consistency \
+                read_gamma_from_file = .FALSE., \
+                path_to_gamma_start = , \
+                read_charge_from_file = .FALSE., \
+                path_to_charge_start = , \
+                gamma_start = 0., \
+                gamma_nnn_start = 1., \
+                charge_start = 0.1, \
+                max_sc_iter = 200, \
+                sc_alpha = 0.2, \
+                sc_alpha_adapt = 1., \
+                gamma_eps_convergence = 1e-4, \
+                charge_eps_convergence = 1e-4 / \
+            &romberg_integration \
+                romb_eps_x = 1e-4, \
+                interpolation_deg_x = 3, \
+                max_grid_refinements_x = 14, \
+                romb_eps_y = 1e-4, \
+                interpolation_deg_y = 3, \
+                max_grid_refinements_y = 14 /"
         )
         return params_nml
 
@@ -92,13 +92,25 @@ class RunnerConfig:
         parser = f90nml.Parser()
         params_nml = parser.reads(
             f"&sc_gap_calculation \
-                                        enable_sc_gap_calc = .FALSE., \
-                                        path_to_run_dir_sc_gap = , \
-                                        dE_sc_gap = 1e-3, \
-                                        Nk_points_sc_gap = 10000 / \
-                                    &chern_number_calculation \
-                                        enable_chern_number_calc = .FALSE., \
-                                        path_to_run_dir_chern_number = , \
-                                        Nk_points_chern_number = 15000 /"
+                enable_sc_gap_calc = .FALSE., \
+                path_to_run_dir_sc_gap = , \
+                dE_sc_gap = 1e-3, \
+                Nk_points_sc_gap = 10000 / \
+            &chern_number_calculation \
+                enable_chern_number_calc = .FALSE., \
+                path_to_run_dir_chern_number = , \
+                Nk_points_chern_number = 15000 /\
+            &dispersion_relation_calculation\
+                enable_dispersion_relation_calc = .TRUE.,\
+                path_to_run_dir_dispersion_relation = ,\
+                Nk_points_dispersion_relation = 500 /\
+            &dos_calculation\
+                enable_dos_calc = .TRUE.,\
+                path_to_run_dir_dos = ,\
+                E_DOS_min = -1.7e3,\
+                E_DOS_max = 1.7e3,\
+                dE0 = 1.,\
+                zeta_DOS = 1e-4,\
+                Nk_points_dos = 2000 /"
         )
         return params_nml

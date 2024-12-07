@@ -59,15 +59,31 @@ REAL*8 :: dk1, dk2, domega
 
 !Used for postprocessing
 !Superconducting gap calculation
-LOGICAL :: enable_sc_gap_calc
-CHARACTER(1000) :: path_to_run_dir_sc_gap
-REAL*8 :: dE_sc_gap
-INTEGER*4 :: Nk_points_sc_gap
+LOGICAL :: enable_sc_gap_calc = .FALSE.
+CHARACTER(1000) :: path_to_run_dir_sc_gap = ""
+REAL*8 :: dE_sc_gap = 0.
+INTEGER*4 :: Nk_points_sc_gap = 0
 
 !For chern number calculation
-LOGICAL :: enable_chern_number_calc
-CHARACTER(1000) :: path_to_run_dir_chern_number
-INTEGER*4 :: Nk_points_chern_number
+LOGICAL :: enable_chern_number_calc = .FALSE.
+CHARACTER(1000) :: path_to_run_dir_chern_number = ""
+INTEGER*4 :: Nk_points_chern_number = 0
+
+!Dispersion relation calculation
+LOGICAL :: enable_dispersion_relation_calc = .FALSE.
+CHARACTER(1000) :: path_to_run_dir_dispersion_relation = ""
+INTEGER*4 :: Nk_points_dispersion_relation = 0
+
+
+!DOS calculation
+LOGICAL :: enable_dos_calc = .FALSE.
+CHARACTER(1000) :: path_to_run_dir_dos = ""
+REAL*8 :: E_DOS_min = 0
+REAL*8 :: E_DOS_max = 0
+REAL*8 :: dE0 = 0
+REAL*8 :: zeta_DOS = 0
+INTEGER*4 :: Nk_points_dos = 0
+
 
 NAMELIST /physical_params/  &
 & T,                        &
@@ -89,7 +105,7 @@ NAMELIST /physical_params/  &
 
 NAMELIST /discretization/ &
 & k1_steps,               &
-& k2_steps                
+& k2_steps
 
 NAMELIST /self_consistency/ &
 & read_gamma_from_file,     &
@@ -124,6 +140,20 @@ NAMELIST /chern_number_calculation/ &
 & path_to_run_dir_chern_number, &
 & Nk_points_chern_number
 
+NAMELIST /dispersion_relation_calculation/ &
+& enable_dispersion_relation_calc, &
+& path_to_run_dir_dispersion_relation, &
+& Nk_points_dispersion_relation
+
+NAMELIST /dos_calculation/ &
+& enable_dos_calc, &
+& path_to_run_dir_dos, &
+& E_DOS_min, &
+& E_DOS_max, &
+& dE0, &
+& zeta_DOS, &
+& Nk_points_dos
+
 CONTAINS
 SUBROUTINE GET_INPUT(nmlfile)
     IMPLICIT NONE
@@ -134,16 +164,16 @@ SUBROUTINE GET_INPUT(nmlfile)
     !TODO: WRITE BETTER CHECKS!!!!!!!!!!!!!!!!!!
     READ(9,NML=physical_params)
     !Check input data
-    IF (T < 0) STOP "Temperature in kelvins must be >= 0!"               
-    
+    IF (T < 0) STOP "Temperature in kelvins must be >= 0!"
+
     !Change to atomic units
-    t_D = t_D * meV2au           
+    t_D = t_D * meV2au
     t_I = t_I * meV2au
     t_Rashba = t_Rashba * meV2au
     lambda_SOC = lambda_SOC * meV2au
-    DELTA_TRI = DELTA_TRI * meV2au 
-    v = v * meV2au 
-    V_pdp = V_pdp * meV2au   
+    DELTA_TRI = DELTA_TRI * meV2au
+    v = v * meV2au
+    V_pdp = V_pdp * meV2au
     V_pds = V_pds * meV2au
     J_SC = J_SC * meV2au
     J_SC_PRIME = J_SC_PRIME * meV2au
@@ -210,7 +240,24 @@ SUBROUTINE GET_POSTPROCESSING_INPUT(nmlfile)
         IF (path_to_run_dir_chern_number == "") STOP "path_to_run_dir_chern_number must not be empty"
     END IF
 
-    
+    READ(9, NML = dispersion_relation_calculation)
+    IF (enable_dispersion_relation_calc) THEN
+        IF (Nk_points_dispersion_relation .LE. 0) STOP "Nk_points_dispersion_relation must be > 0"
+        IF (path_to_run_dir_dispersion_relation == "") STOP "path_to_run_dir_dispersion_relation must not be empty"
+    END IF
+
+    READ(9, NML = dos_calculation)
+    IF (enable_dos_calc) THEN
+        IF (path_to_run_dir_dos == "") STOP "path_to_run_dir_dos must not be empty"
+        IF (E_DOS_min .GT. E_DOS_max) STOP "E_DOS_min must be smaller than E_DOS_max"
+        IF (dE0 .LE. 0) STOP "dE0 must be > 0"
+        IF (zeta_DOS .LE. 0) STOP "zeta_DOS must be > 0"
+        IF (Nk_points_dos .LE. 0) STOP "Nk_points_dos must be > 0"
+        E_DOS_min = E_DOS_min * meV2au
+        E_DOS_max = E_DOS_max * meV2au
+        dE0 = dE0 * meV2au
+    END IF
+
     CLOSE(9)
 
 END SUBROUTINE GET_POSTPROCESSING_INPUT
@@ -222,8 +269,8 @@ SUBROUTINE GET_GAMMA_SC(Gamma_SC, path)
     INTEGER*4 :: n, lat, orb,spin
     INTEGER*4 :: n_read, lat_read, orb_read, spin_read
     REAL*8 :: Gamma_re, Gamma_im
-    CHARACTER(LEN=20) :: output_format   
-    
+    CHARACTER(LEN=20) :: output_format
+
     output_format = '(4I5, 2E15.5)'
 
     OPEN(unit = 9, FILE=path, FORM = "FORMATTED", ACTION = "READ", STATUS="OLD")
@@ -249,8 +296,8 @@ SUBROUTINE GET_CHARGE_DENS(Charge_dens, path)
     CHARACTER(LEN=*), INTENT(IN) :: path
     REAL*8, INTENT(OUT) :: Charge_dens(DIM_POSITIVE_K)
     INTEGER*4 :: spin, lat, orb, n
-    CHARACTER(LEN=20) :: output_format   
-    
+    CHARACTER(LEN=20) :: output_format
+
     output_format = '(3I5, 1E15.5)'
 
     OPEN(unit = 9, FILE=path, FORM = "FORMATTED", ACTION = "READ", STATUS="OLD")
@@ -263,6 +310,5 @@ SUBROUTINE GET_CHARGE_DENS(Charge_dens, path)
     CLOSE(9)
 
 END SUBROUTINE GET_CHARGE_DENS
-
 
 END MODULE mod_reader

@@ -62,7 +62,7 @@ class DispersionPlotter(DataReader):
 
     def shiftEnergies(self):
         lowestEnergy = np.min(self.dispersionDataframe.E)
-        print(lowestEnergy)
+        print(f"Lowest energy is {lowestEnergy} (meV)")
         self.dispersionDataframe.E -= lowestEnergy
         self.dosDataframe.E -= lowestEnergy
 

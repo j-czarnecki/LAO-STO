@@ -65,12 +65,12 @@ def main():
     # dispersionPlotter.LoadSuperconductingGap(
     #     "/home/jczarnecki/Downloads/LAO-STO-Romberg-test/RUN_E_Fermi_-950.0_J_SC_NNN_100.0/OutputData/SuperconductingGap.dat"
     # )
-    dispersionPlotter.LoadSuperconductingGap(
-        "/home/jczarnecki/LAO-STO/OutputData/SuperconductingGap.dat"
-    )
-    dispersionPlotter.plotSuperconductingGap(
-        postfix="_test", title=r"$E_{Fermi} = 53$ (meV)"
-    )
+    # dispersionPlotter.LoadSuperconductingGap(
+    #     "/home/jczarnecki/LAO-STO/OutputData/SuperconductingGap.dat"
+    # )
+    # dispersionPlotter.plotSuperconductingGap(
+    #     postfix="_test", title=r"$E_{Fermi} = 53$ (meV)"
+    # )
 
     # dispersionPlotter.LoadSuperconductingGap(
     #     "/net/ascratch/people/plgjczarnecki/LAO-STO-vpds-J_SC/RUN_E_Fermi_-975.0_J_SC_180.0/OutputData/SuperconductingGap.dat"
@@ -109,24 +109,24 @@ def main():
     # dispersionPlotter.LoadSuperconductingGap('../OutputData/SuperconductingGap_NNN_J150.dat')
     # dispersionPlotter.plotSuperconductingGap(postfix = 'NNN_EF1000_J125', title = r'$J_{nnn} = 125$ (meV)')
 
-    # dispersionPlotter.LoadDispersion("../OutputData/Energies.dat")
-    # dispersionPlotter.LoadDos("../OutputData/DOS.dat")
-    # dispersionPlotter.GetStatistics()
-    # dispersionPlotter.shiftEnergies()
+    dispersionPlotter.LoadDispersion("../OutputData/Energies.dat")
+    dispersionPlotter.LoadDos("../OutputData/DOS.dat")
+    dispersionPlotter.GetStatistics()
+    dispersionPlotter.shiftEnergies()
 
-    # dispersionPlotter.plotCrossection(
-    #     "../Plots/DispersionSliceKy", 150, "ky", 0.0, 2, 12
-    # )
-    # dispersionPlotter.plotCrossection(
-    #     "../Plots/DispersionSliceZoomKy", 30, "ky", 0.0, 0.3, 12
-    # )
+    dispersionPlotter.plotCrossection(
+        "../Plots/DispersionSliceKy", 150, "ky", 0.0, 2, 12
+    )
+    dispersionPlotter.plotCrossection(
+        "../Plots/DispersionSliceZoomKy", 30, "ky", 0.0, 0.3, 12
+    )
 
-    # dispersionPlotter.plotCrossection(
-    #     "../Plots/DispersionSliceKx", 150, "kx", 0.0, 2, 12
-    # )
-    # dispersionPlotter.plotCrossection(
-    #     "../Plots/DispersionSliceZoomKx", 20, "kx", 0.0, 0.1, 12
-    # )
+    dispersionPlotter.plotCrossection(
+        "../Plots/DispersionSliceKx", 150, "kx", 0.0, 2, 12
+    )
+    dispersionPlotter.plotCrossection(
+        "../Plots/DispersionSliceZoomKx", 20, "kx", 0.0, 0.1, 12
+    )
 
     # dispersionPlotter.plotFermiCrossection(10, 0.05, "../Plots/FermiSlice10.png")
     # dispersionPlotter.plotFermiCrossection(20, 0.05, "../Plots/FermiSlice20.png")
@@ -139,8 +139,8 @@ def main():
     # dispersionPlotter.plotFermiCrossection(160, 0.5, "../Plots/FermiSlice160.png")
     # dispersionPlotter.plotFermiCrossection(200, 0.5, "../Plots/FermiSlice200.png")
 
-    # dispersionPlotter.plotDos(150, "../Plots/DOS.png")
-    # dispersionPlotter.plotDos(30, "../Plots/DOSzoom.png")
+    dispersionPlotter.plotDos(150, "../Plots/DOS.png")
+    dispersionPlotter.plotDos(30, "../Plots/DOSzoom.png")
 
 
 if __name__ == "__main__":

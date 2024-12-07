@@ -9,12 +9,14 @@ IMPLICIT NONE
 CONTAINS
 
 
-SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, DOS_filename)
+SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, Nk_points, inputPath)
 
     !DOS calculation
     REAL*8, INTENT(IN) :: E_DOS_min, E_DOS_max, dE0
     REAL*8, INTENT(IN) :: zeta_DOS
-    CHARACTER(LEN=*), INTENT(IN) :: DOS_filename
+    INTEGER*4, INTENT(IN) :: Nk_points
+    CHARACTER(LEN=*) :: inputPath
+
     REAL*8 :: E0
     INTEGER*4 :: DOS_steps
 
@@ -28,26 +30,23 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, DOS_filename)
     CHARACTER(LEN=20) :: output_format
 
 
-    REAL*8 :: k1, k2, kx, ky
+    REAL*8 :: k1, k2, kx, ky, dk1, dk2
     INTEGER*4 :: i,j,k,n, lat, orb, orb_prime,spin
 
+    LOGICAL :: fileExists
 
-    ! E_DOS_MIN = E_DOS_min * meV2au
-    ! E_DOS_max = E_DOS_max * meV2au
-    ! dE0 = dE0 * meV2au
+
+    CALL GET_INPUT(TRIM(inputPath)//"input.nml")
+
     DOS_steps = INT((E_DOS_max - E_DOS_min) / dE0)
-    PRINT*, E_DOS_min, E_DOS_min, dE0
-    PRINT*, zeta_DOS
-    PRINT*, DOS_filename
 
-    !PRINT*, "READING INPUT"
-    !TODO: This should be specified as an input to this subroutine
-    CALL GET_INPUT("dispersion_input.nml")
+    dk1 = K1_MAX / Nk_points
+    dk2 = K2_MAX / Nk_points
 
-    ALLOCATE(Hamiltonian(DIM,DIM)) 
+    ALLOCATE(Hamiltonian(DIM,DIM))
     ALLOCATE(Hamiltonian_const(DIM,DIM))
     ALLOCATE(U_transformation(DIM_POSITIVE_K, DIM_POSITIVE_K))
-    ALLOCATE(Energies(0:k1_steps, 0:k2_steps, DIM_POSITIVE_K))
+    ALLOCATE(Energies(0:Nk_points, 0:Nk_points, DIM_POSITIVE_K))
     ALLOCATE(Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES))
     ALLOCATE(Charge_dens(DIM_POSITIVE_K))
     ALLOCATE(DOS(0:DOS_steps))
@@ -58,26 +57,24 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, DOS_filename)
     Gamma_SC(:,:,:,:) = DCMPLX(0. , 0.)*meV2au
     Charge_dens(:) = 0.
 
-
-    !Get self consistent gamma and charge density
-    !CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), "OutputData/Gamma_SC_iter.dat")
-    
-    !TODO: This should be specified as an input to this subroutine
-    !CALL GET_CHARGE_DENS(Charge_dens(:), "/home/jczarnecki/LAO-STO-results/RUNS_low_U/RUN_E_Fermi_-905.0_U_HUB_166.66666666666666_V_HUB_166.66666666666666/OutputData/Chargen_dens_final.dat")
-
+    INQUIRE(FILE = TRIM(inputPath)//"OutputData/Charge_dens_final.dat", EXIST = fileExists)
+    IF (fileExists) THEN
+        CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
+    ELSE
+        CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
+    END IF
 
     !Computing k-independent terms
     CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:,:))
     CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:,:))
     CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian_const(:,:))
-    DO n = 1, DIM_POSITIVE_K
-        Hamiltonian_const(n,n) = Hamiltonian_const(n,n) - E_Fermi
-        Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) = Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) + E_Fermi
-    END DO
+    !Not shifting with the Fermi Energy, since we want "real" energy scale
     CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
 
-    DO i = 0, k1_steps
-        DO j = 0, k2_steps
+    !$omp parallel private(k1, k2, kx, ky, Hamiltonian, U_transformation)
+    !$omp do
+    DO i = 0, Nk_points
+        DO j = 0, Nk_points
             k1 = i*dk1
             k2 = j*dk2
 
@@ -91,19 +88,23 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, DOS_filename)
             CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:,:), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
             CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:))
             CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
-        
+
             CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
-        
+
             Hamiltonian(:,:) = Hamiltonian_const(:,:) + Hamiltonian(:,:) !Should by multiplied by 0.5 if in Nambu space
-        
+
             CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:DIM_POSITIVE_K,:DIM_POSITIVE_K), Energies(i,j,:), U_transformation(:,:), DIM_POSITIVE_K)
 
         END DO
     END DO
+    !$omp end do
+    !$omp end parallel
 
+    !$omp parallel private(E0)
+    !$omp do
     DO n = 0, DOS_steps
-        DO i = 0, k1_steps
-            DO j = 0, k2_steps
+        DO i = 0, Nk_points
+            DO j = 0, Nk_points
                 DO k = 1, DIM_POSITIVE_K
                     E0 = E_DOS_min + n*dE0
                     DOS(n) = DOS(n) + dirac_delta(Energies(i,j,k), E0, zeta_DOS)
@@ -111,10 +112,11 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, DOS_filename)
             END DO
         END DO
     END DO
-
+    !$omp end do
+    !$omp end parallel
 
     output_format = '(2E15.5)'
-    OPEN(unit = 9, FILE= TRIM(DOS_filename), FORM = "FORMATTED", ACTION = "WRITE")
+    OPEN(unit = 9, FILE=  TRIM(inputPath)//"OutputData/DOS.dat", FORM = "FORMATTED", ACTION = "WRITE")
     WRITE(9,'(A)') "#E[meV] DOS[a.u]"
     DO n = 0, DOS_steps
         E0 = E_DOS_min + n*dE0
@@ -135,10 +137,11 @@ END SUBROUTINE CALCULATE_DOS
 
 
 
-SUBROUTINE CALCULATE_DISPERSION(filename, brilouinZoneFraction)
-
-    CHARACTER(LEN=*), INTENT(IN) :: filename
-    INTEGER*4, INTENT(IN) :: brilouinZoneFraction
+SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points)
+    !! Calculates dispersion relation in the first Brillouin zone.
+    !! Takes physical parameters from input.nml from a directory specified by inputPath.
+    CHARACTER(LEN=*), INTENT(IN) :: inputPath
+    INTEGER*4, INTENT(IN) :: Nk_points
     CHARACTER(LEN=20) :: output_format
 
     COMPLEX*16, ALLOCATABLE :: Hamiltonian(:,:), Hamiltonian_const(:,:), U_transformation(:,:)
@@ -150,17 +153,21 @@ SUBROUTINE CALCULATE_DISPERSION(filename, brilouinZoneFraction)
 
     REAL*8, ALLOCATABLE :: DOS(:)
 
-    REAL*8 :: k1, k2, kx, ky
+    REAL*8 :: k1, k2, kx, ky, dkx, dky
     INTEGER*4 :: i,j,k,n, lat, orb, orb_prime,spin, l, m
     INTEGER*4 :: kx_steps, ky_steps
     REAL*8 :: yz_contribution, zx_contribution, xy_contribution
     REAL*8 :: lat1_contribution, lat2_contribution
     REAL*8 :: spin_up_contribution, spin_down_contribution
+    REAL*8 :: brillouinZoneVertices(6,2)
 
-    !PRINT*, "READING INPUT"
+    LOGICAL :: fileExists
 
-    !TODO: This should be specified as an input to this subroutine
-    CALL GET_INPUT("dispersion_input.nml")
+    brillouinZoneVertices(:,1) = (/ 4.*PI/(3*SQRT(3.0d0)), 2.*PI/(3*SQRT(3.0d0)), -2.*PI/(3*SQRT(3.0d0)), -4.*PI/(3*SQRT(3.0d0)), -2.*PI/(3*SQRT(3.0d0)), 2.*PI/(3*SQRT(3.0d0))/)
+    brillouinZoneVertices(:,2) = (/ 0.0d0, -2.*PI/3.0d0, -2.*PI/3.0d0, 0.0d0, 2.*PI/3.0d0, 2.*PI/3.0d0/)
+
+
+    CALL GET_INPUT(TRIM(inputPath)//"input.nml")
 
     yz_contribution = 0.
     zx_contribution = 0.
@@ -171,8 +178,12 @@ SUBROUTINE CALCULATE_DISPERSION(filename, brilouinZoneFraction)
     spin_down_contribution = 0.
 
 
-    kx_steps = INT(k1_steps/2 / brilouinZoneFraction)
-    ky_steps = INT(k2_steps/2 / brilouinZoneFraction)
+    dkx = KX_MAX / Nk_points
+    dky = KY_MAX / Nk_points
+
+    kx_steps = INT(Nk_points)
+    ky_steps = INT(Nk_points)
+
     output_format = '(I5, 10E15.5)'
 
     ALLOCATE(Hamiltonian(DIM,DIM))
@@ -190,88 +201,96 @@ SUBROUTINE CALCULATE_DISPERSION(filename, brilouinZoneFraction)
     Gamma_SC(:,:,:,:) = DCMPLX(0. , 0.)*meV2au
     Charge_dens(:) = 0.
 
-    !TODO: This should be specified as an input to this subroutine
-    CALL GET_CHARGE_DENS(Charge_dens(:), "/home/jczarnecki/LAO-STO-results/LAO-STO-Hub/RUN_E_Fermi_990.0_J_SC_150.0/OutputData/Charge_dens_final.dat")
+    INQUIRE(FILE = TRIM(inputPath)//"OutputData/Charge_dens_final.dat", EXIST = fileExists)
+    IF (fileExists) THEN
+        CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
+    ELSE
+        CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
+    END IF
 
     !Computing k-independent terms
     CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:,:))
     CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:,:))
     CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian_const(:,:))
-    DO n = 1, DIM_POSITIVE_K
-        Hamiltonian_const(n,n) = Hamiltonian_const(n,n) - E_Fermi
-        Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) = Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) + E_Fermi
-    END DO
+    !Not shifting with the Fermi Energy, since we want "real" energy scale
     CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
 
+    !$omp parallel private(kx, ky, Hamiltonian)
+    !$omp do
     DO i = -kx_steps, kx_steps
         DO j = -ky_steps, ky_steps
-            kx = i*dk1 * (2. * PI * 2./3.)
-            ky = j*dk2 * (2. * PI * 2./3.)
+            kx = i*dkx !* (2. * PI * 2./3.)
+            ky = j*dky !* (2. * PI * 2./3.)
+            IF (is_inside_polygon(brillouinZoneVertices, 6, kx, ky)) THEN
 
-            Hamiltonian(:,:) = DCMPLX(0. , 0.)
-            CALL COMPUTE_TBA_TERM(Hamiltonian(:,:), kx, ky)
-            CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-            CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-            CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-            CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:,:), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
-            CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:))
-            CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
+                Hamiltonian(:,:) = DCMPLX(0. , 0.)
+                CALL COMPUTE_TBA_TERM(Hamiltonian(:,:), kx, ky)
+                CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:,:), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
+                CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:))
+                CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
 
-            CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
+                CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
 
-            Hamiltonian(:,:) = Hamiltonian_const(:,:) + Hamiltonian(:,:) !Should by multiplied by 0.5 if in Nambu space
+                Hamiltonian(:,:) = Hamiltonian_const(:,:) + Hamiltonian(:,:) !Should by multiplied by 0.5 if in Nambu space
 
-            !CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:DIM_POSITIVE_K,:DIM_POSITIVE_K), Energies(i,j,:), U_transformation(:,:), DIM_POSITIVE_K)
-            !Probability(i,j,:,:) = ABS(U_transformation)**2
+                !CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:DIM_POSITIVE_K,:DIM_POSITIVE_K), Energies(i,j,:), U_transformation(:,:), DIM_POSITIVE_K)
+                !Probability(i,j,:,:) = ABS(U_transformation)**2
 
-            CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:DIM_POSITIVE_K, :DIM_POSITIVE_K), Energies(i,j,:), DIM_POSITIVE_K)
-            Probability(i,j,:,:) = ABS(Hamiltonian(:DIM_POSITIVE_K,:DIM_POSITIVE_K))**2
-
+                CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:DIM_POSITIVE_K, :DIM_POSITIVE_K), Energies(i,j,:), DIM_POSITIVE_K)
+                Probability(i,j,:,:) = ABS(Hamiltonian(:DIM_POSITIVE_K,:DIM_POSITIVE_K))**2
+            END IF
         END DO
     END DO
+    !$omp end do
+    !$omp end parallel
 
-    OPEN(unit = 9, FILE= "./OutputData/"//filename, FORM = "FORMATTED", ACTION = "WRITE")
+    OPEN(unit = 9, FILE= TRIM(inputPath)//"OutputData/Energies.dat", FORM = "FORMATTED", ACTION = "WRITE")
     WRITE(9,'(A)') "#N kx[1/a] ky[1/a] Energy[meV] P(yz) P(zx) P(xy) P(lat1) P(lat2) P(s_up) P(s_down)"
     DO l = 1, DIM_POSITIVE_K
         DO i = -kx_steps, kx_steps
             DO j = -ky_steps, ky_steps
-                kx = i*dk1 * (2. * PI * 2./3.)
-                ky = j*dk2 * (2. * PI * 2./3.)
+                kx = i*dkx !* (2. * PI * 2./3.)
+                ky = j*dky !* (2. * PI * 2./3.)
+                IF (is_inside_polygon(brillouinZoneVertices, 6, kx, ky)) THEN
 
 
-                !Calculate specific contributions
-                !Distinguishing orbital contributions
-                yz_contribution = 0.
-                zx_contribution = 0.
-                xy_contribution = 0.
-                DO n = 1, DIM_POSITIVE_K, 3
-                    yz_contribution = yz_contribution + Probability(i,j,n,l)
-                    zx_contribution = zx_contribution + Probability(i,j,n+1,l)
-                    xy_contribution = xy_contribution + Probability(i,j,n+2,l)
-                END DO
-
-                !Distinguishing lattice contributions
-                lat1_contribution = 0.
-                lat2_contribution = 0.
-                DO n = 1, 3
-                    DO m = 0, 1
-                        lat1_contribution = lat1_contribution + Probability(i,j,m*TBA_DIM + n,l)
-                        lat2_contribution = lat2_contribution + Probability(i,j,m*TBA_DIM + n + 3,l)
+                    !Calculate specific contributions
+                    !Distinguishing orbital contributions
+                    yz_contribution = 0.
+                    zx_contribution = 0.
+                    xy_contribution = 0.
+                    DO n = 1, DIM_POSITIVE_K, 3
+                        yz_contribution = yz_contribution + Probability(i,j,n,l)
+                        zx_contribution = zx_contribution + Probability(i,j,n+1,l)
+                        xy_contribution = xy_contribution + Probability(i,j,n+2,l)
                     END DO
-                END DO
 
-                !Distinguishing spin contributions
-                spin_up_contribution = 0.
-                spin_down_contribution = 0.
-                DO n = 1, TBA_DIM
-                    spin_up_contribution = spin_up_contribution + Probability(i,j,n,l)
-                    spin_down_contribution = spin_down_contribution + Probability(i,j,TBA_DIM + n,l)
-                END DO
+                    !Distinguishing lattice contributions
+                    lat1_contribution = 0.
+                    lat2_contribution = 0.
+                    DO n = 1, 3
+                        DO m = 0, 1
+                            lat1_contribution = lat1_contribution + Probability(i,j,m*TBA_DIM + n,l)
+                            lat2_contribution = lat2_contribution + Probability(i,j,m*TBA_DIM + n + 3,l)
+                        END DO
+                    END DO
 
-                WRITE(9, output_format) l, kx, ky, Energies(i, j, l)/meV2au, &
-                & yz_contribution, zx_contribution, xy_contribution, &
-                & lat1_contribution, lat2_contribution, &
-                & spin_up_contribution, spin_down_contribution
+                    !Distinguishing spin contributions
+                    spin_up_contribution = 0.
+                    spin_down_contribution = 0.
+                    DO n = 1, TBA_DIM
+                        spin_up_contribution = spin_up_contribution + Probability(i,j,n,l)
+                        spin_down_contribution = spin_down_contribution + Probability(i,j,TBA_DIM + n,l)
+                    END DO
+
+                    WRITE(9, output_format) l, kx, ky, Energies(i, j, l)/meV2au, &
+                    & yz_contribution, zx_contribution, xy_contribution, &
+                    & lat1_contribution, lat2_contribution, &
+                    & spin_up_contribution, spin_down_contribution
+                END IF
             END DO
         END DO
         WRITE(9,*)
@@ -358,7 +377,7 @@ SUBROUTINE CALCULATE_CHERN_PARAMS(Nk1, Nk2, inputPath)
             Psi(:,1,:,:) = Psi(:,2,:,:)
             DO n = -Nk1/2, Nk1/2
                 CALL LAO_STO_CHERN_ENERGIES(Nk1, Nk2,n,j+1, inputPath, Psi(n,2,:,:)) !Next row
-                !CALL HELLICAL_TEST_CHERN(potChem, Bfield, Nk1, Nk2, n , j+1, Psi(n,2,:,:)) !Next row    
+                !CALL HELLICAL_TEST_CHERN(potChem, Bfield, Nk1, Nk2, n , j+1, Psi(n,2,:,:)) !Next row
             END DO
         END IF
 
