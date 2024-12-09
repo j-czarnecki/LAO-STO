@@ -142,7 +142,8 @@ main_postprocessing.o: 	mod_hamiltonians.o \
 						mod_writers.o \
 						mod_reader.o \
 						mod_compute_hamiltonians.o \
-						mod_postprocessing.o
+						mod_postprocessing.o \
+						mod_logger.o
 
 chern.o: 		mod_hamiltonians.o \
 				mod_parameters.o \
@@ -178,7 +179,8 @@ mod_postprocessing.o: 	mod_hamiltonians.o \
 						mod_utilities.o \
 						mod_writers.o \
 						mod_reader.o \
-						mod_compute_hamiltonians.o
+						mod_compute_hamiltonians.o \
+						mod_logger.o
 
 mod_logger.o:
 

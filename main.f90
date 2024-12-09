@@ -38,8 +38,7 @@ PROGRAM MAIN
 
 
     max_num_threads = omp_get_max_threads()
-    WRITE (log_string,*) "Max num threads", max_num_threads
-    LOG_INFO(log_string)
+
     ! CALL omp_set_num_threads(max_num_threads)
     ! !$omp parallel
     ! PRINT*, "Hello from process", omp_get_thread_num()
@@ -57,8 +56,9 @@ PROGRAM MAIN
 
     CALL GET_INPUT("./input.nml")
 
-    CALL INIT_LOGGER()
-
+    CALL INIT_LOGGER("")
+    WRITE (log_string,*) "Max num threads", max_num_threads
+    LOG_INFO(log_string)
     !Basis
     !c_{k,yz,Ti1,up}, c_{k,zx,Ti1,up}, c_{k,xy,Ti1,up},
     !c_{k,yz,Ti2,up}, c_{k,zx,Ti2,up}, c_{k,xy,Ti2,up},

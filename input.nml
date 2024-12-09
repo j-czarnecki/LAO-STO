@@ -14,7 +14,7 @@
     J_SC_PRIME_NNN = 0.02e3,
     U_HUB = 0e3,
     V_HUB = 0e3,
-    E_Fermi = -1.0e3 /
+    E_Fermi = -1.3e3 /
 
 &discretization
     k1_steps = 100,

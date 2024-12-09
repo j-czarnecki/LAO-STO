@@ -10,15 +10,17 @@
     Nk_points_chern_number = 2000 /
 
 &dispersion_relation_calculation
-    enable_dispersion_relation_calc = .TRUE.,
+    enable_dispersion_relation_calc = .FALSE.,
     path_to_run_dir_dispersion_relation = "/home/jczarnecki/LAO-STO/",
+    include_sc_in_dispersion = .TRUE.,
     Nk_points_dispersion_relation = 500 /
 
 &dos_calculation
     enable_dos_calc = .TRUE.,
     path_to_run_dir_dos = "/home/jczarnecki/LAO-STO/",
-    E_DOS_min = -1.7e3,
-    E_DOS_max = 1.7e3,
-    dE0 = 1.,
-    zeta_DOS = 1e-4,
+    E_DOS_min = -5,
+    E_DOS_max = 5,
+    dE0 = 5e-3,
+    zeta_DOS = 1e-6,
+    include_sc_in_dos = .TRUE.,
     Nk_points_dos = 2000 /

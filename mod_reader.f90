@@ -72,6 +72,7 @@ INTEGER*4 :: Nk_points_chern_number = 0
 !Dispersion relation calculation
 LOGICAL :: enable_dispersion_relation_calc = .FALSE.
 CHARACTER(1000) :: path_to_run_dir_dispersion_relation = ""
+LOGICAL :: include_sc_in_dispersion = .FALSE.
 INTEGER*4 :: Nk_points_dispersion_relation = 0
 
 
@@ -82,6 +83,7 @@ REAL*8 :: E_DOS_min = 0
 REAL*8 :: E_DOS_max = 0
 REAL*8 :: dE0 = 0
 REAL*8 :: zeta_DOS = 0
+LOGICAL :: include_sc_in_dos = .FALSE.
 INTEGER*4 :: Nk_points_dos = 0
 
 
@@ -143,6 +145,7 @@ NAMELIST /chern_number_calculation/ &
 NAMELIST /dispersion_relation_calculation/ &
 & enable_dispersion_relation_calc, &
 & path_to_run_dir_dispersion_relation, &
+& include_sc_in_dispersion, &
 & Nk_points_dispersion_relation
 
 NAMELIST /dos_calculation/ &
@@ -152,6 +155,7 @@ NAMELIST /dos_calculation/ &
 & E_DOS_max, &
 & dE0, &
 & zeta_DOS, &
+& include_sc_in_dos, &
 & Nk_points_dos
 
 CONTAINS

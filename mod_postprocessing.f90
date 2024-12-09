@@ -1,3 +1,4 @@
+#include "macros_def.f90"
 MODULE mod_postprocessing
 USE mod_hamiltonians
 USE mod_parameters
@@ -5,20 +6,23 @@ USE mod_utilities
 USE mod_writers
 USE mod_reader
 USE mod_compute_hamiltonians
+USE mod_logger
 IMPLICIT NONE
 CONTAINS
 
 
-SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, Nk_points, inputPath)
+SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_points, inputPath)
 
     !DOS calculation
     REAL*8, INTENT(IN) :: E_DOS_min, E_DOS_max, dE0
     REAL*8, INTENT(IN) :: zeta_DOS
     INTEGER*4, INTENT(IN) :: Nk_points
-    CHARACTER(LEN=*) :: inputPath
+    LOGICAL, INTENT(IN) :: include_sc
+    CHARACTER(LEN=*), INTENT(IN) :: inputPath
 
     REAL*8 :: E0
     INTEGER*4 :: DOS_steps
+    INTEGER*4 :: hamiltonian_dim
 
     COMPLEX*16, ALLOCATABLE :: Hamiltonian(:,:), Hamiltonian_const(:,:), U_transformation(:,:)
     REAL*8, ALLOCATABLE :: Energies(:,:,:)
@@ -43,10 +47,17 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, Nk_points, inputPa
     dk1 = K1_MAX / Nk_points
     dk2 = K2_MAX / Nk_points
 
+    !If superconductivity is to be included, we add Nambu space to the Hamiltonian and double the size.
+    IF (include_sc) THEN
+        hamiltonian_dim = DIM
+    ELSE
+        hamiltonian_dim = DIM_POSITIVE_K
+    END IF
+
     ALLOCATE(Hamiltonian(DIM,DIM))
     ALLOCATE(Hamiltonian_const(DIM,DIM))
-    ALLOCATE(U_transformation(DIM_POSITIVE_K, DIM_POSITIVE_K))
-    ALLOCATE(Energies(0:Nk_points, 0:Nk_points, DIM_POSITIVE_K))
+    ALLOCATE(U_transformation(hamiltonian_dim, hamiltonian_dim))
+    ALLOCATE(Energies(0:Nk_points, 0:Nk_points, hamiltonian_dim))
     ALLOCATE(Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES))
     ALLOCATE(Charge_dens(DIM_POSITIVE_K))
     ALLOCATE(DOS(0:DOS_steps))
@@ -64,13 +75,33 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, Nk_points, inputPa
         CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
     END IF
 
+    IF (include_sc) THEN
+        !Then we should also read Gamma_SC
+        INQUIRE(FILE = TRIM(inputPath)//"OutputData/Gamma_SC__final.dat", EXIST = fileExists)
+        IF (fileExists) THEN
+            CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(inputPath)//"OutputData/Gamma_SC_final.dat")
+        ELSE
+            CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
+        END IF
+    END IF
+
     !Computing k-independent terms
     CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:,:))
     CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:,:))
     CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian_const(:,:))
     !Not shifting with the Fermi Energy, since we want "real" energy scale
+    !However If we want to include SC, we have to take into account actual Fermi energy for which Gammas were calculated
+    IF (include_sc) THEN
+        DO n = 1, DIM_POSITIVE_K
+            Hamiltonian_const(n,n) = Hamiltonian_const(n,n) - E_Fermi
+            Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) = Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) + E_Fermi
+        END DO
+    END IF
     CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
 
+
+    WRITE (log_string,*) "Calculating energies for DOS calculation"
+    LOG_INFO(log_string)
     !$omp parallel private(k1, k2, kx, ky, Hamiltonian, U_transformation)
     !$omp do
     DO i = 0, Nk_points
@@ -93,19 +124,21 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, Nk_points, inputPa
 
             Hamiltonian(:,:) = Hamiltonian_const(:,:) + Hamiltonian(:,:) !Should by multiplied by 0.5 if in Nambu space
 
-            CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:DIM_POSITIVE_K,:DIM_POSITIVE_K), Energies(i,j,:), U_transformation(:,:), DIM_POSITIVE_K)
+            CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:hamiltonian_dim,:hamiltonian_dim), Energies(i,j,:), U_transformation(:,:), hamiltonian_dim)
 
         END DO
     END DO
     !$omp end do
     !$omp end parallel
 
+    WRITE (log_string,*) "Looping over E0 for DOS calculation"
+    LOG_INFO(log_string)
     !$omp parallel private(E0)
     !$omp do
     DO n = 0, DOS_steps
         DO i = 0, Nk_points
             DO j = 0, Nk_points
-                DO k = 1, DIM_POSITIVE_K
+                DO k = 1, hamiltonian_dim
                     E0 = E_DOS_min + n*dE0
                     DOS(n) = DOS(n) + dirac_delta(Energies(i,j,k), E0, zeta_DOS)
                 END DO
@@ -114,6 +147,9 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, Nk_points, inputPa
     END DO
     !$omp end do
     !$omp end parallel
+
+    WRITE (log_string,*) "Writing DOS to file"
+    LOG_INFO(log_string)
 
     output_format = '(2E15.5)'
     OPEN(unit = 9, FILE=  TRIM(inputPath)//"OutputData/DOS.dat", FORM = "FORMATTED", ACTION = "WRITE")
@@ -137,11 +173,12 @@ END SUBROUTINE CALCULATE_DOS
 
 
 
-SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points)
+SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
     !! Calculates dispersion relation in the first Brillouin zone.
     !! Takes physical parameters from input.nml from a directory specified by inputPath.
     CHARACTER(LEN=*), INTENT(IN) :: inputPath
     INTEGER*4, INTENT(IN) :: Nk_points
+    LOGICAL, INTENT(IN) :: include_sc
     CHARACTER(LEN=20) :: output_format
 
     COMPLEX*16, ALLOCATABLE :: Hamiltonian(:,:), Hamiltonian_const(:,:), U_transformation(:,:)
@@ -159,15 +196,24 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points)
     REAL*8 :: yz_contribution, zx_contribution, xy_contribution
     REAL*8 :: lat1_contribution, lat2_contribution
     REAL*8 :: spin_up_contribution, spin_down_contribution
+    REAL*8 :: electron_contribution, hole_contribution
     REAL*8 :: brillouinZoneVertices(6,2)
 
     LOGICAL :: fileExists
+    INTEGER*4 :: hamiltonian_dim
 
     brillouinZoneVertices(:,1) = (/ 4.*PI/(3*SQRT(3.0d0)), 2.*PI/(3*SQRT(3.0d0)), -2.*PI/(3*SQRT(3.0d0)), -4.*PI/(3*SQRT(3.0d0)), -2.*PI/(3*SQRT(3.0d0)), 2.*PI/(3*SQRT(3.0d0))/)
     brillouinZoneVertices(:,2) = (/ 0.0d0, -2.*PI/3.0d0, -2.*PI/3.0d0, 0.0d0, 2.*PI/3.0d0, 2.*PI/3.0d0/)
 
 
     CALL GET_INPUT(TRIM(inputPath)//"input.nml")
+
+    !If superconductivity is to be included, we add Nambu space to the Hamiltonian and double the size.
+    IF (include_sc) THEN
+        hamiltonian_dim = DIM
+    ELSE
+        hamiltonian_dim = DIM_POSITIVE_K
+    END IF
 
     yz_contribution = 0.
     zx_contribution = 0.
@@ -176,6 +222,8 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points)
     lat2_contribution = 0.
     spin_up_contribution = 0.
     spin_down_contribution = 0.
+    electron_contribution = 0.
+    hole_contribution = 0.
 
 
     dkx = KX_MAX / Nk_points
@@ -184,13 +232,13 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points)
     kx_steps = INT(Nk_points)
     ky_steps = INT(Nk_points)
 
-    output_format = '(I5, 10E15.5)'
+    output_format = '(I5, 12E15.5)'
 
     ALLOCATE(Hamiltonian(DIM,DIM))
     ALLOCATE(Hamiltonian_const(DIM,DIM))
-    ALLOCATE(U_transformation(DIM_POSITIVE_K, DIM_POSITIVE_K))
-    ALLOCATE(Probability(-kx_steps:kx_steps, -ky_steps:ky_steps, DIM_POSITIVE_K, DIM_POSITIVE_K))
-    ALLOCATE(Energies(-kx_steps:kx_steps, -ky_steps:ky_steps, DIM_POSITIVE_K))
+    ALLOCATE(U_transformation(hamiltonian_dim, hamiltonian_dim))
+    ALLOCATE(Probability(-kx_steps:kx_steps, -ky_steps:ky_steps, hamiltonian_dim, hamiltonian_dim))
+    ALLOCATE(Energies(-kx_steps:kx_steps, -ky_steps:ky_steps, hamiltonian_dim))
     ALLOCATE(Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES))
     ALLOCATE(Charge_dens(DIM_POSITIVE_K))
 
@@ -208,11 +256,28 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points)
         CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
     END IF
 
+    IF (include_sc) THEN
+        !Then we should also read Gamma_SC
+        INQUIRE(FILE = TRIM(inputPath)//"OutputData/Gamma_SC__final.dat", EXIST = fileExists)
+        IF (fileExists) THEN
+            CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(inputPath)//"OutputData/Gamma_SC_final.dat")
+        ELSE
+            CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
+        END IF
+    END IF
+
     !Computing k-independent terms
     CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:,:))
     CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:,:))
     CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian_const(:,:))
-    !Not shifting with the Fermi Energy, since we want "real" energy scale
+    !Not shifting with the Fermi Energy, since we want "real" energy scale.
+    !However If we want to include SC, we have to take into account actual Fermi energy for which Gammas were calculated
+    IF (include_sc) THEN
+        DO n = 1, DIM_POSITIVE_K
+            Hamiltonian_const(n,n) = Hamiltonian_const(n,n) - E_Fermi
+            Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) = Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) + E_Fermi
+        END DO
+    END IF
     CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
 
     !$omp parallel private(kx, ky, Hamiltonian)
@@ -239,8 +304,8 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points)
                 !CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:DIM_POSITIVE_K,:DIM_POSITIVE_K), Energies(i,j,:), U_transformation(:,:), DIM_POSITIVE_K)
                 !Probability(i,j,:,:) = ABS(U_transformation)**2
 
-                CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:DIM_POSITIVE_K, :DIM_POSITIVE_K), Energies(i,j,:), DIM_POSITIVE_K)
-                Probability(i,j,:,:) = ABS(Hamiltonian(:DIM_POSITIVE_K,:DIM_POSITIVE_K))**2
+                CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:hamiltonian_dim, :hamiltonian_dim), Energies(i,j,:), hamiltonian_dim)
+                Probability(i,j,:,:) = ABS(Hamiltonian(:hamiltonian_dim,:hamiltonian_dim))**2
             END IF
         END DO
     END DO
@@ -248,8 +313,8 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points)
     !$omp end parallel
 
     OPEN(unit = 9, FILE= TRIM(inputPath)//"OutputData/Energies.dat", FORM = "FORMATTED", ACTION = "WRITE")
-    WRITE(9,'(A)') "#N kx[1/a] ky[1/a] Energy[meV] P(yz) P(zx) P(xy) P(lat1) P(lat2) P(s_up) P(s_down)"
-    DO l = 1, DIM_POSITIVE_K
+    WRITE(9,'(A)') "#N kx[1/a] ky[1/a] Energy[meV] P(yz) P(zx) P(xy) P(lat1) P(lat2) P(s_up) P(s_down) P(electron) P(hole)"
+    DO l = 1, hamiltonian_dim
         DO i = -kx_steps, kx_steps
             DO j = -ky_steps, ky_steps
                 kx = i*dkx !* (2. * PI * 2./3.)
@@ -262,7 +327,7 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points)
                     yz_contribution = 0.
                     zx_contribution = 0.
                     xy_contribution = 0.
-                    DO n = 1, DIM_POSITIVE_K, 3
+                    DO n = 1, hamiltonian_dim, 3
                         yz_contribution = yz_contribution + Probability(i,j,n,l)
                         zx_contribution = zx_contribution + Probability(i,j,n+1,l)
                         xy_contribution = xy_contribution + Probability(i,j,n+2,l)
@@ -275,6 +340,10 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points)
                         DO m = 0, 1
                             lat1_contribution = lat1_contribution + Probability(i,j,m*TBA_DIM + n,l)
                             lat2_contribution = lat2_contribution + Probability(i,j,m*TBA_DIM + n + 3,l)
+                            IF (include_sc) THEN
+                                lat1_contribution = lat1_contribution + Probability(i,j,DIM_POSITIVE_K + m*TBA_DIM + n,l)
+                                lat2_contribution = lat2_contribution + Probability(i,j,DIM_POSITIVE_K + m*TBA_DIM + n + 3,l)
+                            END IF
                         END DO
                     END DO
 
@@ -284,12 +353,29 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points)
                     DO n = 1, TBA_DIM
                         spin_up_contribution = spin_up_contribution + Probability(i,j,n,l)
                         spin_down_contribution = spin_down_contribution + Probability(i,j,TBA_DIM + n,l)
+                        IF (include_sc) THEN
+                            spin_up_contribution = spin_up_contribution + Probability(i,j,DIM_POSITIVE_K + n,l)
+                            spin_down_contribution = spin_down_contribution + Probability(i,j,DIM_POSITIVE_K + TBA_DIM + n,l)
+                        END IF
                     END DO
+
+                    electron_contribution = 0.
+                    hole_contribution = 0.
+                    IF (include_sc) THEN
+                        DO n = 1, DIM_POSITIVE_K
+                            electron_contribution = electron_contribution + Probability(i,j,n,l)
+                            hole_contribution = hole_contribution + Probability(i,j,DIM_POSITIVE_K + n,l)
+                        END DO
+                    ELSE
+                        electron_contribution = 1.
+                        hole_contribution = 0.
+                    END IF
 
                     WRITE(9, output_format) l, kx, ky, Energies(i, j, l)/meV2au, &
                     & yz_contribution, zx_contribution, xy_contribution, &
                     & lat1_contribution, lat2_contribution, &
-                    & spin_up_contribution, spin_down_contribution
+                    & spin_up_contribution, spin_down_contribution, &
+                    & electron_contribution, hole_contribution
                 END IF
             END DO
         END DO

@@ -9,8 +9,13 @@ CHARACTER(LEN=MAX_LOG_LEN) :: log_string
 !$omp threadprivate(log_string)
 CONTAINS
 
-RECURSIVE SUBROUTINE INIT_LOGGER()
-    OPEN(unit = LOGGER_UNIT, FILE = "./log.log", FORM = "FORMATTED", ACTION = "WRITE")
+RECURSIVE SUBROUTINE INIT_LOGGER(filename)
+    CHARACTER(LEN=*), INTENT(IN) :: filename
+    IF (filename == "") THEN
+        OPEN(unit = LOGGER_UNIT, FILE = "./log.log", FORM = "FORMATTED", ACTION = "WRITE")
+    ELSE
+        OPEN(unit = LOGGER_UNIT, FILE = "./"//TRIM(filename)//".log", FORM = "FORMATTED", ACTION = "WRITE")
+    END IF
     WRITE(LOGGER_UNIT, *) "==== START ===="
     FLUSH(LOGGER_UNIT)
     CALL CPU_TIME(T_START)

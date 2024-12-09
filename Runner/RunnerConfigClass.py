@@ -103,6 +103,7 @@ class RunnerConfig:
             &dispersion_relation_calculation\
                 enable_dispersion_relation_calc = .FALSE.,\
                 path_to_run_dir_dispersion_relation = ,\
+                include_sc_in_dispersion = .TRUE.,\
                 Nk_points_dispersion_relation = 500 /\
             &dos_calculation\
                 enable_dos_calc = .FALSE.,\
@@ -111,6 +112,7 @@ class RunnerConfig:
                 E_DOS_max = 1.7e3,\
                 dE0 = 1.,\
                 zeta_DOS = 1e-4,\
+                include_sc_in_dos = .TRUE.,\
                 Nk_points_dos = 2000 /"
         )
         return params_nml
