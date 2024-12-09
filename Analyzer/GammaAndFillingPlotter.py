@@ -44,7 +44,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
 
         # Set rcParams for tighter layout
         plt.rcParams['figure.autolayout'] = True
-        plt.rcParams['figure.constrained_layout.use'] = True
+        plt.rcParams['figure.constrained_layout.use'] = False
         plt.rcParams['axes.linewidth'] = 1.2
 
         # Set rcParams to show ticks on both left and right sides

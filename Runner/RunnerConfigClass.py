@@ -22,11 +22,11 @@ class RunnerConfig:
             """\
         #!/bin/bash -l
         ## Job name
-        #SBATCH -J LAO-STO-SC
+        #SBATCH -J KTO-SC
         ## Number of allocated nodes
         #SBATCH -N 1
         ## Number of tasks per node (by default this corresponds to the number of cores allocated per node)
-        #SBATCH --ntasks-per-node=20
+        #SBATCH --ntasks-per-node=10
         ## Memory allocated per core (default is 5GB)
         #SBATCH --mem-per-cpu=3800MB
         ## Max task execution time (format is HH:MM:SS)
@@ -47,12 +47,12 @@ class RunnerConfig:
         params_nml = parser.reads(
             f"&physical_params \
                 T = 0.0, \
-                t_D = 0.5e3, \
-                t_I = 0.04e3, \
-                t_Rashba = 0.0e3, \
-                lambda_SOC = 0.01e3, \
-                DELTA_TRI = -0.005e3, \
-                v = 0.2e3, \
+                t_D = 0.65e3, \
+                t_I = 0.05e3, \
+                t_Rashba = 0.004e3, \
+                lambda_SOC = 0.265e3, \
+                DELTA_TRI = -0.01e3, \
+                v = 0.0e3, \
                 V_pdp = 0.028e3, \
                 V_pds = -0.065e3, \
                 J_SC = 0.0e3, \
@@ -70,10 +70,10 @@ class RunnerConfig:
                 path_to_gamma_start = , \
                 read_charge_from_file = .FALSE., \
                 path_to_charge_start = , \
-                gamma_start = 0., \
-                gamma_nnn_start = 1., \
+                gamma_start = 1., \
+                gamma_nnn_start = 0., \
                 charge_start = 0.1, \
-                max_sc_iter = 200, \
+                max_sc_iter = 100, \
                 sc_alpha = 0.2, \
                 sc_alpha_adapt = 1., \
                 gamma_eps_convergence = 1e-4, \
@@ -101,11 +101,11 @@ class RunnerConfig:
                 path_to_run_dir_chern_number = , \
                 Nk_points_chern_number = 15000 /\
             &dispersion_relation_calculation\
-                enable_dispersion_relation_calc = .TRUE.,\
+                enable_dispersion_relation_calc = .FALSE.,\
                 path_to_run_dir_dispersion_relation = ,\
                 Nk_points_dispersion_relation = 500 /\
             &dos_calculation\
-                enable_dos_calc = .TRUE.,\
+                enable_dos_calc = .FALSE.,\
                 path_to_run_dir_dos = ,\
                 E_DOS_min = -1.7e3,\
                 E_DOS_max = 1.7e3,\

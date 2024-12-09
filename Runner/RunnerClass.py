@@ -20,7 +20,7 @@ class Runner(RunnerConfig):
         to be J_SC / 10
         """
         if isAres:
-            pathToAppend = f"/net/ascratch/people/plgjczarnecki/LAO-STO-E_Fermi_T/RUN"
+            pathToAppend = f"/net/ascratch/people/plgjczarnecki/KTO-test/RUN"
         else:
             pathToAppend = f"RUN"
 
