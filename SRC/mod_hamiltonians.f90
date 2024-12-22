@@ -2,12 +2,12 @@ MODULE mod_hamiltonians
 USE mod_utilities
 USE mod_parameters
 USE mod_reader
-IMPLICIT NONE 
+IMPLICIT NONE
 CONTAINS
 
 
 RECURSIVE SUBROUTINE COMPUTE_TBA_TERM(Hamiltonian, kx, ky)
-    IMPLICIT NONE 
+    IMPLICIT NONE
     REAL*8, INTENT(INOUT) :: kx, ky
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM) !Twice as big because of spin
     !Only specifying upper triangle of matrix, since Hamiltonian is hermitian
@@ -37,7 +37,7 @@ RECURSIVE SUBROUTINE COMPUTE_TBA_TERM(Hamiltonian, kx, ky)
 END SUBROUTINE COMPUTE_TBA_TERM
 
 RECURSIVE SUBROUTINE COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian)
-    IMPLICIT NONE 
+    IMPLICIT NONE
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
 
     !Ti1 atoms
@@ -76,7 +76,7 @@ RECURSIVE SUBROUTINE COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian)
 END SUBROUTINE COMPUTE_ATOMIC_SOC_TERMS
 
 RECURSIVE SUBROUTINE COMPUTE_TRIGONAL_TERMS(Hamiltonian)
-    IMPLICIT NONE 
+    IMPLICIT NONE
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
 
     !Spin up
@@ -88,7 +88,7 @@ RECURSIVE SUBROUTINE COMPUTE_TRIGONAL_TERMS(Hamiltonian)
     Hamiltonian(ORBITALS + 1, ORBITALS + 2) = Hamiltonian(ORBITALS + 1, ORBITALS + 2) + DELTA_TRI/2.
     Hamiltonian(ORBITALS + 1, ORBITALS + 3) = Hamiltonian(ORBITALS + 1, ORBITALS + 3) + DELTA_TRI/2.
     Hamiltonian(ORBITALS + 2, ORBITALS + 3) = Hamiltonian(ORBITALS + 2, ORBITALS + 3) + DELTA_TRI/2.
-    
+
     !Spin down
     !Ti 1 atoms
     Hamiltonian(1 + TBA_DIM,2 + TBA_DIM) = Hamiltonian(1 + TBA_DIM,2 + TBA_DIM) + DELTA_TRI/2.
@@ -110,7 +110,7 @@ RECURSIVE SUBROUTINE COMPUTE_TRIGONAL_TERMS(Hamiltonian)
     Hamiltonian(DIM_POSITIVE_K + ORBITALS + 1, DIM_POSITIVE_K + ORBITALS + 2) = Hamiltonian(DIM_POSITIVE_K + ORBITALS + 1, DIM_POSITIVE_K + ORBITALS + 2) - DELTA_TRI/2.
     Hamiltonian(DIM_POSITIVE_K + ORBITALS + 1, DIM_POSITIVE_K + ORBITALS + 3) = Hamiltonian(DIM_POSITIVE_K + ORBITALS + 1, DIM_POSITIVE_K + ORBITALS + 3) - DELTA_TRI/2.
     Hamiltonian(DIM_POSITIVE_K + ORBITALS + 2, DIM_POSITIVE_K + ORBITALS + 3) = Hamiltonian(DIM_POSITIVE_K + ORBITALS + 2, DIM_POSITIVE_K + ORBITALS + 3) - DELTA_TRI/2.
-    
+
     !Spin down
     !Ti 1 atoms
     Hamiltonian(DIM_POSITIVE_K + 1 + TBA_DIM, DIM_POSITIVE_K + 2 + TBA_DIM) = Hamiltonian(DIM_POSITIVE_K + 1 + TBA_DIM, DIM_POSITIVE_K + 2 + TBA_DIM) - DELTA_TRI/2.
@@ -128,7 +128,7 @@ END SUBROUTINE COMPUTE_TRIGONAL_TERMS
 
 
 RECURSIVE SUBROUTINE COMPUTE_ELECTRIC_FIELD(Hamiltonian)
-    IMPLICIT NONE 
+    IMPLICIT NONE
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
     INTEGER*4 :: i
 
@@ -152,7 +152,7 @@ RECURSIVE SUBROUTINE COMPUTE_ELECTRIC_FIELD(Hamiltonian)
 END SUBROUTINE COMPUTE_ELECTRIC_FIELD
 
 RECURSIVE SUBROUTINE COMPUTE_TI1_TI2(Hamiltonian,kx, ky)
-    IMPLICIT NONE 
+    IMPLICIT NONE
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
     REAL*8, INTENT(INOUT) :: kx, ky
     !Spin-up part
@@ -196,13 +196,13 @@ RECURSIVE SUBROUTINE COMPUTE_TI1_TI2(Hamiltonian,kx, ky)
 END SUBROUTINE COMPUTE_TI1_TI2
 
 RECURSIVE SUBROUTINE COMPUTE_H_PI(Hamiltonian, kx, ky)
-    IMPLICIT NONE 
+    IMPLICIT NONE
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
     REAL*8, INTENT(INOUT) :: kx, ky
     REAL*8 :: k1, k2, k3
 
-    k1 = -SQRT(3.)/2.*kx + 3./2.*ky 
-    k2 = -SQRT(3.)/2.*kx - 3./2.*ky 
+    k1 = -SQRT(3.)/2.*kx + 3./2.*ky
+    k2 = -SQRT(3.)/2.*kx - 3./2.*ky
     k3 = SQRT(3.)*kx
 
     !Spin up, Ti1
@@ -249,12 +249,12 @@ RECURSIVE SUBROUTINE COMPUTE_H_PI(Hamiltonian, kx, ky)
 END SUBROUTINE COMPUTE_H_PI
 
 RECURSIVE SUBROUTINE COMPUTE_H_SIGMA(Hamiltonian, kx, ky)
-    IMPLICIT NONE 
+    IMPLICIT NONE
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
     REAL*8, INTENT(INOUT) :: kx, ky
     REAL*8 :: k1, k2, k3
-    k1 = -SQRT(3.)/2.*kx + 3./2.*ky 
-    k2 = -SQRT(3.)/2.*kx - 3./2.*ky 
+    k1 = -SQRT(3.)/2.*kx + 3./2.*ky
+    k2 = -SQRT(3.)/2.*kx - 3./2.*ky
     k3 = SQRT(3.)*kx
 
     !Spin up, Ti1

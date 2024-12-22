@@ -7,4 +7,6 @@
 *.x
 *.pyc
 *.log
+OBJ/
+MOD/
 */__pycache__/*

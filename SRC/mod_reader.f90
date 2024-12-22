@@ -218,8 +218,6 @@ SUBROUTINE GET_INPUT(nmlfile)
     IF (interpolation_deg_y .LE. 0) STOP "interpolation_deg_y must be > 0"
     IF (max_grid_refinements_y .LE. 0) STOP "max_grid_refinements_y must be > 0"
 
-
-
     CLOSE(9)
 
 END SUBROUTINE GET_INPUT
@@ -259,6 +257,7 @@ SUBROUTINE GET_POSTPROCESSING_INPUT(nmlfile)
         IF (Nk_points_dos .LE. 0) STOP "Nk_points_dos must be > 0"
         E_DOS_min = E_DOS_min * meV2au
         E_DOS_max = E_DOS_max * meV2au
+        zeta_DOS = zeta_DOS * meV2au
         dE0 = dE0 * meV2au
     END IF
 

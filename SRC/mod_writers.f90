@@ -42,7 +42,7 @@ SUBROUTINE PRINT_ENERGIES(Energies, k1_steps, k2_steps, dk1, dk2, filename, N)
             DO j = 0, k2_steps
                 k1 = i*dk1
                 k2 = j*dk2
-    
+
                 kx = 2.*PI/(SQRT(3.0d0)) * k1
                 ky = -2.*PI/3. * k1 + 4.*PI/3. * k2
                 WRITE(9, output_format) l, k1, k2, Energies(i, j, l)/meV2au
@@ -52,7 +52,7 @@ SUBROUTINE PRINT_ENERGIES(Energies, k1_steps, k2_steps, dk1, dk2, filename, N)
         END DO
         WRITE(9,*)
         WRITE(9,*)
-    END DO 
+    END DO
     CLOSE(9)
 END SUBROUTINE
 
@@ -102,14 +102,5 @@ SUBROUTINE PRINT_CHARGE(Charge_dens, filename)
     END DO
     CLOSE(9)
 END SUBROUTINE PRINT_CHARGE
-
-
-
-
-
-
-
-
-
 
 END MODULE mod_writers
