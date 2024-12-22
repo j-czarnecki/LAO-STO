@@ -17,18 +17,18 @@ RECURSIVE SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chun
 
     COMPLEX*16, INTENT(IN) :: Hamiltonian_const(DIM, DIM)
     REAL*8, INTENT(IN) :: k1_chunk_min, k1_chunk_max, k2_chunk_min, k2_chunk_max
-    COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES)
+    COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS)
     REAL*8, INTENT(IN) :: Charge_dens(DIM_POSITIVE_K)
     REAL*8, INTENT(IN) :: romb_eps_x, romb_eps_y
     INTEGER*4, INTENT(IN) :: interpolation_deg_x, interpolation_deg_y, max_grid_refinements_x, max_grid_refinements_y
-    COMPLEX*16, INTENT(OUT) :: Delta_local(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES)
+    COMPLEX*16, INTENT(OUT) :: Delta_local(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS)
     REAL*8, INTENT(OUT) :: Charge_dens_local(DIM_POSITIVE_K)
     !Parameters for Romberg integration
 
     COMPLEX*16 :: stepsize(max_grid_refinements_y + 1)
-    COMPLEX*16 :: Delta_iterations(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES, max_grid_refinements_y + 1)
+    COMPLEX*16 :: Delta_iterations(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS, max_grid_refinements_y + 1)
     REAL*8 :: Charge_dens_iterations(DIM_POSITIVE_K, max_grid_refinements_y + 1)
-    COMPLEX*16 :: Delta_sum(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES)
+    COMPLEX*16 :: Delta_sum(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS)
     REAL*8 :: Charge_dens_sum(DIM_POSITIVE_K)
     COMPLEX*16 :: result_error, result
     INTEGER*4 :: n,i,j, spin, orb, lat
@@ -106,8 +106,9 @@ RECURSIVE SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chun
                 !Checking Delta_iterations convergence
                 DO spin = 1, 2
                     DO orb = 1, ORBITALS
-                        DO n = 1, N_ALL_NEIGHBOURS
-                            DO lat = 1, SUBLATTICES
+                        !Split into N_NEIGHBOURS and N_ALL_NEIGHBOURS because other parts of matrix are referenced
+                        DO n = 1, N_NEIGHBOURS
+                            DO lat = 1, LAYER_COUPLINGS
                                 CALL POLINT(stepsize((j - interpolation_deg_y + 1):j), Delta_iterations(orb,n,spin,lat,(j - interpolation_deg_y + 1):j), &
                                             & interpolation_deg_y, DCMPLX(0. , 0.), result, result_error)
                                 Delta_local(orb,n,spin,lat) = result
@@ -116,6 +117,16 @@ RECURSIVE SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chun
                                 END IF
                             END DO
                         END DO
+                        DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
+                            DO lat = 1, SUBLATTICES
+                                CALL POLINT(stepsize((j - interpolation_deg_y + 1):j), Delta_iterations(orb,n,spin,lat,(j - interpolation_deg_y + 1):j), &
+                                            & interpolation_deg_y, DCMPLX(0. , 0.), result, result_error)
+                                Delta_local(orb,n,spin,lat) = result
+                                IF (ABS(result_error) > romb_eps_y*ABS(result)) THEN
+                                    convergence = .FALSE.
+                                END IF
+                            END DO
+                        END DO            
                     END DO
                 END DO
 
@@ -160,19 +171,19 @@ RECURSIVE SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chun
                     & romb_eps_x, interpolation_deg_x, max_grid_refinements_x)
     COMPLEX*16, INTENT(IN) :: Hamiltonian_const(DIM, DIM)
     REAL*8, INTENT(IN) :: k1_chunk_min, k1_chunk_max, k2_actual
-    COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES)
+    COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS)
     REAL*8, INTENT(IN) :: Charge_dens(DIM_POSITIVE_K)
     REAL*8, INTENT(IN) :: romb_eps_x
     INTEGER*4, INTENT(IN) :: interpolation_deg_x, max_grid_refinements_x
 
 
-    COMPLEX*16, INTENT(OUT) :: Delta_local(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES)
+    COMPLEX*16, INTENT(OUT) :: Delta_local(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS)
     REAL*8, INTENT(OUT) :: Charge_dens_local(DIM_POSITIVE_K)
 
     COMPLEX*16 :: stepsize(max_grid_refinements_x + 1)
-    COMPLEX*16 :: Delta_iterations(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES, max_grid_refinements_x + 1)
+    COMPLEX*16 :: Delta_iterations(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS, max_grid_refinements_x + 1)
     REAL*8 :: Charge_dens_iterations(DIM_POSITIVE_K, max_grid_refinements_x + 1)
-    COMPLEX*16 :: Delta_sum(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES)
+    COMPLEX*16 :: Delta_sum(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS)
     REAL*8 :: Charge_dens_sum(DIM_POSITIVE_K)
     COMPLEX*16 :: result_error, result
     INTEGER*4 :: n,i,j, spin, orb, lat
@@ -250,7 +261,18 @@ RECURSIVE SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chun
                 !Checking Delta_iterations convergence
                 DO spin = 1, 2
                     DO orb = 1, ORBITALS
-                        DO n = 1, N_ALL_NEIGHBOURS
+                        !Split into N_NEIGHBOURS and N_ALL_NEIGHBOURS because other parts of matrix are referenced
+                        DO n = 1, N_NEIGHBOURS
+                            DO lat = 1, LAYER_COUPLINGS
+                                CALL POLINT(stepsize((j - interpolation_deg_x + 1):j), Delta_iterations(orb,n,spin,lat,(j - interpolation_deg_x + 1):j), &
+                                            & interpolation_deg_x, DCMPLX(0. , 0.), result, result_error)
+                                Delta_local(orb,n,spin,lat) = result
+                                IF (ABS(result_error) > romb_eps_x*ABS(result)) THEN
+                                    convergence = .FALSE.
+                                END IF
+                            END DO
+                        END DO
+                        DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
                             DO lat = 1, SUBLATTICES
                                 CALL POLINT(stepsize((j - interpolation_deg_x + 1):j), Delta_iterations(orb,n,spin,lat,(j - interpolation_deg_x + 1):j), &
                                             & interpolation_deg_x, DCMPLX(0. , 0.), result, result_error)
@@ -289,9 +311,9 @@ RECURSIVE SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chun
     END DO
 
 
-    WRITE(log_string,'(a, F10.6, a, F10.6, a, I15)') "Romberg X did not converge for &
-    & k1_chunk_min: ", k1_chunk_min, " k2_actual: ", k2_actual, " after iteration: ", j - 1
-    LOG_ABNORMAL(log_string)
+    ! WRITE(log_string,'(a, F10.6, a, F10.6, a, I15)') "Romberg X did not converge for &
+    ! & k1_chunk_min: ", k1_chunk_min, " k2_actual: ", k2_actual, " after iteration: ", j - 1
+    ! LOG_ABNORMAL(log_string)
 
 
 END SUBROUTINE ROMBERG_X

@@ -1,8 +1,16 @@
-TARGET = LAO_STO.x
+TARGET = ./bin/LAO_STO.x
+POSTPROCESSING_TARGET = ./bin/POST_LAO_STO.x
+SRC_DIR = SRC
+OBJ_DIR = OBJ
+MOD_DIR = MOD
+
+# the command shell
 SHELL = /bin/sh
 F90 = ifx
+CC = gcc
+CXX = g++
 LIB_OPENMP = -qopenmp
-F90FLAGS = -O3 -fpp -ipo $(LIB_OPENMP)
+F90FLAGS = -O3 -fpp -ipo $(LIB_OPENMP) -module $(MOD_DIR)
 LIBS = -llapack -lblas
 LIBS_MKL = -I${MKLROOT}/include \
 					 -I/opt/intel/mkl/include \
@@ -13,80 +21,57 @@ LIBS_MKL = -I${MKLROOT}/include \
            -Wl,--end-group \
            -lpthread -lm -ldl #-lgomp
 
-TEST_TARGET = TEST_LAO_STO.x
-POSTPROCESSING_TARGET = POSTPROCESSING_LAO_STO.x
-CHERN_TARGET = CHERN_LAO_STO.x
 
-.PHONY: all debug clean test postprocessing chern gnu
+.PHONY: all  ares_all  ares_post gnu tsan debug clean test post post_debug analyze
 
 
 ####### Full-performance build (default)
-OBJS = 	main.o \
-		mod_hamiltonians.o \
-		mod_parameters.o \
-		mod_utilities.o \
-		mod_writers.o \
-		mod_reader.o \
-		mod_broydenV2.o \
-		mod_compute_hamiltonians.o \
-		mod_integrate.o \
-		mod_logger.o
+OBJS = 	$(OBJ_DIR)/main.o \
+				$(OBJ_DIR)/mod_hamiltonians.o \
+				$(OBJ_DIR)/mod_parameters.o \
+				$(OBJ_DIR)/mod_utilities.o \
+				$(OBJ_DIR)/mod_writers.o \
+				$(OBJ_DIR)/mod_reader.o \
+				$(OBJ_DIR)/mod_broydenV2.o \
+				$(OBJ_DIR)/mod_compute_hamiltonians.o \
+				$(OBJ_DIR)/mod_integrate.o \
+				$(OBJ_DIR)/mod_logger.o
 
-# Rule to check if a library is available
-CHECK_LIB := $(shell $(TARGET) $(LIBS) $(LIBS_MKL) -o /dev/null $(OBJS) 2>/dev/null && echo "yes" || echo "no")
+###### Plotting dispersion relation, calculating DOS and Chern number
+POSTPROCESSING_OBJS = 	$(OBJ_DIR)/main_postprocessing.o \
+						$(OBJ_DIR)/mod_postprocessing.o \
+						$(OBJ_DIR)/mod_hamiltonians.o \
+						$(OBJ_DIR)/mod_parameters.o \
+						$(OBJ_DIR)/mod_utilities.o \
+						$(OBJ_DIR)/mod_writers.o \
+						$(OBJ_DIR)/mod_reader.o \
+						$(OBJ_DIR)/mod_compute_hamiltonians.o \
+						$(OBJ_DIR)/mod_logger.o
 
-# Rule to check if an alternative library is available
-CHECK_ARES_LIB := $(shell $(TARGET) $(ARES_LIBS) -o /dev/null $(OBJS) 2>/dev/null && echo "yes" || echo "no")
-
+# Superconductivity calculation target
 $(TARGET): $(OBJS)
 	$(F90) -o $(TARGET) $(F90FLAGS) $^ $(LIBS) $(LIBS_MKL)
 
-%.o : %.f90
-	$(F90) $(F90FLAGS) -c $< -o $@
-
-
-###### Running tests
-TEST_OBJS = tests.o \
-			mod_hamiltonians.o \
-			mod_parameters.o \
-			mod_utilities.o \
-			mod_writers.o \
-			mod_reader.o \
-			mod_broydenV2.o \
-			mod_compute_hamiltonians.o \
-			mod_integrate.o \
-			mod_logger.o
-
-$(TEST_TARGET): $(TEST_OBJS)
-	$(F90) -o $(TEST_TARGET) $(F90FLAGS) $^ $(LIBS) $(LIBS_MKL)
-
-%.o : %.f90
-	$(F90) $(F90FLAGS) -c $< -o $@
-
-###### Plotting dispersion relation, calculating DOS and Chern number
-POSTPROCESSING_OBJS = 	main_postprocessing.o \
-						mod_postprocessing.o \
-						mod_hamiltonians.o \
-						mod_parameters.o \
-						mod_utilities.o \
-						mod_writers.o \
-						mod_reader.o \
-						mod_compute_hamiltonians.o \
-						mod_logger.o
-
+# Postprocessing target
 $(POSTPROCESSING_TARGET): $(POSTPROCESSING_OBJS)
 	$(F90) -o $(POSTPROCESSING_TARGET) $(F90FLAGS) $^ $(LIBS) $(LIBS_MKL)
 
-%.o : %.f90
+# Setting where to find .o and .mod files
+$(OBJ_DIR)/%.o : $(SRC_DIR)/%.f90
+	mkdir -p $(OBJ_DIR) $(MOD_DIR)
 	$(F90) $(F90FLAGS) -c $< -o $@
+
+$(OBJ_DIR)/%.s : $(SRC_DIR)/%.f90
+	mkdir -p $(OBJ_DIR) $(MOD_DIR)
+	$(F90) $(F90FLAGS) -S $< -o $@
 
 all: $(TARGET)
 
 ares_all: LIBS = -lscalapack -lflexiblas
 ares_all: $(TARGET)
 
-ares_postprocessing: LIBS = -lscalapack -lflexiblas
-ares_postprocessing: $(POSTPROCESSING_TARGET)
+ares_post: LIBS = -lscalapack -lflexiblas
+ares_post: $(POSTPROCESSING_TARGET)
 
 gnu: F90 = gfortran
 gnu: F90FLAGS = -O3 -Wall -Wextra -ffree-line-length-none $(LIB_OPENMP)
@@ -102,87 +87,93 @@ debug: $(TARGET)
 tsan: F90FLAGS = -O0 -g -fpp -DDEBUG -fsanitize=thread $(LIB_OPENMP)
 tsan: $(TARGET)
 
-test: F90FLAGS = -O0 -g -fpp #-check all -debug all -warn all -diag-enable sc
-test: $(TEST_TARGET)
+post: $(POSTPROCESSING_TARGET)
 
-postprocessing: $(POSTPROCESSING_TARGET)
+post_debug: F90 = gfortran
+post_debug: F90FLAGS = -O0 -g -fcheck=array-temps,bounds,do,mem -fsanitize=address -ffree-line-length-none #-check all -warn all #-g flag necessary to generate debug symbols
+post_debug: $(POSTPROCESSING_TARGET)
 
-postprocessing_debug: F90 = gfortran
-postprocessing_debug: F90FLAGS = -O0 -g -fcheck=array-temps,bounds,do,mem -fsanitize=address -ffree-line-length-none #-check all -warn all #-g flag necessary to generate debug symbols
-postprocessing_debug: $(POSTPROCESSING_TARGET)
+test:
+	mkdir -p $(SRC_DIR)/test/$(MOD_DIR)
+	cp SRC/*.f90 SRC/test/
+	@export FC="$(F90)" && export CC="$(CC)" && export CXX="$(CXX)" && export FSFLAG=-I && export FCFLAGS="$(F90FLAGS)" && cd $(SRC_DIR)/test && funit
+	cd ../../
+
+analyze:
+	cd Analyzer && python3 mainAnalyzer.py && cd ..
 
 clean:
-	rm -f *.o
+	rm -rf $(MOD_DIR)
+	rm -rf $(OBJ_DIR)
+	rm -f $(TARGET)
+	rm -f $(POSTPROCESSING_TARGET)
+	rm -f $(SRC_DIR)/test/*.f90
+	rm -rf $(SRC_DIR)/test/$(MOD_DIR)
+	rm -rf $(SRC_DIR)/test/*.o
 	rm -f *.mod
-	rm -f *.x
-	rm -rf *.i90
-
+	rm -rf $(SRC_DIR)/*.i90
+	rm -rf $(SRC_DIR)/*.mod
+	@export CC="$(CC)" && export CXX="$(CXX)" && cd $(SRC_DIR)/test && funit --clean && cd ../../
 
 
 
 ########### Dependencies
+$(OBJ_DIR)/main.o:	$(OBJ_DIR)/mod_hamiltonians.o \
+										$(OBJ_DIR)/mod_parameters.o \
+										$(OBJ_DIR)/mod_utilities.o \
+										$(OBJ_DIR)/mod_writers.o \
+										$(OBJ_DIR)/mod_reader.o \
+										$(OBJ_DIR)/mod_broydenV2.o \
+										$(OBJ_DIR)/mod_compute_hamiltonians.o \
+										$(OBJ_DIR)/mod_integrate.o \
+										$(OBJ_DIR)/mod_logger.o
 
-main.o:	mod_hamiltonians.o \
-		mod_parameters.o \
-		mod_utilities.o \
-		mod_writers.o \
-		mod_reader.o \
-		mod_broydenV2.o \
-		mod_compute_hamiltonians.o \
-		mod_integrate.o \
-		mod_logger.o
+$(OBJ_DIR)/main_postprocessing.o: 	$(OBJ_DIR)/mod_hamiltonians.o \
+																		$(OBJ_DIR)/mod_parameters.o \
+																		$(OBJ_DIR)/mod_utilities.o \
+																		$(OBJ_DIR)/mod_writers.o \
+																		$(OBJ_DIR)/mod_reader.o \
+																		$(OBJ_DIR)/mod_compute_hamiltonians.o \
+																		$(OBJ_DIR)/mod_postprocessing.o \
+																		$(OBJ_DIR)/mod_logger.o
 
-tests.o:	mod_hamiltonians.o \
-			mod_parameters.o \
-			mod_writers.o
+$(OBJ_DIR)/chern.o: 		$(OBJ_DIR)/mod_hamiltonians.o \
+												$(OBJ_DIR)/mod_parameters.o \
+												$(OBJ_DIR)/mod_utilities.o \
+												$(OBJ_DIR)/mod_writers.o \
+												$(OBJ_DIR)/mod_reader.o \
+												$(OBJ_DIR)/mod_compute_hamiltonians.o
 
-main_postprocessing.o: 	mod_hamiltonians.o \
-						mod_parameters.o \
-						mod_utilities.o \
-						mod_writers.o \
-						mod_reader.o \
-						mod_compute_hamiltonians.o \
-						mod_postprocessing.o \
-						mod_logger.o
+$(OBJ_DIR)/mod_utilities.o: $(OBJ_DIR)/mod_parameters.o \
+														$(OBJ_DIR)/mod_reader.o
 
-chern.o: 		mod_hamiltonians.o \
-				mod_parameters.o \
-				mod_utilities.o \
-				mod_writers.o \
-				mod_reader.o \
-				mod_compute_hamiltonians.o
+$(OBJ_DIR)/mod_parameters.o:
 
-mod_utilities.o: mod_parameters.o \
-				 mod_reader.o
+$(OBJ_DIR)/mod_hamiltonians.o:	$(OBJ_DIR)/mod_utilities.o \
+								$(OBJ_DIR)/mod_parameters.o \
+								$(OBJ_DIR)/mod_reader.o
 
-mod_parameters.o:
+$(OBJ_DIR)/mod_writers.o: $(OBJ_DIR)/mod_parameters.o \
+						  $(OBJ_DIR)/mod_reader.o
 
-mod_hamiltonians.o:	mod_utilities.o \
-					mod_parameters.o \
-					mod_reader.o
+$(OBJ_DIR)/mod_reader.o: $(OBJ_DIR)/mod_parameters.o \
+						 $(OBJ_DIR)/mod_logger.o
 
-mod_writers.o: mod_parameters.o
+$(OBJ_DIR)/mod_compute_hamiltonians.o: 	$(OBJ_DIR)/mod_parameters.o \
+										$(OBJ_DIR)/mod_utilities.o \
+										$(OBJ_DIR)/mod_hamiltonians.o \
+										$(OBJ_DIR)/mod_writers.o
 
-mod_reader.o: mod_parameters.o
+$(OBJ_DIR)/mod_integrate.o: $(OBJ_DIR)/mod_parameters.o \
+							$(OBJ_DIR)/mod_compute_hamiltonians.o \
+							$(OBJ_DIR)/mod_logger.o
 
-mod_compute_hamiltonians.o: mod_parameters.o \
-							mod_utilities.o \
-							mod_hamiltonians.o \
-							mod_writers.o
+$(OBJ_DIR)/mod_postprocessing.o: 	$(OBJ_DIR)/mod_hamiltonians.o \
+									$(OBJ_DIR)/mod_parameters.o \
+									$(OBJ_DIR)/mod_utilities.o \
+									$(OBJ_DIR)/mod_writers.o \
+									$(OBJ_DIR)/mod_reader.o \
+									$(OBJ_DIR)/mod_compute_hamiltonians.o \
+									$(OBJ_DIR)/mod_logger.o
 
-mod_integrate.o: mod_parameters.o \
-				 mod_compute_hamiltonians.o \
-				 mod_logger.o
-
-mod_postprocessing.o: 	mod_hamiltonians.o \
-						mod_parameters.o \
-						mod_utilities.o \
-						mod_writers.o \
-						mod_reader.o \
-						mod_compute_hamiltonians.o \
-						mod_logger.o
-
-mod_logger.o:
-
-
-
+$(OBJ_DIR)/mod_logger.o:

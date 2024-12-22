@@ -379,8 +379,8 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
                 END IF
             END DO
         END DO
-        WRITE(9,*)
-        WRITE(9,*)
+        ! WRITE(9,*)
+        ! WRITE(9,*)
     END DO
     CLOSE(9)
 

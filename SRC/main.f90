@@ -36,8 +36,11 @@ PROGRAM MAIN
     !OMP specific
     INTEGER*4 :: max_num_threads, used_threads
 
-
     max_num_threads = omp_get_max_threads()
+
+    CALL INIT_LOGGER("")
+    WRITE (log_string,*) "Max num threads", max_num_threads
+    LOG_INFO(log_string)
 
     ! CALL omp_set_num_threads(max_num_threads)
     ! !$omp parallel
@@ -47,18 +50,14 @@ PROGRAM MAIN
     ! !$omp end parallel
     ! PRINT*, "Allocated threads", used_threads
 
+    CALL GET_INPUT("./input.nml")
     !N_NEIGHBOURS + N_NEXT_NEIGHBOURS = 9, to implement both pairings
     !2 because spin up-down and down-up,
     !2 because of complex number
-    !SUBLATTICES because of Ti1-Ti2 coupling and Ti2 - Ti1 coupling (stored in this order)
+    !LAYER_COUPLINGS because of Ti1-Ti2 coupling and Ti2 - Ti1 coupling (stored in this order) for nearest-neighbours
     !DIM_POSITIVE_K included due to Charge density self-consistency
-    delta_real_elems = DIM_POSITIVE_K + ORBITALS*N_ALL_NEIGHBOURS*2*2*SUBLATTICES !SUBLATTICES should be excluded in absence of magnetic field
+    delta_real_elems = DIM_POSITIVE_K + ORBITALS*2*2*(N_NEIGHBOURS*LAYER_COUPLINGS + N_NEXT_NEIGHBOURS*SUBLATTICES)
 
-    CALL GET_INPUT("./input.nml")
-
-    CALL INIT_LOGGER("")
-    WRITE (log_string,*) "Max num threads", max_num_threads
-    LOG_INFO(log_string)
     !Basis
     !c_{k,yz,Ti1,up}, c_{k,zx,Ti1,up}, c_{k,xy,Ti1,up},
     !c_{k,yz,Ti2,up}, c_{k,zx,Ti2,up}, c_{k,xy,Ti2,up},
@@ -69,10 +68,15 @@ PROGRAM MAIN
     ALLOCATE(Hamiltonian_const(DIM,DIM))
     ALLOCATE(U_transformation(DIM,DIM))
     ALLOCATE(Energies(DIM))
-    ALLOCATE(Delta_local(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES))    !Third dimension for spin coupling up-down and down-up
-    ALLOCATE(Delta_new(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES))
-    ALLOCATE(Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES))
-    ALLOCATE(Gamma_SC_new(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES))
+    ALLOCATE(Delta_local(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS))    !Third dimension for spin coupling up-down and down-up
+                                                                           !Fourth dimension for coupling between sublattices/layers
+                                                                           !Coupling with nearest neighbours is inter-layer, thus we include both
+                                                                           !Ti1 - Ti2 coupling and Ti2 - Ti1 coupling separately.
+                                                                           !For next-to-nearest neighbours we only include Ti1-Ti1 etc. coupling
+                                                                           !Due to its intra-layer character
+    ALLOCATE(Delta_new(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS))
+    ALLOCATE(Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS))
+    ALLOCATE(Gamma_SC_new(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS))
     ALLOCATE(Delta_broyden(delta_real_elems))   !Flattened Gamma array
     ALLOCATE(Delta_new_broyden(delta_real_elems))
     ALLOCATE(Charge_dens(DIM_POSITIVE_K))
@@ -125,10 +129,8 @@ PROGRAM MAIN
     CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:,:))
     CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:,:))
     CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian_const(:,:))
-    DO n = 1, DIM_POSITIVE_K
-        Hamiltonian_const(n,n) = Hamiltonian_const(n,n) - E_Fermi
-        Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) = Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) + E_Fermi
-    END DO
+    CALL COMPUTE_LAYER_POTENTIAL(Hamiltonian_const(:,:))
+    CALL COMPUTE_FERMI_ENERGY(Hamiltonian_const(:,:))
     CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
 
     OPEN(unit = 99, FILE= "./OutputData/Convergence.dat", FORM = "FORMATTED", ACTION = "WRITE")
@@ -196,12 +198,11 @@ PROGRAM MAIN
         !Gamma calculation
         DO spin = 1,2   !Loop over spin coupling up-down or down-up
             DO n = 1, N_NEIGHBOURS !Loop over neighbours
-                DO lat = 1, SUBLATTICES !Loop over sublattices coupling
+                DO lat = 1, LAYER_COUPLINGS !Loop over LAYER_COUPLINGS to include Ti1-Ti2 and Ti2-Ti1 coupling
                     DO orb = 1, ORBITALS
                         Gamma_SC_new(orb,n,spin,lat) = -0.5*J_SC*Delta_new(orb,n,spin,lat)
                         DO orb_prime = 1, ORBITALS
                             IF(orb .NE. orb_prime) THEN
-                                ! CHECK WHETHER THIS IS 0.25 OR 0.5
                                 Gamma_SC_new(orb,n,spin,lat) = Gamma_SC_new(orb,n,spin,lat) - 0.5 * J_SC_PRIME * Delta_new(orb_prime, n,spin,lat)
                             END IF
                         END DO
@@ -213,7 +214,7 @@ PROGRAM MAIN
         !Gamma for next nearest neighbours pairing
         DO spin = 1,2   !Loop over spin coupling up-down or down-up
             DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS !Loop over next nearest neighbours
-                DO lat = 1, SUBLATTICES !Loop over sublattices coupling
+                DO lat = 1, SUBLATTICES !Loop over sublattices coupling, since for next-to-nearest neighbours it has intra-layer character
                     DO orb = 1, ORBITALS
                         Gamma_SC_new(orb,n,spin,lat) = -0.5*J_SC_NNN*Delta_new(orb,n,spin,lat)
                         DO orb_prime = 1, ORBITALS
@@ -239,8 +240,8 @@ PROGRAM MAIN
         sc_flag = .TRUE.
         DO spin = 1, 2
             DO orb = 1, ORBITALS
-                DO n = 1, N_ALL_NEIGHBOURS
-                    DO lat = 1, SUBLATTICES !to 1 in absence of magnetic field to SUBLATTICES if else
+                DO n = 1, N_NEIGHBOURS
+                    DO lat = 1, LAYER_COUPLINGS
                         !It should be considered whether relative or absolute error must be checked
                         gamma_error = ABS( ABS(Gamma_SC_new(orb,n,spin,lat)) - ABS(Gamma_SC(orb,n,spin,lat)) )
                         !Gamma convergence checking
@@ -254,6 +255,21 @@ PROGRAM MAIN
 
                     END DO
                 END DO
+                DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
+                    DO lat = 1, SUBLATTICES
+                        !It should be considered whether relative or absolute error must be checked
+                        gamma_error = ABS( ABS(Gamma_SC_new(orb,n,spin,lat)) - ABS(Gamma_SC(orb,n,spin,lat)) )
+                        !Gamma convergence checking
+                        IF (gamma_error > gamma_eps_convergence) THEN
+                            sc_flag = .FALSE.
+                            !EXIT !Maybe go to???
+                        END IF
+
+                        !Find biggest error in current iteration
+                        IF (gamma_error > gamma_max_error) gamma_max_error = gamma_error
+
+                    END DO
+                END DO                
             END DO
         END DO
         !Change Broyden mixing parameter if simulation diverges between iterations
@@ -297,15 +313,8 @@ PROGRAM MAIN
             broyden_index = 1
             DO spin = 1, 2
                 DO orb = 1, ORBITALS
-                    DO n = 1, N_ALL_NEIGHBOURS
-                        DO lat = 1, SUBLATTICES !to 1 in absence of magnetic field to SUBLATTICES if else
-                            ! Delta_broyden(broyden_index) = REAL(Gamma_SC(orb,n,spin,lat))
-                            ! Delta_broyden(INT((delta_real_elems - DIM_POSITIVE_K)/2) + broyden_index) = AIMAG(Gamma_SC(orb,n,spin,lat))
-                            ! Delta_new_broyden(broyden_index) = REAL(Gamma_SC_new(orb,n,spin,lat))
-                            ! Delta_new_broyden(INT((delta_real_elems - DIM_POSITIVE_K)/2) + broyden_index) = AIMAG(Gamma_SC_new(orb,n,spin,lat))
-                            ! broyden_index = broyden_index + 1
-
-                            !Changed order of elements
+                    DO n = 1, N_NEIGHBOURS
+                        DO lat = 1, LAYER_COUPLINGS
                             Delta_broyden(broyden_index) = REAL(Gamma_SC(orb,n,spin,lat))
                             Delta_new_broyden(broyden_index) = REAL(Gamma_SC_new(orb,n,spin,lat))
                             broyden_index = broyden_index + 1
@@ -315,6 +324,18 @@ PROGRAM MAIN
                             broyden_index = broyden_index + 1
                         END DO
                     END DO
+                    DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
+                        DO lat = 1, SUBLATTICES
+                            Delta_broyden(broyden_index) = REAL(Gamma_SC(orb,n,spin,lat))
+                            Delta_new_broyden(broyden_index) = REAL(Gamma_SC_new(orb,n,spin,lat))
+                            broyden_index = broyden_index + 1
+
+                            Delta_broyden(broyden_index) = AIMAG(Gamma_SC(orb,n,spin,lat))
+                            Delta_new_broyden(broyden_index) = AIMAG(Gamma_SC_new(orb,n,spin,lat))
+                            broyden_index = broyden_index + 1
+                        END DO
+                    END DO
+
                 END DO
             END DO
 
@@ -340,9 +361,14 @@ PROGRAM MAIN
             broyden_index = 1
             DO spin = 1, 2
                 DO orb = 1, ORBITALS
-                    DO n = 1, N_ALL_NEIGHBOURS
-                        DO lat = 1, SUBLATTICES !to 1 in absence of magnetic field to SUBLATTICES if else
-                            !Gamma_SC(orb,n,spin,lat) = DCMPLX(Delta_broyden(broyden_index), Delta_broyden(INT((delta_real_elems - DIM_POSITIVE_K)/2) + broyden_index))
+                    DO n = 1, N_NEIGHBOURS
+                        DO lat = 1, LAYER_COUPLINGS
+                            Gamma_SC(orb,n,spin,lat) = DCMPLX(Delta_broyden(broyden_index), Delta_broyden(broyden_index + 1))
+                            broyden_index = broyden_index + 2
+                        END DO
+                    END DO
+                    DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
+                        DO lat = 1, SUBLATTICES
                             Gamma_SC(orb,n,spin,lat) = DCMPLX(Delta_broyden(broyden_index), Delta_broyden(broyden_index + 1))
                             broyden_index = broyden_index + 2
                         END DO
@@ -404,4 +430,5 @@ PROGRAM MAIN
     DEALLOCATE(Charge_dens_local)
     DEALLOCATE(Charge_dens_new)
 
+    IF (ALLOCATED(V_layer)) DEALLOCATE(V_layer) !Deallocate global variable
 END PROGRAM MAIN

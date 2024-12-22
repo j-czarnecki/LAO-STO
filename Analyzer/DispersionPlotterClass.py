@@ -64,7 +64,42 @@ class DispersionPlotter(DataReader):
         lowestEnergy = np.min(self.dispersionDataframe.E)
         print(f"Lowest energy is {lowestEnergy} (meV)")
         self.dispersionDataframe.E -= lowestEnergy
-        self.dosDataframe.E -= lowestEnergy
+        if not self.dosDataframe.empty:
+            self.dosDataframe.E -= lowestEnergy
+
+    def plotFirstBrillouinZoneBoundary(self):
+        brillouinZoneVertices = np.zeros((7, 2))  # One more to close the polygon
+
+        brillouinZoneVertices[:, 0] = np.array(
+            [
+                4.0 * np.pi / (3 * np.sqrt(3.0)),
+                2.0 * np.pi / (3 * np.sqrt(3.0)),
+                -2.0 * np.pi / (3 * np.sqrt(3.0)),
+                -4.0 * np.pi / (3 * np.sqrt(3.0)),
+                -2.0 * np.pi / (3 * np.sqrt(3.0)),
+                2.0 * np.pi / (3 * np.sqrt(3.0)),
+                4.0 * np.pi / (3 * np.sqrt(3.0)),
+            ]
+        )
+
+        brillouinZoneVertices[:, 1] = np.array(
+            [
+                0.0,
+                -2.0 * np.pi / 3.0,
+                -2.0 * np.pi / 3.0,
+                0.0,
+                2.0 * np.pi / 3.0,
+                2.0 * np.pi / 3.0,
+                0.0,
+            ]
+        )
+        plt.plot(
+            brillouinZoneVertices[:, 0],
+            brillouinZoneVertices[:, 1],
+            "--",
+            color="black",
+            linewidth=0.8,
+        )
 
     def plotCrossection(
         self,
@@ -85,7 +120,7 @@ class DispersionPlotter(DataReader):
             xLabelOnPlot = r"$k_y~(\tilde{a}^{-1})$"
             fixedK = "kx"
 
-        plotEnergies = np.zeros((self.kPoints1D, nBands), dtype=np.float64)
+        plotEnergies = np.zeros((self.kPoints1D, nBands), dtype=np.float32)
         currentIndex = np.zeros(nBands, dtype=int)
         for i in range(self.dataLength):
             if self.dispersionDataframe[fixedK][i] == fixedKVal:
@@ -179,6 +214,8 @@ class DispersionPlotter(DataReader):
 
     def plotFermiCrossection(self, eFermi: float, dE: float, plotOutputPath: str):
         plt.figure()
+        self.plotFirstBrillouinZoneBoundary()
+
         for i in range(len(self.dispersionDataframe.N)):
             if np.abs(self.dispersionDataframe.E[i] - eFermi) < dE:
                 plt.plot(
@@ -196,8 +233,8 @@ class DispersionPlotter(DataReader):
         plt.title(r"$E_{Fermi} = $ " + str(eFermi) + " (meV)")
         plt.xlabel(r"$k_x~(\tilde{a}^{-1})$")
         plt.ylabel(r"$k_y~(\tilde{a}^{-1})$")
-        plt.xlim(-2.15, 2.15)
-        plt.ylim(-2.15, 2.15)
+        plt.xlim(-2.5, 2.5)
+        plt.ylim(-2.5, 2.5)
         plt.gca().set_aspect("equal", adjustable="box")
         plt.savefig(plotOutputPath)
         plt.close()
@@ -213,39 +250,8 @@ class DispersionPlotter(DataReader):
         plt.close()
 
     def plotSuperconductingGap(self, postfix: str, title: str):
-        brillouinZoneVertices = np.zeros((7, 2))  # One more to close the polygon
-
-        brillouinZoneVertices[:, 0] = np.array(
-            [
-                4.0 * np.pi / (3 * np.sqrt(3.0)),
-                2.0 * np.pi / (3 * np.sqrt(3.0)),
-                -2.0 * np.pi / (3 * np.sqrt(3.0)),
-                -4.0 * np.pi / (3 * np.sqrt(3.0)),
-                -2.0 * np.pi / (3 * np.sqrt(3.0)),
-                2.0 * np.pi / (3 * np.sqrt(3.0)),
-                4.0 * np.pi / (3 * np.sqrt(3.0)),
-            ]
-        )
-
-        brillouinZoneVertices[:, 1] = np.array(
-            [
-                0.0,
-                -2.0 * np.pi / 3.0,
-                -2.0 * np.pi / 3.0,
-                0.0,
-                2.0 * np.pi / 3.0,
-                2.0 * np.pi / 3.0,
-                0.0,
-            ]
-        )
         plt.figure()
-        plt.plot(
-            brillouinZoneVertices[:, 0],
-            brillouinZoneVertices[:, 1],
-            "--",
-            color="black",
-            linewidth=0.8,
-        )
+        self.plotFirstBrillouinZoneBoundary()
 
         plt.scatter(
             self.superconductingGapDataframe.kx,
@@ -283,42 +289,12 @@ class DispersionPlotter(DataReader):
         plt.close()
 
     def plotSuperconductingGapMap(self):
-        brillouinZoneVertices = np.zeros((7, 2))  # One more to close the polygon
-
-        brillouinZoneVertices[:, 0] = np.array(
-            [
-                4.0 * np.pi / (3 * np.sqrt(3.0)),
-                2.0 * np.pi / (3 * np.sqrt(3.0)),
-                -2.0 * np.pi / (3 * np.sqrt(3.0)),
-                -4.0 * np.pi / (3 * np.sqrt(3.0)),
-                -2.0 * np.pi / (3 * np.sqrt(3.0)),
-                2.0 * np.pi / (3 * np.sqrt(3.0)),
-                4.0 * np.pi / (3 * np.sqrt(3.0)),
-            ]
-        )
-
-        brillouinZoneVertices[:, 1] = np.array(
-            [
-                0.0,
-                -2.0 * np.pi / 3.0,
-                -2.0 * np.pi / 3.0,
-                0.0,
-                2.0 * np.pi / 3.0,
-                2.0 * np.pi / 3.0,
-                0.0,
-            ]
-        )
 
         # print(self.superconductingGapMap[1][1][1])
         for state in range(1, 7):
             plt.figure()
-            plt.plot(
-                brillouinZoneVertices[:, 0],
-                brillouinZoneVertices[:, 1],
-                "--",
-                color="black",
-                linewidth=0.8,
-            )
+            self.plotFirstBrillouinZoneBoundary()
+
             plt.scatter(
                 self.superconductingGapMap[state]["kx"],
                 self.superconductingGapMap[state]["ky"],

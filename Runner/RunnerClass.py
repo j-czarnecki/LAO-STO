@@ -12,15 +12,18 @@ from RunnerConfigClass import *
 class Runner(RunnerConfig):
     def __init__(self):
         RunnerConfig.__init__(self)
+        self.aresScratch = "/net/ascratch/people/plgjczarnecki/"
 
-    def run_slurm_param_value(self, paramValuePairs, isAres: bool = False):
+    def run_slurm_param_value(
+        self, paramValuePairs: list, runsDir: str, material: str, isAres: bool = False
+    ):
         """
         Sets all parameters given in key-value pairs.
         No need to specify J_SC_PRIME, since it is always set
         to be J_SC / 10
         """
         if isAres:
-            pathToAppend = f"/net/ascratch/people/plgjczarnecki/KTO-test/RUN"
+            pathToAppend = os.path.join(self.aresScratch, runsDir, "RUN")
         else:
             pathToAppend = f"RUN"
 
@@ -40,7 +43,13 @@ class Runner(RunnerConfig):
             os.mkdir(os.path.join(path, output_dir))
         os.chdir(path)
 
-        nml = self.LAO_STO_default_nml()  # creating default namelist
+        # Getting namelist with parameters
+        nml = f90nml.Namelist()
+        if material == "STO":
+            nml = self.LAO_STO_default_nml()
+        elif material == "KTO":
+            nml = self.LAO_KTO_default_nml()
+
         for pair in paramValuePairs:
             nml[pair[0]][pair[1]] = pair[2]  # editing all key-value pairs
         nml["physical_params"]["J_SC_PRIME"] = (
@@ -60,7 +69,7 @@ class Runner(RunnerConfig):
                 print(self.job_header, file=job_file)
 
             print("cd " + path, file=job_file)
-            print(os.path.join(runner_cwd, "..", "LAO_STO.x"), file=job_file)
+            print(os.path.join(runner_cwd, "..", "bin", "LAO_STO.x"), file=job_file)
 
         # queue slurm job
         simulate = subprocess.run(["sbatch", "job.sh"])
@@ -90,7 +99,7 @@ class Runner(RunnerConfig):
 
             print("cd " + runDir, file=job_file)
             print(
-                os.path.join(runner_cwd, "..", "POSTPROCESSING_LAO_STO.x"),
+                os.path.join(runner_cwd, "..", "bin", "POST_LAO_STO.x"),
                 file=job_file,
             )
 

@@ -1,9 +1,24 @@
+#include "macros_def.f90"
+
 MODULE mod_reader
 USE mod_parameters
+USE mod_logger
 IMPLICIT NONE
 SAVE
 
 !Default values, overwritten in get_input
+!Discretization
+INTEGER*4 :: k1_steps = 0
+INTEGER*4 :: k2_steps = 0
+INTEGER*4 :: SUBLATTICES = 2
+
+!Those parameters are in fact derived and recalculated if needed at GET_INPUT
+!(see SET_HAMILTONIAN_PARAMS)
+INTEGER*4 :: ORBITALS = 0
+INTEGER*4 :: TBA_DIM = 0
+INTEGER*4 :: DIM_POSITIVE_K = 0  !Hamiltonian for positive k i.e half of the Nambu space, *2 due to spin
+INTEGER*4 :: DIM = 0    !*2 to transform to Nambu Space.
+INTEGER*4 :: LAYER_COUPLINGS = 0 !This determines how many layer-related superconducting parameters have to be calculated.
 
 !Physical parameters
 REAL*8 :: T = 0.
@@ -22,12 +37,7 @@ REAL*8 :: J_SC_PRIME_NNN = 0.
 REAL*8 :: U_HUB = 0.
 REAL*8 :: V_HUB = 0.
 REAL*8 :: E_Fermi = 0.
-
-!Discretization
-INTEGER*4 :: k1_steps = 0
-INTEGER*4 :: k2_steps = 0
-
-
+REAL*8, ALLOCATABLE :: V_layer(:)
 
 !Self-consistency
 LOGICAL :: read_gamma_from_file = .FALSE.
@@ -103,11 +113,13 @@ NAMELIST /physical_params/  &
 & J_SC_PRIME_NNN,           &
 & U_HUB,                    &
 & V_HUB,                    &
-& E_Fermi
+& E_Fermi,                  &
+& V_layer
 
 NAMELIST /discretization/ &
 & k1_steps,               &
-& k2_steps
+& k2_steps,               &
+& SUBLATTICES
 
 NAMELIST /self_consistency/ &
 & read_gamma_from_file,     &
@@ -162,11 +174,50 @@ CONTAINS
 SUBROUTINE GET_INPUT(nmlfile)
     IMPLICIT NONE
     CHARACTER(LEN=*), INTENT(IN) :: nmlfile
+    INTEGER*4 :: i
 
     OPEN(unit = 9, FILE=nmlfile, FORM = "FORMATTED", ACTION = "READ", STATUS="OLD")
 
+    READ(9,NML=discretization)
+    WRITE(log_string, '(2(A, I0))') "k1_steps: ", k1_steps, &
+                                  & " k2_steps: ", k2_steps
+    LOG_INFO(log_string)
+
+    IF ((k1_steps .LE. 0) .OR. (k2_steps .LE. 0)) STOP "k_steps must be > 0"
+    IF (SUBLATTICES .LE. 0) STOP "SUBLATTICES must be > 0"
+    CALL SET_HAMILTONIAN_PARAMS()
+    WRITE(log_string, '(5(A, I0))') " SUBLATTICES: ", SUBLATTICES,&
+                                  & " ORBITALS: ", ORBITALS, &
+                                  & " TBA_DIM: ", TBA_DIM, &
+                                  & " DIM_POSITIVE_K: ", DIM_POSITIVE_K, &
+                                  & " DIM: ", DIM
+    LOG_INFO(log_string)
+
+    !This is crucial
+    ALLOCATE(V_layer(SUBLATTICES))
+
     !TODO: WRITE BETTER CHECKS!!!!!!!!!!!!!!!!!!
     READ(9,NML=physical_params)
+    WRITE(log_string, '(16(A, E15.5))') "T: ", T,&
+                                     & " t_D: ", t_D,&
+                                     & " t_I: ", t_I,&
+                                     & " t_Rashba: ", t_Rashba,&
+                                     & " lambda_SOC: ", lambda_SOC,&
+                                     & " DELTA_TRI: ", DELTA_TRI,&
+                                     & " v: ", v,&
+                                     & " V_pdp: ", V_pdp,&
+                                     & " V_pds: ", V_pds,&
+                                     & " J_SC: ", J_SC,&
+                                     & " J_SC_PRIME: ", J_SC_PRIME,&
+                                     & " J_SC_NNN: ", J_SC_NNN,&
+                                     & " J_SC_PRIME_NNN: ", J_SC_PRIME_NNN,&
+                                     & " U_HUB: ", U_HUB,&
+                                     & " V_HUB: ", V_HUB,&
+                                     & " E_Fermi: ", E_Fermi
+    LOG_INFO(log_string)
+    WRITE(log_string, *) "V_layer: ", (V_layer(i), i = 1, SUBLATTICES)
+    LOG_INFO(log_string)
+
     !Check input data
     IF (T < 0) STOP "Temperature in kelvins must be >= 0!"
 
@@ -186,11 +237,23 @@ SUBROUTINE GET_INPUT(nmlfile)
     U_HUB = U_HUB * meV2au
     V_HUB = V_HUB * meV2au
     E_Fermi = E_Fermi * meV2au
-
-    READ(9,NML=discretization)
-    IF ((k1_steps .LE. 0) .OR. (k2_steps .LE. 0)) STOP "k_steps must be > 0"
+    V_layer = V_layer * meV2au
 
     READ(9,NML=self_consistency)
+    WRITE(log_string, '(2(A, I0, 2A), 10(A, E15.5))') "read_gamma_from_file: ", read_gamma_from_file,&
+                                                    & " path_to_gamma_start: ", TRIM(path_to_gamma_start),&
+                                                    & " read_charge_from_file: ", read_charge_from_file,&
+                                                    & " path_to_charge_start: ", TRIM(path_to_charge_start),&
+                                                    & " gamma_start: ", gamma_start,&
+                                                    & " gamma_nnn_start: ", gamma_nnn_start,&
+                                                    & " charge_start: ", charge_start,&
+                                                    & " max_sc_iter: ", max_sc_iter,&
+                                                    & " sc_alpha: ", sc_alpha,&
+                                                    & " sc_alpha_adapt: ", sc_alpha_adapt,&
+                                                    & " gamma_eps_convergence: ", gamma_eps_convergence,&
+                                                    & " charge_eps_convergence: ", charge_eps_convergence
+    LOG_INFO(log_string)
+
     IF (read_gamma_from_file .AND. path_to_gamma_start == "") STOP "If read_gamma_from_file == .TRUE. then path_to_gamma_start must not be empty" 
     IF (read_charge_from_file .AND. path_to_charge_start == "") STOP "If read_charge_from_file == .TRUE. then path_to_charge_start must not be empty" 
     IF (charge_start .LT. 0) STOP "charge_start must be >= 0"
@@ -210,6 +273,14 @@ SUBROUTINE GET_INPUT(nmlfile)
     eta_p = v * SQRT(3.) / 3.905 * nm2au
 
     READ(9, NML=romberg_integration)
+    WRITE(log_string, '(2((A, E15.5), 2(A, I0)))') "romb_eps_x: ", romb_eps_x, &
+                                                 & " interpolation_deg_x: ", interpolation_deg_x, &
+                                                 & " max_grid_refinements_x: ", max_grid_refinements_x, &
+                                                 & " romb_eps_y: ", romb_eps_y, &
+                                                 & " interpolation_deg_y: ", interpolation_deg_y, &
+                                                 & " max_grid_refinements_y: ", max_grid_refinements_y
+    LOG_INFO(log_string)
+
     IF (romb_eps_x .LE. 0) STOP "romb_eps_x must be > 0"
     IF (interpolation_deg_x .LE. 0) STOP "interpolation_deg_x must be > 0"
     IF (max_grid_refinements_x .LE. 0) STOP "max_grid_refinements_x must be > 0"
@@ -217,8 +288,6 @@ SUBROUTINE GET_INPUT(nmlfile)
     IF (romb_eps_y .LE. 0) STOP "romb_eps_y must be > 0"
     IF (interpolation_deg_y .LE. 0) STOP "interpolation_deg_y must be > 0"
     IF (max_grid_refinements_y .LE. 0) STOP "max_grid_refinements_y must be > 0"
-
-
 
     CLOSE(9)
 
@@ -259,6 +328,7 @@ SUBROUTINE GET_POSTPROCESSING_INPUT(nmlfile)
         IF (Nk_points_dos .LE. 0) STOP "Nk_points_dos must be > 0"
         E_DOS_min = E_DOS_min * meV2au
         E_DOS_max = E_DOS_max * meV2au
+        zeta_DOS = zeta_DOS * meV2au
         dE0 = dE0 * meV2au
     END IF
 
@@ -269,7 +339,7 @@ END SUBROUTINE GET_POSTPROCESSING_INPUT
 
 SUBROUTINE GET_GAMMA_SC(Gamma_SC, path)
     CHARACTER(LEN=*), INTENT(IN) :: path
-    COMPLEX*16, INTENT(OUT) :: Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES)
+    COMPLEX*16, INTENT(OUT) :: Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS)
     INTEGER*4 :: n, lat, orb,spin
     INTEGER*4 :: n_read, lat_read, orb_read, spin_read
     REAL*8 :: Gamma_re, Gamma_im
@@ -281,7 +351,17 @@ SUBROUTINE GET_GAMMA_SC(Gamma_SC, path)
     READ(9,*)
 
     DO spin =1, 2
-        DO n = 1, N_ALL_NEIGHBOURS
+        DO n = 1, N_NEIGHBOURS
+            DO lat = 1, SUBLATTICES
+                DO orb = 1, ORBITALS
+                    READ(9, output_format) spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
+                    Gamma_SC(orb_read, n_read, spin_read, lat_read) = DCMPLX(Gamma_re, Gamma_im)*meV2au
+                END DO
+            END DO
+            READ(9,*)
+            READ(9,*)
+        END DO
+        DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
             DO lat = 1, SUBLATTICES
                 DO orb = 1, ORBITALS
                     READ(9, output_format) spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
@@ -314,5 +394,15 @@ SUBROUTINE GET_CHARGE_DENS(Charge_dens, path)
     CLOSE(9)
 
 END SUBROUTINE GET_CHARGE_DENS
+
+SUBROUTINE SET_HAMILTONIAN_PARAMS()
+    !! This subroutine sets global variables that define dimension of hamiltonian in calculation
+    !! SUBLATTICES should have been set beffore at reading input.nml
+    ORBITALS = 3
+    TBA_DIM = ORBITALS*SUBLATTICES
+    DIM_POSITIVE_K = TBA_DIM*2  !Hamiltonian for positive k i.e half of the Nambu space, *2 due to spin
+    DIM = DIM_POSITIVE_K*2    !*2 to transform to Nambu Space.
+    LAYER_COUPLINGS = 2*(SUBLATTICES - 1)
+END SUBROUTINE
 
 END MODULE mod_reader

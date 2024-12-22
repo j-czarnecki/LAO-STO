@@ -2,133 +2,114 @@ MODULE mod_hamiltonians
 USE mod_utilities
 USE mod_parameters
 USE mod_reader
-IMPLICIT NONE 
+IMPLICIT NONE
 CONTAINS
 
 
 RECURSIVE SUBROUTINE COMPUTE_TBA_TERM(Hamiltonian, kx, ky)
-    IMPLICIT NONE 
+    IMPLICIT NONE
     REAL*8, INTENT(INOUT) :: kx, ky
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM) !Twice as big because of spin
+    INTEGER*4 :: spin, lat, row, col
     !Only specifying upper triangle of matrix, since Hamiltonian is hermitian
-    !spin up
-    Hamiltonian(1,4) = epsilon_yz(kx, ky)
-    Hamiltonian(2,5) = epsilon_zx(kx, ky)
-    Hamiltonian(3,6) = epsilon_xy(kx, ky)
-    !spin down
-    Hamiltonian(TBA_DIM + 1,TBA_DIM + 4) = epsilon_yz(kx, ky)
-    Hamiltonian(TBA_DIM + 2,TBA_DIM + 5) = epsilon_zx(kx, ky)
-    Hamiltonian(TBA_DIM + 3,TBA_DIM + 6) = epsilon_xy(kx, ky)
+    DO spin = 0, 1
+        DO lat = 0, SUBLATTICES - 2
+            !Kinetic hopping between nearest neighbours (different sublattices/ Ti layers)
+            row = spin*TBA_DIM + lat*ORBITALS + 1
+            col = spin*TBA_DIM + (lat + 1)*ORBITALS + 1
+
+            Hamiltonian(row, col) = Hamiltonian(row, col) + epsilon_yz(kx, ky)
+            Hamiltonian(row + 1, col + 1) = Hamiltonian(row + 1, col + 1) + epsilon_zx(kx, ky)
+            Hamiltonian(row + 2, col + 2) = Hamiltonian(row + 2, col + 2) + epsilon_xy(kx, ky)
+        END DO
+    END DO
 
     !Nambu space: H(k) -> -H(-k)
     kx = -kx
     ky = -ky
-    !spin up
-    Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 4) = -CONJG(epsilon_yz(kx, ky))
-    Hamiltonian(DIM_POSITIVE_K + 2, DIM_POSITIVE_K + 5) = -CONJG(epsilon_zx(kx, ky))
-    Hamiltonian(DIM_POSITIVE_K + 3, DIM_POSITIVE_K + 6) = -CONJG(epsilon_xy(kx, ky))
-    !spin down
-    Hamiltonian(DIM_POSITIVE_K + TBA_DIM + 1, DIM_POSITIVE_K + TBA_DIM + 4) = -CONJG(epsilon_yz(kx, ky))
-    Hamiltonian(DIM_POSITIVE_K + TBA_DIM + 2, DIM_POSITIVE_K + TBA_DIM + 5) = -CONJG(epsilon_zx(kx, ky))
-    Hamiltonian(DIM_POSITIVE_K + TBA_DIM + 3, DIM_POSITIVE_K + TBA_DIM + 6) = -CONJG(epsilon_xy(kx, ky))
+    DO spin = 0, 1
+        DO lat = 0, SUBLATTICES - 2
+            !Kinetic hopping between nearest neighbours (different sublattices/ Ti layers)
+            row = DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + 1
+            col = DIM_POSITIVE_K + spin*TBA_DIM + (lat + 1)*ORBITALS + 1
+
+            Hamiltonian(row, col) = Hamiltonian(row, col) - CONJG(epsilon_yz(kx, ky))
+            Hamiltonian(row + 1, col + 1) = Hamiltonian(row + 1, col + 1) - CONJG(epsilon_zx(kx, ky))
+            Hamiltonian(row + 2, col + 2) = Hamiltonian(row + 2, col + 2) - CONJG(epsilon_xy(kx, ky))
+        END DO
+    END DO
     kx = -kx
     ky = -ky
 
 END SUBROUTINE COMPUTE_TBA_TERM
 
 RECURSIVE SUBROUTINE COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian)
-    IMPLICIT NONE 
+    IMPLICIT NONE
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
+    INTEGER*4 :: nambu, lat, row, col
+    REAL*8 :: sign
 
-    !Ti1 atoms
-    Hamiltonian(1,2) = Hamiltonian(1,2) + imag*lambda_SOC/2.
-    Hamiltonian(7,8) = Hamiltonian(7,8) - imag*lambda_SOC/2.
-    Hamiltonian(1,9) = Hamiltonian(1,9) - lambda_SOC/2.
-    Hamiltonian(2,9) = Hamiltonian(2,9) + imag*lambda_SOC/2.
-    Hamiltonian(3,7) = Hamiltonian(3,7) + lambda_SOC/2.
-    Hamiltonian(3,8) = Hamiltonian(3,8) - imag*lambda_SOC/2.
+    DO nambu = 0, 1
+        sign = (-1)**nambu
+        DO lat = 0, SUBLATTICES - 1
+            row = nambu*DIM_POSITIVE_K + lat*ORBITALS + 1
+            col = nambu*DIM_POSITIVE_K + lat*ORBITALS + 2
+            Hamiltonian(row, col) = Hamiltonian(row, col) + imag*lambda_SOC/2.
 
-    !Ti2 atoms
-    Hamiltonian(4,5) = Hamiltonian(4,5) + imag*lambda_SOC/2.
-    Hamiltonian(10,11) = Hamiltonian(10,11) - imag*lambda_SOC/2.
-    Hamiltonian(4,12) = Hamiltonian(4,12) - lambda_SOC/2.
-    Hamiltonian(5,12) = Hamiltonian(5,12) + imag*lambda_SOC/2.
-    Hamiltonian(6,10) = Hamiltonian(6,10) + lambda_SOC/2.
-    Hamiltonian(6,11) = Hamiltonian(6,11) - imag*lambda_SOC/2.
+            row = nambu*DIM_POSITIVE_K + TBA_DIM + lat*ORBITALS + 1
+            col = nambu*DIM_POSITIVE_K + TBA_DIM + lat*ORBITALS + 2
+            Hamiltonian(row, col) = Hamiltonian(row, col) - imag*lambda_SOC/2.
 
-    !Nambu space
-    !Ti1 atoms
-    Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 2) = Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 2) + imag*lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 7, DIM_POSITIVE_K + 8) = Hamiltonian(DIM_POSITIVE_K + 7, DIM_POSITIVE_K + 8) - imag*lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 9) = Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 9) + lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 2, DIM_POSITIVE_K + 9) = Hamiltonian(DIM_POSITIVE_K + 2, DIM_POSITIVE_K + 9) + imag*lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 3, DIM_POSITIVE_K + 7) = Hamiltonian(DIM_POSITIVE_K + 3, DIM_POSITIVE_K + 7) - lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 3, DIM_POSITIVE_K + 8) = Hamiltonian(DIM_POSITIVE_K + 3, DIM_POSITIVE_K + 8) - imag*lambda_SOC/2.
+            row = nambu*DIM_POSITIVE_K + lat*ORBITALS + 1
+            col = nambu*DIM_POSITIVE_K + TBA_DIM + lat*ORBITALS + 3
+            Hamiltonian(row, col) = Hamiltonian(row, col) - sign*lambda_SOC/2. !Only real elements change sign here
+    
+            row = nambu*DIM_POSITIVE_K + lat*ORBITALS + 2
+            col = nambu*DIM_POSITIVE_K + TBA_DIM + lat*ORBITALS + 3
+            Hamiltonian(row, col) = Hamiltonian(row, col) + imag*lambda_SOC/2.
 
-    !Ti2 atoms
-    Hamiltonian(DIM_POSITIVE_K + 4, DIM_POSITIVE_K + 5) = Hamiltonian(DIM_POSITIVE_K + 4,DIM_POSITIVE_K + 5) + imag*lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 10, DIM_POSITIVE_K + 11) = Hamiltonian(DIM_POSITIVE_K + 10,DIM_POSITIVE_K + 11) - imag*lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 4, DIM_POSITIVE_K + 12) = Hamiltonian(DIM_POSITIVE_K + 4,DIM_POSITIVE_K + 2) + lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 5, DIM_POSITIVE_K + 12) = Hamiltonian(DIM_POSITIVE_K + 5,DIM_POSITIVE_K + 2) + imag*lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 6, DIM_POSITIVE_K + 10) = Hamiltonian(DIM_POSITIVE_K + 6,DIM_POSITIVE_K + 0) - lambda_SOC/2.
-    Hamiltonian(DIM_POSITIVE_K + 6, DIM_POSITIVE_K + 11) = Hamiltonian(DIM_POSITIVE_K + 6,DIM_POSITIVE_K + 1) - imag*lambda_SOC/2.
+            row = nambu*DIM_POSITIVE_K + lat*ORBITALS + 3
+            col = nambu*DIM_POSITIVE_K + TBA_DIM + lat*ORBITALS + 1
+            Hamiltonian(row, col) = Hamiltonian(row, col) + sign*lambda_SOC/2. !Only real elements change sign here
+
+            row = nambu*DIM_POSITIVE_K + lat*ORBITALS + 3
+            col = nambu*DIM_POSITIVE_K + TBA_DIM + lat*ORBITALS + 2
+            Hamiltonian(row, col) = Hamiltonian(row, col) - imag*lambda_SOC/2.
+        END DO
+    END DO
 
 END SUBROUTINE COMPUTE_ATOMIC_SOC_TERMS
 
 RECURSIVE SUBROUTINE COMPUTE_TRIGONAL_TERMS(Hamiltonian)
-    IMPLICIT NONE 
+    IMPLICIT NONE
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
+    INTEGER*4 :: lat, spin, nambu, row, col
+    REAL*8 :: sign
 
-    !Spin up
-    !Ti 1 atoms
-    Hamiltonian(1,2) = Hamiltonian(1,2) + DELTA_TRI/2.
-    Hamiltonian(1,3) = Hamiltonian(1,3) + DELTA_TRI/2.
-    Hamiltonian(2,3) = Hamiltonian(2,3) + DELTA_TRI/2.
-    !Ti 2 atoms
-    Hamiltonian(ORBITALS + 1, ORBITALS + 2) = Hamiltonian(ORBITALS + 1, ORBITALS + 2) + DELTA_TRI/2.
-    Hamiltonian(ORBITALS + 1, ORBITALS + 3) = Hamiltonian(ORBITALS + 1, ORBITALS + 3) + DELTA_TRI/2.
-    Hamiltonian(ORBITALS + 2, ORBITALS + 3) = Hamiltonian(ORBITALS + 2, ORBITALS + 3) + DELTA_TRI/2.
-    
-    !Spin down
-    !Ti 1 atoms
-    Hamiltonian(1 + TBA_DIM,2 + TBA_DIM) = Hamiltonian(1 + TBA_DIM,2 + TBA_DIM) + DELTA_TRI/2.
-    Hamiltonian(1 + TBA_DIM,3 + TBA_DIM) = Hamiltonian(1 + TBA_DIM,3 + TBA_DIM) + DELTA_TRI/2.
-    Hamiltonian(2 + TBA_DIM,3 + TBA_DIM) = Hamiltonian(2 + TBA_DIM,3 + TBA_DIM) + DELTA_TRI/2.
-    !Ti 2 atoms
-    Hamiltonian(1 + ORBITALS + TBA_DIM,2 + ORBITALS + TBA_DIM) = Hamiltonian(1 + ORBITALS + TBA_DIM,2 + ORBITALS + TBA_DIM) + DELTA_TRI/2.
-    Hamiltonian(1 + ORBITALS + TBA_DIM,3 + ORBITALS + TBA_DIM) = Hamiltonian(1 + ORBITALS + TBA_DIM,3 + ORBITALS + TBA_DIM) + DELTA_TRI/2.
-    Hamiltonian(2 + ORBITALS + TBA_DIM,3 + ORBITALS + TBA_DIM) = Hamiltonian(2 + ORBITALS + TBA_DIM,3 + ORBITALS + TBA_DIM) + DELTA_TRI/2.
+    DO nambu = 0, 1
+        sign = (-1)**nambu
+        DO lat = 0, SUBLATTICES - 1
+            DO spin = 0, 1
+                row = nambu*DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + 1
+                col = nambu*DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + 2
+                Hamiltonian(row, col) = Hamiltonian(row, col) + sign*DELTA_TRI/2.
+                
+                row = nambu*DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + 1
+                col = nambu*DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + 3
+                Hamiltonian(row, col) = Hamiltonian(row, col) + sign*DELTA_TRI/2.
 
-
-    !Nambu space
-    !Spin up
-    !Ti 1 atoms
-    Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 2) = Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 2) - DELTA_TRI/2.
-    Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 3) = Hamiltonian(DIM_POSITIVE_K + 1, DIM_POSITIVE_K + 3) - DELTA_TRI/2.
-    Hamiltonian(DIM_POSITIVE_K + 2, DIM_POSITIVE_K + 3) = Hamiltonian(DIM_POSITIVE_K + 2, DIM_POSITIVE_K + 3) - DELTA_TRI/2.
-    !Ti 2 atoms
-    Hamiltonian(DIM_POSITIVE_K + ORBITALS + 1, DIM_POSITIVE_K + ORBITALS + 2) = Hamiltonian(DIM_POSITIVE_K + ORBITALS + 1, DIM_POSITIVE_K + ORBITALS + 2) - DELTA_TRI/2.
-    Hamiltonian(DIM_POSITIVE_K + ORBITALS + 1, DIM_POSITIVE_K + ORBITALS + 3) = Hamiltonian(DIM_POSITIVE_K + ORBITALS + 1, DIM_POSITIVE_K + ORBITALS + 3) - DELTA_TRI/2.
-    Hamiltonian(DIM_POSITIVE_K + ORBITALS + 2, DIM_POSITIVE_K + ORBITALS + 3) = Hamiltonian(DIM_POSITIVE_K + ORBITALS + 2, DIM_POSITIVE_K + ORBITALS + 3) - DELTA_TRI/2.
-    
-    !Spin down
-    !Ti 1 atoms
-    Hamiltonian(DIM_POSITIVE_K + 1 + TBA_DIM, DIM_POSITIVE_K + 2 + TBA_DIM) = Hamiltonian(DIM_POSITIVE_K + 1 + TBA_DIM, DIM_POSITIVE_K + 2 + TBA_DIM) - DELTA_TRI/2.
-    Hamiltonian(DIM_POSITIVE_K + 1 + TBA_DIM, DIM_POSITIVE_K + 3 + TBA_DIM) = Hamiltonian(DIM_POSITIVE_K + 1 + TBA_DIM, DIM_POSITIVE_K + 3 + TBA_DIM) - DELTA_TRI/2.
-    Hamiltonian(DIM_POSITIVE_K + 2 + TBA_DIM, DIM_POSITIVE_K + 3 + TBA_DIM) = Hamiltonian(DIM_POSITIVE_K + 2 + TBA_DIM, DIM_POSITIVE_K + 3 + TBA_DIM) - DELTA_TRI/2.
-    !Ti 2 atoms
-    Hamiltonian(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K,2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K,2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - DELTA_TRI/2.
-    Hamiltonian(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K,3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K,3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - DELTA_TRI/2.
-    Hamiltonian(2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K,3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K,3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - DELTA_TRI/2.
-
-
-
+                row = nambu*DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + 2
+                col = nambu*DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + 3
+                Hamiltonian(row, col) = Hamiltonian(row, col) + sign*DELTA_TRI/2.
+            END DO
+        END DO
+    END DO
 
 END SUBROUTINE COMPUTE_TRIGONAL_TERMS
 
 
 RECURSIVE SUBROUTINE COMPUTE_ELECTRIC_FIELD(Hamiltonian)
-    IMPLICIT NONE 
+    IMPLICIT NONE
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
     INTEGER*4 :: i
 
@@ -152,7 +133,7 @@ RECURSIVE SUBROUTINE COMPUTE_ELECTRIC_FIELD(Hamiltonian)
 END SUBROUTINE COMPUTE_ELECTRIC_FIELD
 
 RECURSIVE SUBROUTINE COMPUTE_TI1_TI2(Hamiltonian,kx, ky)
-    IMPLICIT NONE 
+    IMPLICIT NONE
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
     REAL*8, INTENT(INOUT) :: kx, ky
     !Spin-up part
@@ -196,13 +177,13 @@ RECURSIVE SUBROUTINE COMPUTE_TI1_TI2(Hamiltonian,kx, ky)
 END SUBROUTINE COMPUTE_TI1_TI2
 
 RECURSIVE SUBROUTINE COMPUTE_H_PI(Hamiltonian, kx, ky)
-    IMPLICIT NONE 
+    IMPLICIT NONE
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
     REAL*8, INTENT(INOUT) :: kx, ky
     REAL*8 :: k1, k2, k3
 
-    k1 = -SQRT(3.)/2.*kx + 3./2.*ky 
-    k2 = -SQRT(3.)/2.*kx - 3./2.*ky 
+    k1 = -SQRT(3.)/2.*kx + 3./2.*ky
+    k2 = -SQRT(3.)/2.*kx - 3./2.*ky
     k3 = SQRT(3.)*kx
 
     !Spin up, Ti1
@@ -249,12 +230,12 @@ RECURSIVE SUBROUTINE COMPUTE_H_PI(Hamiltonian, kx, ky)
 END SUBROUTINE COMPUTE_H_PI
 
 RECURSIVE SUBROUTINE COMPUTE_H_SIGMA(Hamiltonian, kx, ky)
-    IMPLICIT NONE 
+    IMPLICIT NONE
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
     REAL*8, INTENT(INOUT) :: kx, ky
     REAL*8 :: k1, k2, k3
-    k1 = -SQRT(3.)/2.*kx + 3./2.*ky 
-    k2 = -SQRT(3.)/2.*kx - 3./2.*ky 
+    k1 = -SQRT(3.)/2.*kx + 3./2.*ky
+    k2 = -SQRT(3.)/2.*kx - 3./2.*ky
     k3 = SQRT(3.)*kx
 
     !Spin up, Ti1
@@ -302,74 +283,144 @@ SUBROUTINE COMPUTE_RASHBA_HOPPING(Hamiltonian, kx, ky)
     IMPLICIT NONE
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
     REAL*8, INTENT(INOUT) :: kx, ky
+    INTEGER*4 :: lat, spin, row, col
 
-    !First-second sublattice, spin up
-    Hamiltonian(1, ORBITALS + 2) = Hamiltonian(1, ORBITALS + 2) + rashba_yz_zx(kx, ky)
-    Hamiltonian(1, ORBITALS + 3) = Hamiltonian(1, ORBITALS + 3) + rashba_yz_xy(kx, ky)
-    Hamiltonian(2, ORBITALS + 1) = Hamiltonian(2, ORBITALS + 1) - rashba_yz_zx(kx, ky)
-    Hamiltonian(2, ORBITALS + 3) = Hamiltonian(2, ORBITALS + 3) + rashba_zx_xy(kx, ky)
-    Hamiltonian(3, ORBITALS + 1) = Hamiltonian(3, ORBITALS + 1) - rashba_yz_xy(kx, ky)
-    Hamiltonian(3, ORBITALS + 2) = Hamiltonian(3, ORBITALS + 2) - rashba_zx_xy(kx, ky)
-    !First-second sublattice, spin down
-    Hamiltonian(1 + TBA_DIM, TBA_DIM + ORBITALS + 2) = Hamiltonian(1 + TBA_DIM, TBA_DIM + ORBITALS + 2) + rashba_yz_zx(kx, ky)
-    Hamiltonian(1 + TBA_DIM, TBA_DIM + ORBITALS + 3) = Hamiltonian(1 + TBA_DIM, TBA_DIM + ORBITALS + 3) + rashba_yz_xy(kx, ky)
-    Hamiltonian(2 + TBA_DIM, TBA_DIM + ORBITALS + 1) = Hamiltonian(2 + TBA_DIM, TBA_DIM + ORBITALS + 1) - rashba_yz_zx(kx, ky)
-    Hamiltonian(2 + TBA_DIM, TBA_DIM + ORBITALS + 3) = Hamiltonian(2 + TBA_DIM, TBA_DIM + ORBITALS + 3) + rashba_zx_xy(kx, ky)
-    Hamiltonian(3 + TBA_DIM, TBA_DIM + ORBITALS + 1) = Hamiltonian(3 + TBA_DIM, TBA_DIM + ORBITALS + 1) - rashba_yz_xy(kx, ky)
-    Hamiltonian(3 + TBA_DIM, TBA_DIM + ORBITALS + 2) = Hamiltonian(3 + TBA_DIM, TBA_DIM + ORBITALS + 2) - rashba_zx_xy(kx, ky)
+    DO spin = 0, 1
+        DO lat = 0, SUBLATTICES - 2
+            row = spin*TBA_DIM + lat*ORBITALS + 1
+            col = spin*TBA_DIM + (lat + 1)*ORBITALS + 2
+            Hamiltonian(row, col) = Hamiltonian(row, col) + rashba_yz_zx(kx, ky)
 
-    !Nambu space
+            row = spin*TBA_DIM + lat*ORBITALS + 1
+            col = spin*TBA_DIM + (lat + 1)*ORBITALS + 3
+            Hamiltonian(row, col) = Hamiltonian(row, col) + rashba_yz_xy(kx, ky)
+
+            row = spin*TBA_DIM + lat*ORBITALS + 2
+            col = spin*TBA_DIM + (lat + 1)*ORBITALS + 1
+            Hamiltonian(row, col) = Hamiltonian(row, col) - rashba_yz_zx(kx, ky)
+
+            row = spin*TBA_DIM + lat*ORBITALS + 2
+            col = spin*TBA_DIM + (lat + 1)*ORBITALS + 3
+            Hamiltonian(row, col) = Hamiltonian(row, col) + rashba_zx_xy(kx, ky)
+
+            row = spin*TBA_DIM + lat*ORBITALS + 3
+            col = spin*TBA_DIM + (lat + 1)*ORBITALS + 1
+            Hamiltonian(row, col) = Hamiltonian(row, col) - rashba_yz_xy(kx, ky)
+
+            row = spin*TBA_DIM + lat*ORBITALS + 3
+            col = spin*TBA_DIM + (lat + 1)*ORBITALS + 2
+            Hamiltonian(row, col) = Hamiltonian(row, col) - rashba_zx_xy(kx, ky)
+        END DO
+    END DO
+
+    !Nambu space: H(k) -> -H(-k)
     kx = -kx
     ky = -ky
+    DO spin = 0, 1
+        DO lat = 0, SUBLATTICES - 2
+            row = DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + 1
+            col = DIM_POSITIVE_K + spin*TBA_DIM + (lat + 1)*ORBITALS + 2
+            Hamiltonian(row, col) = Hamiltonian(row, col) - CONJG(rashba_yz_zx(kx, ky))
 
-    !First-second sublattice, spin up
-    Hamiltonian(1 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 2) = Hamiltonian(1 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 2) - CONJG(rashba_yz_zx(kx, ky))
-    Hamiltonian(1 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 3) = Hamiltonian(1 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 3) - CONJG(rashba_yz_xy(kx, ky))
-    Hamiltonian(2 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 1) = Hamiltonian(2 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 1) + CONJG(rashba_yz_zx(kx, ky))
-    Hamiltonian(2 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 3) = Hamiltonian(2 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 3) - CONJG(rashba_zx_xy(kx, ky))
-    Hamiltonian(3 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 1) = Hamiltonian(3 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 1) + CONJG(rashba_yz_xy(kx, ky))
-    Hamiltonian(3 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 2) = Hamiltonian(3 + DIM_POSITIVE_K, DIM_POSITIVE_K + ORBITALS + 2) + CONJG(rashba_zx_xy(kx, ky))
-    !First-second sublattice, spin down
-    Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 2) = Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 2) - CONJG(rashba_yz_zx(kx, ky))
-    Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 3) = Hamiltonian(1 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 3) - CONJG(rashba_yz_xy(kx, ky))
-    Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 1) = Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 1) + CONJG(rashba_yz_zx(kx, ky))
-    Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 3) = Hamiltonian(2 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 3) - CONJG(rashba_zx_xy(kx, ky))
-    Hamiltonian(3 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 1) = Hamiltonian(3 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 1) + CONJG(rashba_yz_xy(kx, ky))
-    Hamiltonian(3 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 2) = Hamiltonian(3 + TBA_DIM + DIM_POSITIVE_K, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 2) + CONJG(rashba_zx_xy(kx, ky))
+            row = DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + 1
+            col = DIM_POSITIVE_K + spin*TBA_DIM + (lat + 1)*ORBITALS + 3
+            Hamiltonian(row, col) = Hamiltonian(row, col) - CONJG(rashba_yz_xy(kx, ky))
 
+            row = DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + 2
+            col = DIM_POSITIVE_K + spin*TBA_DIM + (lat + 1)*ORBITALS + 1
+            Hamiltonian(row, col) = Hamiltonian(row, col) + CONJG(rashba_yz_zx(kx, ky))
+
+            row = DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + 2
+            col = DIM_POSITIVE_K + spin*TBA_DIM + (lat + 1)*ORBITALS + 3
+            Hamiltonian(row, col) = Hamiltonian(row, col) - CONJG(rashba_zx_xy(kx, ky))
+
+            row = DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + 3
+            col = DIM_POSITIVE_K + spin*TBA_DIM + (lat + 1)*ORBITALS + 1
+            Hamiltonian(row, col) = Hamiltonian(row, col) + CONJG(rashba_yz_xy(kx, ky))
+
+            row = DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + 3
+            col = DIM_POSITIVE_K + spin*TBA_DIM + (lat + 1)*ORBITALS + 2
+            Hamiltonian(row, col) = Hamiltonian(row, col) + CONJG(rashba_zx_xy(kx, ky))
+        END DO
+    END DO
     kx = -kx
     ky = -ky
 END SUBROUTINE COMPUTE_RASHBA_HOPPING
 
+SUBROUTINE COMPUTE_LAYER_POTENTIAL(Hamiltonian)
+    IMPLICIT NONE
+    COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
+    INTEGER*4 :: nambu, spin, lat, orb, row
+    REAL*8 :: sign
+    
+    DO nambu = 0, 1
+        sign = (-1)**nambu
+        DO spin = 0, 1
+            DO lat = 0, SUBLATTICES - 1
+                DO orb = 1, ORBITALS
+                    row = nambu*DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb
+                    Hamiltonian(row, row) = Hamiltonian(row, row) + sign*V_layer(lat + 1) !lat + 1, because we cannot start from 0
+                END DO
+            END DO
+        END DO
+    END DO
+END SUBROUTINE COMPUTE_LAYER_POTENTIAL
+
+SUBROUTINE COMPUTE_FERMI_ENERGY(Hamiltonian)
+    IMPLICIT NONE
+    COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
+    INTEGER*4 :: nambu, i, row
+    REAL*8 :: sign
+
+    DO nambu = 0, 1
+        sign = (-1)**nambu
+        DO i = 1, DIM_POSITIVE_K
+            row = nambu*DIM_POSITIVE_K + i
+            Hamiltonian(row, row) = Hamiltonian(row, row) - sign*E_Fermi
+        END DO
+    END DO
+END SUBROUTINE COMPUTE_FERMI_ENERGY
+
 RECURSIVE SUBROUTINE COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC)
     IMPLICIT NONE
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
-    COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2,SUBLATTICES)
+    COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2,LAYER_COUPLINGS)
     REAL*8, INTENT(IN) :: kx, ky
-    INTEGER*4 :: orb, lat, spin
+    INTEGER*4 :: orb, lat, spin, row, col, gamma_spin_index, gamma_lat_index
 
     !Nearest neighbours pairing
     DO orb = 1, ORBITALS
-        !Up - down Ti1 - Ti2 coupling
-        Hamiltonian(orb, orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM) = Hamiltonian(orb, orb + ORBITALS + DIM_POSITIVE_K + TBA_DIM) + &
-        & Gamma_SC(orb,1,2,2) * pairing_1(ky) + Gamma_SC(orb,2,2,2) * pairing_2(kx,ky) + Gamma_SC(orb,3,2,2) * pairing_3(kx,ky)
-        !Up - down Ti2 - Ti1 coupling
-        Hamiltonian(orb + ORBITALS, orb + DIM_POSITIVE_K + TBA_DIM) = Hamiltonian(orb + ORBITALS, orb + DIM_POSITIVE_K + TBA_DIM) + &
-        & Gamma_SC(orb,1,2,1) * CONJG(pairing_1(ky)) + Gamma_SC(orb,2,2,1) * CONJG(pairing_2(kx,ky)) + Gamma_SC(orb,3,2,1) * CONJG(pairing_3(kx,ky))
+        DO spin = 0, 1
+            gamma_spin_index = MOD(spin + 1, 2) + 1
+            DO lat = 0, LAYER_COUPLINGS - 1, 2
+                gamma_lat_index = lat + 2
+                !Ti1 - Ti2 coupling
+                row = spin*TBA_DIM + orb + lat*ORBITALS
+                col = orb + (lat+1)*ORBITALS + DIM_POSITIVE_K + TBA_DIM*MOD(spin + 1, 2)
+                Hamiltonian(row, col) = Hamiltonian(row, col) + &
+                & Gamma_SC(orb,1,gamma_spin_index, gamma_lat_index) * pairing_1(ky) +&
+                & Gamma_SC(orb,2,gamma_spin_index, gamma_lat_index) * pairing_2(kx,ky) +&
+                & Gamma_SC(orb,3,gamma_spin_index, gamma_lat_index) * pairing_3(kx,ky)
 
-        !Down - up Ti1 - Ti2 coupling
-        Hamiltonian(orb + TBA_DIM, orb + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(orb + TBA_DIM, orb + ORBITALS + DIM_POSITIVE_K) + &
-        & Gamma_SC(orb,1,1,2) * pairing_1(ky) + Gamma_SC(orb,2,1,2) * pairing_2(kx,ky) + Gamma_SC(orb,3,1,2) * pairing_3(kx,ky)
-        !Down - up Ti2 - Ti1 coupling
-        Hamiltonian(orb + ORBITALS + TBA_DIM, orb + DIM_POSITIVE_K) = Hamiltonian(orb + ORBITALS + TBA_DIM, orb + DIM_POSITIVE_K) + &
-        & Gamma_SC(orb,1,1,1) * CONJG(pairing_1(ky)) + Gamma_SC(orb,2,1,1) * CONJG(pairing_2(kx,ky)) + Gamma_SC(orb,3,1,1) * CONJG(pairing_3(kx,ky))
+                gamma_lat_index = lat + 1
+                !Ti2 - Ti1 coupling
+                row = spin*TBA_DIM + orb + (lat+1)*ORBITALS
+                col = orb + DIM_POSITIVE_K + TBA_DIM*MOD(spin + 1, 2) + lat*ORBITALS
+                Hamiltonian(row, col) = Hamiltonian(row, col) + &
+                & Gamma_SC(orb,1,gamma_spin_index, gamma_lat_index) * CONJG(pairing_1(ky)) +&
+                & Gamma_SC(orb,2,gamma_spin_index, gamma_lat_index) * CONJG(pairing_2(kx,ky)) +&
+                & Gamma_SC(orb,3,gamma_spin_index, gamma_lat_index) * CONJG(pairing_3(kx,ky))
+            END DO
+        END DO
     END DO
 
     !Next nearest neighbours pairing
     DO orb = 1, ORBITALS
         DO lat = 0, SUBLATTICES - 1
             DO spin = 0, 1
-                Hamiltonian(orb + lat*ORBITALS + spin*TBA_DIM, orb + lat*ORBITALS + MOD(spin+1,2)*TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(orb + lat*ORBITALS + spin*TBA_DIM, orb + lat*ORBITALS + MOD(spin+1,2)*TBA_DIM + DIM_POSITIVE_K) + &
+                row = orb + lat*ORBITALS + spin*TBA_DIM
+                col = orb + lat*ORBITALS + MOD(spin+1,2)*TBA_DIM + DIM_POSITIVE_K
+                Hamiltonian(row, col) = Hamiltonian(row, col) + &
                 & Gamma_SC(orb, N_NEIGHBOURS + 1, MOD(spin + 1, 2) + 1, lat + 1)*CONJG(pairing_nnn_1(kx)) + &
                 & Gamma_SC(orb, N_NEIGHBOURS + 2, MOD(spin + 1, 2) + 1, lat + 1)*CONJG(pairing_nnn_2(kx, ky)) + &
                 & Gamma_SC(orb, N_NEIGHBOURS + 3, MOD(spin + 1, 2) + 1, lat + 1)*CONJG(pairing_nnn_3(kx, ky)) + &
@@ -386,38 +437,41 @@ RECURSIVE SUBROUTINE COMPUTE_HUBBARD(Hamiltonian, Charge_dens)
     IMPLICIT NONE 
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
     REAL*8, INTENT(IN) :: Charge_dens(DIM_POSITIVE_K)
-    INTEGER*4 :: orb, lat, orb_prime, spin
+    INTEGER*4 :: orb, lat, orb_prime, spin, nambu, row
+    REAL*8 :: sign
     
-    DO spin = 0, 1
-        DO lat = 0, SUBLATTICES - 1
-            DO orb = 1, ORBITALS
-                Hamiltonian(spin*TBA_DIM + lat*ORBITALS + orb, spin*TBA_DIM + lat*ORBITALS + orb) = Hamiltonian(spin*TBA_DIM + lat*ORBITALS + orb, spin*TBA_DIM + lat*ORBITALS + orb) + &
-                & U_HUB*Charge_dens(MOD(spin + 1, 2)*TBA_DIM + lat*ORBITALS + orb) !Modulo should give opposite spin
-                DO orb_prime = 1, ORBITALS
-                    IF (orb .NE. orb_prime) THEN
-                        Hamiltonian(spin*TBA_DIM + lat*ORBITALS + orb, spin*TBA_DIM + lat*ORBITALS + orb) = Hamiltonian(spin*TBA_DIM + lat*ORBITALS + orb, spin*TBA_DIM + lat*ORBITALS + orb) + &
-                        & V_HUB*(Charge_dens(lat*ORBITALS + orb_prime) + Charge_dens(TBA_DIM + lat*ORBITALS + orb_prime)) !total charge dens in orbital
-                    END IF
+    DO nambu = 0, 1
+        sign = (-1)**nambu
+        DO spin = 0, 1
+            DO lat = 0, SUBLATTICES - 1
+                DO orb = 1, ORBITALS
+                    row = nambu*DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb
+                    Hamiltonian(row, row) = Hamiltonian(row, row) + sign*U_HUB*Charge_dens(MOD(spin + 1, 2)*TBA_DIM + lat*ORBITALS + orb) !Modulo should give opposite spin
+                    DO orb_prime = 1, ORBITALS
+                        IF (orb .NE. orb_prime) THEN
+                            Hamiltonian(row, row) = Hamiltonian(row, row) + sign*V_HUB*(Charge_dens(lat*ORBITALS + orb_prime) + Charge_dens(TBA_DIM + lat*ORBITALS + orb_prime)) !total charge dens in orbital
+                        END IF
+                    END DO
                 END DO
             END DO
         END DO
     END DO
 
-    !Nambu space
-    DO spin = 0, 1
-        DO lat = 0, SUBLATTICES - 1
-            DO orb = 1, ORBITALS
-                Hamiltonian(DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb, DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb) = Hamiltonian(DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb, DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb) - &
-                & U_HUB*Charge_dens(MOD(spin + 1, 2)*TBA_DIM + lat*ORBITALS + orb) !Modulo should give opposite spin
-                DO orb_prime = 1, ORBITALS
-                    IF (orb .NE. orb_prime) THEN
-                        Hamiltonian(DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb, DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb) = Hamiltonian(DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb, DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb) - &
-                        & V_HUB*(Charge_dens(lat*ORBITALS + orb_prime) + Charge_dens(TBA_DIM + lat*ORBITALS + orb_prime)) !total charge dens in orbital
-                    END IF
-                END DO
-            END DO
-        END DO
-    END DO
+    ! !Nambu space
+    ! DO spin = 0, 1
+    !     DO lat = 0, SUBLATTICES - 1
+    !         DO orb = 1, ORBITALS
+    !             Hamiltonian(DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb, DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb) = Hamiltonian(DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb, DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb) - &
+    !             & U_HUB*Charge_dens(MOD(spin + 1, 2)*TBA_DIM + lat*ORBITALS + orb) !Modulo should give opposite spin
+    !             DO orb_prime = 1, ORBITALS
+    !                 IF (orb .NE. orb_prime) THEN
+    !                     Hamiltonian(DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb, DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb) = Hamiltonian(DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb, DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + orb) - &
+    !                     & V_HUB*(Charge_dens(lat*ORBITALS + orb_prime) + Charge_dens(TBA_DIM + lat*ORBITALS + orb_prime)) !total charge dens in orbital
+    !                 END IF
+    !             END DO
+    !         END DO
+    !     END DO
+    ! END DO
 
 END SUBROUTINE COMPUTE_HUBBARD
 
