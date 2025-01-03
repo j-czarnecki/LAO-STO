@@ -242,7 +242,7 @@ class DispersionPlotter(DataReader):
     def plotDos(self, eMax: float, plotOutputPath: str):
         plt.figure()
         plt.plot(self.dosDataframe.DOS, self.dosDataframe.E, color="black", linewidth=1)
-        plt.ylim(bottom=0, top=eMax)
+        plt.ylim(bottom=-eMax, top=eMax)
         plt.xlabel(r"DOS")
         plt.ylabel(r"E (meV)")
         # plt.grid(True)

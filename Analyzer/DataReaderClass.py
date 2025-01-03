@@ -322,6 +322,7 @@ class DataReader:
         else:
             print("No such file ", energiesPath)
 
+
     def LoadDos(self, dosPath: str):
         """
         Loads DOS data from dosPath.

@@ -91,7 +91,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
                         self.maxval = np.abs(self.nnnSymmetryGammaDict[key][i])
 
         print('Maxval is ', self.maxval)
-    
+
     def plotGammasJ(self):
         E_fermi_tab = [-1030, -1040, -1050]
         colors = ['black', 'blue', 'red']
@@ -118,37 +118,42 @@ class GammaAndFillingPlotter(SymmetryResolver):
             plt.ylim(0 , 0.2)
             plt.savefig(f"../Plots/GammaJ_{spin}_{sublat}_{self.orbitalNameMapping[orbital - 1]}_{symmetry}.png")
             plt.close()
-                
 
     def plotGammasFermi(self):
         secondParamValues = [element[1] for element in self.params]
         secondParamValues = sorted(list(set(secondParamValues)))
 
         for key in self.symmetryKeys:
-            plt.figure()
+            fig, ax1 = plt.subplots(figsize = (7,5), dpi = 400)
+
             for secondParam in secondParamValues:
                 gamma_plot = []
                 ef_plot= []
+                n_total_plot = []
 
                 for i in range(len(self.params)):
                     if int(self.params[i][1]) == secondParam:
                         ef_plot.append(self.params[i][0]  - self.eMinimal)
                         gamma_plot.append(np.abs(self.symmetryGammaDict[key][i]))
-                plt.plot(ef_plot, gamma_plot, '-', label = secondParam)
+                        n_total_plot.append(self.fillingTotal[i]/12.)
 
+                ax1.plot(ef_plot, gamma_plot, label = secondParam)
+                ax1_ticks = ax1.get_xticks()
+
+                #Plot secondary axis for occupation
+                tick_labels = np.interp(ax1_ticks, ef_plot, n_total_plot)  # Interpolate the mapping
+                ax2 = ax1.secondary_xaxis('top')
+                ax2.set_xticks(ax1_ticks)  # Use the same positions as `ef_plot`
+                ax2.set_xticklabels([f"{val:.2f}" for val in tick_labels])  # Map `n_total_plot` as tick labels
             spin, sublat, orbital, symmetry = key
-            #plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}')
-            plt.legend(title = r"$J$ (meV)", loc = 'upper right')
-            #plt.legend(title = r"$E_{Fermi}$ (meV)", loc = 'upper right')
-            plt.xlabel(r"$E_{Fermi}$ (meV)")
-            #plt.xlabel(r"$J$ (meV)")
-            plt.ylabel(fr"$\Gamma_{{{self.latticeNameMapping[sublat - 1]} {self.latticeNameMapping[sublat % 2]},{self.orbitalNameMapping[orbital - 1]},{symmetry}}}^{{{self.spinSymbolsMapping[spin - 1]} {self.spinSymbolsMapping[spin % 2]}}}$ (meV)",
-                        labelpad= 20)
-            plt.ylim(top = 1.02*self.maxval)
-            #plt.xlim(100, 250)
-            #plt.grid()
-            #plt.xlim(0 , 0.1)
-            #plt.show()
+
+
+            ax1.legend(title = r"$J$ (meV)", loc = 'upper left')
+            ax1.set_ylim(top = 1.02*self.maxval)
+            ax1.set_xlabel(r"$E_{Fermi}$ (meV)")
+            ax2.set_xlabel(r"$n_{total}$", labelpad = 10)  # Customize units as needed
+            ax1.set_ylabel(fr"$\Gamma_{{{self.latticeNameMapping[sublat - 1]} {self.latticeNameMapping[sublat % 2]},{self.orbitalNameMapping[orbital - 1]},{symmetry}}}^{{{self.spinSymbolsMapping[spin - 1]} {self.spinSymbolsMapping[spin % 2]}}}$ (meV)",
+                          labelpad= 20)
             plt.savefig(f"../Plots/GammaFermi_{spin}_{sublat}_{self.orbitalNameMapping[orbital - 1]}_{symmetry}.png")
             plt.close()
 
@@ -170,7 +175,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
 
             spin, sublat, orbital, symmetry = key
             #plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}')
-            plt.legend(title = r"$U$ (meV)", loc = 'upper right')
+            plt.legend(title = r"$J$ (meV)", loc = 'upper left')
             plt.xlabel(r"$n_{tot}$")
             plt.ylabel(fr"$\Gamma_{{{self.latticeNameMapping[sublat - 1]} {self.latticeNameMapping[sublat % 2]},{self.orbitalNameMapping[orbital - 1]},{symmetry}}}^{{{self.spinSymbolsMapping[spin - 1]} {self.spinSymbolsMapping[spin % 2]}}}$ (meV)",
                         labelpad= 20)
@@ -178,7 +183,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
             #plt.grid()
             #plt.xlim(0 , 0.1)
             plt.savefig(f"../Plots/GammaFilling_{spin}_{sublat}_{self.orbitalNameMapping[orbital - 1]}_{symmetry}.png")
-            plt.close() 
+            plt.close()
 
     def plotGammasTemperature(self):
         '''Here temperature has to be passed as 0-th argument to GammaAndFilling plotter object, j_sc as the 1-st and e_fermi: 2-nd.'''
@@ -228,7 +233,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
         #E_Fermi
         thirdParamValues = [element[2] for element in self.params]
         thirdParamValues = sorted(list(set(thirdParamValues)))
-        
+
 
         for key in self.symmetryKeys:
             plt.figure()
@@ -277,9 +282,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 #plt.grid()
                 #plt.xlim(0 , 0.1)
                 plt.savefig(f"../Plots/GammaTemperatureMap{secondParam}_{spin}_{sublat}_{self.orbitalNameMapping[orbital - 1]}_{symmetry}.png")
-                plt.close() 
-                          
-                
+                plt.close()
 
 
 
@@ -288,28 +291,34 @@ class GammaAndFillingPlotter(SymmetryResolver):
         secondParamValues = sorted(list(set(secondParamValues)))
 
         for key in self.nnnSymmetryKeys:
-            plt.figure()
+            fig, ax1 = plt.subplots(figsize = (7,5), dpi = 400)
             for secondParam in secondParamValues:
                 gamma_plot = []
                 ef_plot= []
+                n_total_plot = []
 
                 for i in range(len(self.params)):
                     if int(self.params[i][1]) == secondParam:
                         ef_plot.append(self.params[i][0]  - self.eMinimal)
                         gamma_plot.append(np.abs(self.nnnSymmetryGammaDict[key][i]))
-                plt.plot(ef_plot, gamma_plot, '-', label = secondParam)
+                        n_total_plot.append(self.fillingTotal[i]/12.)
+
+                ax1.plot(ef_plot, gamma_plot, label = secondParam)
+                ax1_ticks = ax1.get_xticks()
+
+                #Plot secondary axis for occupation
+                tick_labels = np.interp(ax1_ticks, ef_plot, n_total_plot)  # Interpolate the mapping
+                ax2 = ax1.secondary_xaxis('top')
+                ax2.set_xticks(ax1_ticks)  # Use the same positions as `ef_plot`
+                ax2.set_xticklabels([f"{val:.2f}" for val in tick_labels])  # Map `n_total_plot` as tick labels
 
             spin, sublat, orbital, symmetry = key
-            #plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}')
-            #plt.legend(title = r"$J_{nnn}$ (meV)", loc = 'upper right')
-            plt.legend(title = r"$E_{Fermi}$ (meV)", loc = 'upper right')
-            #plt.xlabel(r"$E_{Fermi}$ (meV)")
-            plt.xlabel(r"$J_{nnn}$ (meV)")
-            plt.ylabel(fr"$\Gamma_{{{self.latticeNameMapping[sublat - 1]} {self.latticeNameMapping[sublat - 1]}, {self.orbitalNameMapping[orbital - 1]},{symmetry}}}^{{{self.spinSymbolsMapping[spin - 1]} {self.spinSymbolsMapping[spin % 2]}}}$ (meV)")
-            plt.ylim(top = 1.02*self.maxval)
-            #plt.xlim(left = 0.0)
-            #plt.grid()
-            #plt.xlim(0 , 0.1)
+            ax1.legend(title = r"$J_{nnn}$ (meV)", loc = 'upper left')
+            ax1.set_ylim(top = 1.02*self.maxval)
+            ax1.set_xlabel(r"$E_{Fermi}$ (meV)")
+            ax2.set_xlabel(r"$n_{total}$", labelpad = 10)  # Customize units as needed
+            ax1.set_ylabel(fr"$\Gamma_{{{self.latticeNameMapping[sublat - 1]} {self.latticeNameMapping[sublat % 2]},{self.orbitalNameMapping[orbital - 1]},{symmetry}}}^{{{self.spinSymbolsMapping[spin - 1]} {self.spinSymbolsMapping[spin % 2]}}}$ (meV)",
+                          labelpad= 20)
             plt.savefig(f"../Plots/nnnGammaFermi_{spin}_{sublat}_{self.orbitalNameMapping[orbital - 1]}_{symmetry}.png")
             plt.close()
 
