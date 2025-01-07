@@ -20,15 +20,18 @@ class Runner(RunnerConfig):
         """
         Sets all parameters given in key-value pairs.
         No need to specify J_SC_PRIME, since it is always set
-        to be J_SC / 10
+        to be J_SC / 10.
+        Also starting values of gamma parameters are automatically set to 0 if corresponding J is 0.
         """
         if isAres:
-            pathToAppend = os.path.join(self.aresScratch, runsDir, "RUN")
+            pathToAppend = os.path.join(self.aresScratch, runsDir)
+            os.makedirs(pathToAppend, exist_ok = True)
+            pathToAppend = os.path.join(pathToAppend, "RUN")
         else:
             pathToAppend = f"RUN"
 
         for pair in paramValuePairs:
-            if pair[0] != "self_consistency":
+            if pair[0] != "self_consistency" and pair[1] != "V_layer":
                 pathToAppend = pathToAppend + f"_{pair[1]}_{pair[2]}"
 
         runner_cwd = os.getcwd()
@@ -52,12 +55,8 @@ class Runner(RunnerConfig):
 
         for pair in paramValuePairs:
             nml[pair[0]][pair[1]] = pair[2]  # editing all key-value pairs
-        nml["physical_params"]["J_SC_PRIME"] = (
-            nml["physical_params"]["J_SC"] / 10.0
-        )  # No need to specify J_SC_PRIME
-        nml["physical_params"]["J_SC_PRIME_NNN"] = (
-            nml["physical_params"]["J_SC_NNN"] / 10.0
-        )  # No need to specify J_SC_PRIME_NNN
+
+        self.__set_derived_values(nml)
 
         with open("input.nml", "w") as nml_file:
             f90nml.write(nml, nml_file, sort=False)
@@ -171,3 +170,22 @@ class Runner(RunnerConfig):
                     time.sleep(30)
 
         print("!!! ALL SEQUENTIAL JOBS FINISHED !!!")
+
+    def __set_derived_values(self, nml: f90nml.Namelist):
+        '''
+        This method sets all values derived from other namelist parameters
+        '''
+        # Setting inter-orbital pairing
+        nml["physical_params"]["J_SC_PRIME"] = (
+            nml["physical_params"]["J_SC"] / 10.0
+        )  # No need to specify J_SC_PRIME
+        nml["physical_params"]["J_SC_PRIME_NNN"] = (
+            nml["physical_params"]["J_SC_NNN"] / 10.0
+        )  # No need to specify J_SC_PRIME_NNN
+
+        # Setting appropriate starting values
+        if nml["physical_params"]["J_SC"] == 0.0:
+            nml["self_consistency"]["gamma_start"] = 0.
+        if nml["physical_params"]["J_SC_NNN"] == 0.0:
+            nml["self_consistency"]["gamma_nnn_start"] = 0.
+

@@ -27,28 +27,36 @@ def configureAndRunPostprocessing():
 
 def configureAndRunSc():
     runner = Runner()
+
+    # Setting number of sublattices and potential of layers
+    n_sublattices = 3
+    Sublat_param = ("discretization", "SUBLATTICES", n_sublattices)
+    const_v_layer = 1.946e3
+    V_layer_param = ("physical_params", "V_layer", [const_v_layer for _ in range(n_sublattices)])
+
     # Fermi energy
     nml_name = "physical_params"
     param_name = "E_Fermi"
-    Ef_min = -1.405e3
-    Ef_max = -1.25e3
-    Ef_steps = 31
+    Ef_min = 0e3
+    Ef_max = 0.2e3
+    Ef_steps = 10
     dE = abs(Ef_max - Ef_min) / Ef_steps
     Fermi_table = [(nml_name, param_name, Ef_min + i * dE) for i in range(Ef_steps + 1)]
 
     # J_SC
     nml_name = "physical_params"
     param_name = "J_SC"
-    J_min = 0.1e3
+    J_min = 0.2e3
     J_max = 0.4e3
-    J_steps = 3
+    J_steps = 4
     dJ = abs(J_max - J_min) / J_steps
     J_table = [(nml_name, param_name, J_min + i * dJ) for i in range(J_steps + 1)]
+
     for Ef in Fermi_table:
         for J_sc in J_table:
             runner.run_slurm_param_value(
-                paramValuePairs=[Ef, J_sc],
-                rusnDir="KTO-test",
+                paramValuePairs=[Ef, J_sc, V_layer_param, Sublat_param],
+                runsDir="KTO-SC/KTO-3-layers",
                 material="KTO",
                 isAres=True,
             )

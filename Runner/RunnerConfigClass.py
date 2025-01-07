@@ -26,9 +26,11 @@ class RunnerConfig:
         ## Number of allocated nodes
         #SBATCH -N 1
         ## Number of tasks per node (by default this corresponds to the number of cores allocated per node)
-        #SBATCH --ntasks-per-node=10
-        ## Memory allocated per core (default is 5GB)
-        #SBATCH --mem-per-cpu=3800MB
+        #SBATCH --ntasks-per-node=20
+        ## Memory allocated per core (default is 5GB), comment if mem for whole job should be taken
+        ##SBATCH --mem-per-cpu=3800MB
+        ## Memory allocated for whole job, comment if mem-per-cpu should be taken
+        #SBATCH --mem=8GB
         ## Max task execution time (format is HH:MM:SS)
         #SBATCH --time=168:00:00
         ## Name of grant to which resource usage will be charged
@@ -47,7 +49,7 @@ class RunnerConfig:
         params_nml = parser.reads(
             f"&discretization \
                 k1_steps = 100, \
-                k2_steps = 100,
+                k2_steps = 100, \
                 SUBLATTICES = 2 / \
             &physical_params \
                 T = 0.0, \
@@ -65,15 +67,15 @@ class RunnerConfig:
                 J_SC_PRIME_NNN = 0.0e3, \
                 U_HUB = 0e3, \
                 V_HUB = 0e3, \
-                E_Fermi = -1.0e3,
+                E_Fermi = -1.0e3, \
                 V_layer = 0.0, 0.0 / \
             &self_consistency \
                 read_gamma_from_file = .FALSE., \
-                path_to_gamma_start = , \
+                path_to_gamma_start = '', \
                 read_charge_from_file = .FALSE., \
-                path_to_charge_start = , \
+                path_to_charge_start = '', \
                 gamma_start = 1., \
-                gamma_nnn_start = 0., \
+                gamma_nnn_start = 1., \
                 charge_start = 0.1, \
                 max_sc_iter = 100, \
                 sc_alpha = 0.2, \
@@ -95,7 +97,7 @@ class RunnerConfig:
         params_nml = parser.reads(
             f"&discretization \
                 k1_steps = 100, \
-                k2_steps = 100,
+                k2_steps = 100, \
                 SUBLATTICES = 2 / \
             &physical_params \
                 T = 0.0, \
@@ -113,15 +115,15 @@ class RunnerConfig:
                 J_SC_PRIME_NNN = 0.0e3, \
                 U_HUB = 0e3, \
                 V_HUB = 0e3, \
-                E_Fermi = -1.0e3,
+                E_Fermi = -1.0e3, \
                 V_layer = 0.0, 0.0 / \
             &self_consistency \
                 read_gamma_from_file = .FALSE., \
-                path_to_gamma_start = , \
+                path_to_gamma_start = '', \
                 read_charge_from_file = .FALSE., \
-                path_to_charge_start = , \
+                path_to_charge_start = '', \
                 gamma_start = 1., \
-                gamma_nnn_start = 0., \
+                gamma_nnn_start = 1., \
                 charge_start = 0.1, \
                 max_sc_iter = 100, \
                 sc_alpha = 0.2, \
@@ -143,21 +145,21 @@ class RunnerConfig:
         params_nml = parser.reads(
             f"&sc_gap_calculation \
                 enable_sc_gap_calc = .FALSE., \
-                path_to_run_dir_sc_gap = , \
+                path_to_run_dir_sc_gap = '', \
                 dE_sc_gap = 1e-3, \
                 Nk_points_sc_gap = 10000 / \
             &chern_number_calculation \
                 enable_chern_number_calc = .FALSE., \
-                path_to_run_dir_chern_number = , \
+                path_to_run_dir_chern_number = '', \
                 Nk_points_chern_number = 15000 /\
             &dispersion_relation_calculation\
                 enable_dispersion_relation_calc = .FALSE.,\
-                path_to_run_dir_dispersion_relation = ,\
+                path_to_run_dir_dispersion_relation = '',\
                 include_sc_in_dispersion = .TRUE.,\
                 Nk_points_dispersion_relation = 500 /\
             &dos_calculation\
                 enable_dos_calc = .FALSE.,\
-                path_to_run_dir_dos = ,\
+                path_to_run_dir_dos = '',\
                 E_DOS_min = -1.7e3,\
                 E_DOS_max = 1.7e3,\
                 dE0 = 1.,\

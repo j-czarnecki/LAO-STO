@@ -86,13 +86,13 @@ def main():
     #dispersionPlotter.GetStatistics()
     #dispersionPlotter.shiftEnergies()
 
-    dispersionPlotter.plotCrossection(
-        "../Plots/DispersionSliceKy", 500, "ky", 0.0, 2, 12
-    )
+    # dispersionPlotter.plotCrossection(
+    #     "../Plots/DispersionSliceKy", 500, "ky", 0.0, 2, 12
+    # )
 
-    dispersionPlotter.plotCrossection(
-        "../Plots/DispersionSliceKx", 500, "kx", 0.0, 2, 12
-    )
+    # dispersionPlotter.plotCrossection(
+    #     "../Plots/DispersionSliceKx", 500, "kx", 0.0, 2, 12
+    # )
 
     # dispersionPlotter.plotFermiCrossection(200, 1.0, "../Plots/FermiSlice200.png")
     # dispersionPlotter.plotFermiCrossection(500, 1.0, "../Plots/FermiSlice500.png")
