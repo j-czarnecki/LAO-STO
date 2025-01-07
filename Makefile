@@ -89,9 +89,8 @@ tsan: $(TARGET)
 
 post: $(POSTPROCESSING_TARGET)
 
-post_debug: F90 = gfortran
-post_debug: F90FLAGS = -O0 -g -fcheck=array-temps,bounds,do,mem -fsanitize=address -ffree-line-length-none #-check all -warn all #-g flag necessary to generate debug symbols
-post_debug: $(POSTPROCESSING_TARGET)
+post_debug: F90FLAGS = -O0 -g -fpp -DDEBUG -traceback $(LIB_OPENMP)
+post_debug:	$(POSTPROCESSING_TARGET)
 
 test:
 	mkdir -p $(SRC_DIR)/test/$(MOD_DIR)
@@ -113,6 +112,7 @@ clean:
 	rm -f *.mod
 	rm -rf $(SRC_DIR)/*.i90
 	rm -rf $(SRC_DIR)/*.mod
+	rm -rf *.mod
 	@export CC="$(CC)" && export CXX="$(CXX)" && cd $(SRC_DIR)/test && funit --clean && cd ../../
 
 

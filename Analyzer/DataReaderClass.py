@@ -8,12 +8,13 @@ import shutil
 
 class DataReader:
 
-    def __init__(self, runsPath: str, matchPattern: str):
+    def __init__(self, runsPath: str, matchPattern: str, sublattices: int):
         """
         Initializes DataReader object, which contains all data from a series of simulations.
         Arguments:
             runsPath - path which contains folders with single simulations
             matchPattern - regex that tells the program which directories form runsPath should be loaded
+            sublattices - number of sublattices
         Initializes:
             self.gamma - dictionary with keys of form (spin, neighbour, sublat, orbital), by default stores unsorted lists of given gammas.
                          It has the same order as self.params, based on which it could be sorted.
@@ -29,6 +30,7 @@ class DataReader:
         # TODO: improve annotations
         self.matchPattern = matchPattern
         self.runsPath = runsPath
+        self.sublattices = sublattices
         self.gamma: dict = {}
         self.filling: dict = {}
         self.fillingTotal: list = []
@@ -282,46 +284,39 @@ class DataReader:
         Loads dispersion relations data from energiesPath.
         """
         print("---> Loading dispersion data")
+        names = [
+            "N",
+            "kx",
+            "ky",
+            "E",
+            "P_yz",
+            "P_zx",
+            "P_xy",
+            *[f"P_lat{i}" for i in range(1, self.sublattices + 1)],
+            "P_up",
+            "P_down",
+            "P_elec",
+            "P_hole",
+        ]
+        real_width = 14
+        cols = [
+            (0, 6),
+            *[
+                (7 + i + i * real_width, 7 + i + (i + 1) * real_width)
+                for i in range(10 + self.sublattices)
+            ],
+        ]
         if os.path.exists(energiesPath):
             self.dispersionDataframe = pd.read_fwf(
                 energiesPath,
                 skiprows=1,
-                colspecs=[
-                    (0, 6),
-                    (7, 21),
-                    (22, 36),
-                    (37, 51),
-                    (52, 66),
-                    (67, 81),
-                    (82, 96),
-                    (97, 111),
-                    (112, 126),
-                    (127, 141),
-                    (142, 156),
-                    (157, 171),
-                    (172, 186),
-                ],
-                names=[
-                    "N",
-                    "kx",
-                    "ky",
-                    "E",
-                    "P_yz",
-                    "P_zx",
-                    "P_xy",
-                    "P_lat1",
-                    "P_lat2",
-                    "P_up",
-                    "P_down",
-                    "P_elec",
-                    "P_hole",
-                ],
+                colspecs=cols,
+                names=names,
                 dtype=np.float32,
                 low_memory=True,
             )
         else:
             print("No such file ", energiesPath)
-
 
     def LoadDos(self, dosPath: str):
         """

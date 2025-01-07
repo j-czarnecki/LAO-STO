@@ -9,10 +9,11 @@ import seaborn as sns
 # Data reader is in fact not used here, rethink this architecture
 class DispersionPlotter(DataReader):
 
-    def __init__(self):
-        DataReader.__init__(self, "./", "xxx")
-        self.dataLength = 0
-        self.kPoints1D = 0
+    def __init__(self, sublattices: int):
+        DataReader.__init__(self, "./", "xxx", sublattices)
+        self.dataLength: int = 0
+        self.kPoints1D: int = 0
+        self.maxBands: int = 0
 
         plt.rcParams["text.usetex"] = True
         plt.rcParams["font.family"] = "serif"
@@ -58,11 +59,15 @@ class DispersionPlotter(DataReader):
     def GetStatistics(self):
         self.dataLength = len(self.dispersionDataframe.N)
         self.kPoints1D = len(set(self.dispersionDataframe.kx))
+        self.maxBands = np.max(self.dispersionDataframe.N)
         self.lowestEnergy = np.min(self.dispersionDataframe.E)
+        print(f"Data length is {self.dataLength}")
+        print(f"Lowest energy is {self.lowestEnergy} (meV)")
+        print(f"Number of k-points is {self.kPoints1D}")
+        print(f"Number of bands is {self.maxBands}")
 
     def shiftEnergies(self):
         lowestEnergy = np.min(self.dispersionDataframe.E)
-        print(f"Lowest energy is {lowestEnergy} (meV)")
         self.dispersionDataframe.E -= lowestEnergy
         if not self.dosDataframe.empty:
             self.dosDataframe.E -= lowestEnergy
@@ -148,9 +153,13 @@ class DispersionPlotter(DataReader):
                     marker=".",
                     markersize=2,
                     color=(
-                        self.dispersionDataframe.P_lat1[i],
-                        0,
-                        self.dispersionDataframe.P_lat2[i],
+                        self.dispersionDataframe["P_lat1"][i],
+                        self.dispersionDataframe["P_lat2"][i],
+                        (
+                            self.dispersionDataframe["P_lat3"][i]
+                            if "P_lat3" in self.dispersionDataframe
+                            else 0
+                        ),
                     ),
                 )
                 plt.figure(2)
@@ -198,7 +207,7 @@ class DispersionPlotter(DataReader):
 
         plt.figure(3)
         plt.plot(
-            np.sort(list(set(self.dispersionDataframe.ky))),
+            np.sort(list(set(self.dispersionDataframe[sliceAlong]))),
             plotEnergies,
             linewidth=1,
             color="black",
@@ -241,8 +250,8 @@ class DispersionPlotter(DataReader):
 
     def plotDos(self, eMax: float, plotOutputPath: str):
         plt.figure()
-        plt.plot(self.dosDataframe.DOS, self.dosDataframe.E, color="black", linewidth=1)
-        plt.ylim(bottom=-eMax, top=eMax)
+        plt.plot(self.dosDataframe.E, self.dosDataframe.DOS, color="black", linewidth=1)
+        plt.xlim(left=-eMax, right=eMax)
         plt.xlabel(r"DOS")
         plt.ylabel(r"E (meV)")
         # plt.grid(True)

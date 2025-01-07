@@ -195,6 +195,7 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
     INTEGER*4 :: kx_steps, ky_steps
     REAL*8 :: yz_contribution, zx_contribution, xy_contribution
     REAL*8 :: lat1_contribution, lat2_contribution
+    REAL*8, ALLOCATABLE :: Lat_contributions(:)
     REAL*8 :: spin_up_contribution, spin_down_contribution
     REAL*8 :: electron_contribution, hole_contribution
     REAL*8 :: brillouinZoneVertices(6,2)
@@ -232,15 +233,16 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
     kx_steps = INT(Nk_points)
     ky_steps = INT(Nk_points)
 
-    output_format = '(I5, 12E15.5)'
+    WRITE(output_format, '(A, I0, A)') '(I5, ', 10 + SUBLATTICES,'E15.5)'
 
     ALLOCATE(Hamiltonian(DIM,DIM))
     ALLOCATE(Hamiltonian_const(DIM,DIM))
     ALLOCATE(U_transformation(hamiltonian_dim, hamiltonian_dim))
     ALLOCATE(Probability(-kx_steps:kx_steps, -ky_steps:ky_steps, hamiltonian_dim, hamiltonian_dim))
     ALLOCATE(Energies(-kx_steps:kx_steps, -ky_steps:ky_steps, hamiltonian_dim))
-    ALLOCATE(Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES))
+    ALLOCATE(Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, 2, LAYER_COUPLINGS))
     ALLOCATE(Charge_dens(DIM_POSITIVE_K))
+    ALLOCATE(Lat_contributions(SUBLATTICES))
 
     Hamiltonian(:,:) = DCMPLX(0., 0.)
     Hamiltonian_const(:,:) = DCMPLX(0. , 0.)
@@ -249,11 +251,13 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
     Gamma_SC(:,:,:,:) = DCMPLX(0. , 0.)*meV2au
     Charge_dens(:) = 0.
 
-    INQUIRE(FILE = TRIM(inputPath)//"OutputData/Charge_dens_final.dat", EXIST = fileExists)
-    IF (fileExists) THEN
-        CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
-    ELSE
-        CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
+    IF ((U_HUB .NE. 0.0) .OR. (V_HUB .NE. 0.0)) THEN
+        INQUIRE(FILE = TRIM(inputPath)//"OutputData/Charge_dens_final.dat", EXIST = fileExists)
+        IF (fileExists) THEN
+            CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
+        ELSE
+            CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
+        END IF
     END IF
 
     IF (include_sc) THEN
@@ -270,13 +274,11 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
     CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:,:))
     CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:,:))
     CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian_const(:,:))
+    CALL COMPUTE_LAYER_POTENTIAL(Hamiltonian_const(:,:))
     !Not shifting with the Fermi Energy, since we want "real" energy scale.
     !However If we want to include SC, we have to take into account actual Fermi energy for which Gammas were calculated
     IF (include_sc) THEN
-        DO n = 1, DIM_POSITIVE_K
-            Hamiltonian_const(n,n) = Hamiltonian_const(n,n) - E_Fermi
-            Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) = Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) + E_Fermi
-        END DO
+        CALL COMPUTE_FERMI_ENERGY(Hamiltonian_const(:,:))
     END IF
     CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
 
@@ -296,9 +298,7 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
                 CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:,:), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
                 CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:))
                 CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
-
                 CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
-
                 Hamiltonian(:,:) = Hamiltonian_const(:,:) + Hamiltonian(:,:) !Should by multiplied by 0.5 if in Nambu space
 
                 !CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:DIM_POSITIVE_K,:DIM_POSITIVE_K), Energies(i,j,:), U_transformation(:,:), DIM_POSITIVE_K)
@@ -313,7 +313,7 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
     !$omp end parallel
 
     OPEN(unit = 9, FILE= TRIM(inputPath)//"OutputData/Energies.dat", FORM = "FORMATTED", ACTION = "WRITE")
-    WRITE(9,'(A)') "#N kx[1/a] ky[1/a] Energy[meV] P(yz) P(zx) P(xy) P(lat1) P(lat2) P(s_up) P(s_down) P(electron) P(hole)"
+    WRITE(9,'(A)') "#N kx[1/a] ky[1/a] Energy[meV] P(yz) P(zx) P(xy) P(lat1) P(lat2) ... P(latN) P(s_up) P(s_down) P(electron) P(hole)"
     DO l = 1, hamiltonian_dim
         DO i = -kx_steps, kx_steps
             DO j = -ky_steps, ky_steps
@@ -327,7 +327,7 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
                     yz_contribution = 0.
                     zx_contribution = 0.
                     xy_contribution = 0.
-                    DO n = 1, hamiltonian_dim, 3
+                    DO n = 1, hamiltonian_dim, ORBITALS
                         yz_contribution = yz_contribution + Probability(i,j,n,l)
                         zx_contribution = zx_contribution + Probability(i,j,n+1,l)
                         xy_contribution = xy_contribution + Probability(i,j,n+2,l)
@@ -336,14 +336,15 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
                     !Distinguishing lattice contributions
                     lat1_contribution = 0.
                     lat2_contribution = 0.
-                    DO n = 1, 3
-                        DO m = 0, 1
-                            lat1_contribution = lat1_contribution + Probability(i,j,m*TBA_DIM + n,l)
-                            lat2_contribution = lat2_contribution + Probability(i,j,m*TBA_DIM + n + 3,l)
-                            IF (include_sc) THEN
-                                lat1_contribution = lat1_contribution + Probability(i,j,DIM_POSITIVE_K + m*TBA_DIM + n,l)
-                                lat2_contribution = lat2_contribution + Probability(i,j,DIM_POSITIVE_K + m*TBA_DIM + n + 3,l)
-                            END IF
+                    Lat_contributions(:) = 0.
+                    DO m = 0, SUBLATTICES - 1
+                        DO spin = 0, 1
+                            DO n = 1, ORBITALS
+                                Lat_contributions(m + 1) = Lat_contributions(m + 1) + Probability(i,j,spin*TBA_DIM + m*ORBITALS + n,l)
+                                IF (include_sc) THEN
+                                    Lat_contributions(m + 1) = Lat_contributions(m + 1) + Probability(i,j,DIM_POSITIVE_K + spin*TBA_DIM + m*ORBITALS + n,l)
+                                END IF
+                            END DO
                         END DO
                     END DO
 
@@ -373,7 +374,7 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
 
                     WRITE(9, output_format) l, kx, ky, Energies(i, j, l)/meV2au, &
                     & yz_contribution, zx_contribution, xy_contribution, &
-                    & lat1_contribution, lat2_contribution, &
+                    & (Lat_contributions(lat), lat = 1, SUBLATTICES), &
                     & spin_up_contribution, spin_down_contribution, &
                     & electron_contribution, hole_contribution
                 END IF
@@ -391,6 +392,7 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
     DEALLOCATE(Energies)
     DEALLOCATE(Gamma_SC)
     DEALLOCATE(Charge_dens)
+    DEALLOCATE(Lat_contributions)
 
 END SUBROUTINE CALCULATE_DISPERSION
 

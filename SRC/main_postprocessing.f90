@@ -44,4 +44,6 @@ PROGRAM main_postprocessing
 
     CALL CLOSE_LOGGER()
 
+    IF (ALLOCATED(V_layer)) DEALLOCATE(V_layer)
+
 END PROGRAM main_postprocessing

@@ -63,7 +63,7 @@ RECURSIVE SUBROUTINE COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian)
             row = nambu*DIM_POSITIVE_K + lat*ORBITALS + 1
             col = nambu*DIM_POSITIVE_K + TBA_DIM + lat*ORBITALS + 3
             Hamiltonian(row, col) = Hamiltonian(row, col) - sign*lambda_SOC/2. !Only real elements change sign here
-    
+
             row = nambu*DIM_POSITIVE_K + lat*ORBITALS + 2
             col = nambu*DIM_POSITIVE_K + TBA_DIM + lat*ORBITALS + 3
             Hamiltonian(row, col) = Hamiltonian(row, col) + imag*lambda_SOC/2.
@@ -93,7 +93,7 @@ RECURSIVE SUBROUTINE COMPUTE_TRIGONAL_TERMS(Hamiltonian)
                 row = nambu*DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + 1
                 col = nambu*DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + 2
                 Hamiltonian(row, col) = Hamiltonian(row, col) + sign*DELTA_TRI/2.
-                
+
                 row = nambu*DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + 1
                 col = nambu*DIM_POSITIVE_K + spin*TBA_DIM + lat*ORBITALS + 3
                 Hamiltonian(row, col) = Hamiltonian(row, col) + sign*DELTA_TRI/2.
@@ -352,7 +352,7 @@ SUBROUTINE COMPUTE_LAYER_POTENTIAL(Hamiltonian)
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
     INTEGER*4 :: nambu, spin, lat, orb, row
     REAL*8 :: sign
-    
+
     DO nambu = 0, 1
         sign = (-1)**nambu
         DO spin = 0, 1
@@ -382,30 +382,37 @@ SUBROUTINE COMPUTE_FERMI_ENERGY(Hamiltonian)
 END SUBROUTINE COMPUTE_FERMI_ENERGY
 
 RECURSIVE SUBROUTINE COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC)
+    !! Computes the superconducting coupling at given (kx,ky) point
     IMPLICIT NONE
-    COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
-    COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2,LAYER_COUPLINGS)
-    REAL*8, INTENT(IN) :: kx, ky
+    COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM) !! Hamiltonian of the system that is to be filled
+    COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2,LAYER_COUPLINGS) !! Superconducting energies
+    REAL*8, INTENT(IN) :: kx !! Wavevector in X direction
+    REAL*8, INTENT(IN) :: ky !! Wavevector in Y direction
     INTEGER*4 :: orb, lat, spin, row, col, gamma_spin_index, gamma_lat_index
 
     !Nearest neighbours pairing
     DO orb = 1, ORBITALS
         DO spin = 0, 1
             gamma_spin_index = MOD(spin + 1, 2) + 1
-            DO lat = 0, LAYER_COUPLINGS - 1, 2
-                gamma_lat_index = lat + 2
+            ! -2, because we have to iterate up to one-before-last sublattice to be able to increment (lat + 1)
+            DO lat = 0, SUBLATTICES - 2
+                gamma_lat_index = 2*lat + 2
                 !Ti1 - Ti2 coupling
                 row = spin*TBA_DIM + orb + lat*ORBITALS
                 col = orb + (lat+1)*ORBITALS + DIM_POSITIVE_K + TBA_DIM*MOD(spin + 1, 2)
+                ! PRINT*, row, col
                 Hamiltonian(row, col) = Hamiltonian(row, col) + &
                 & Gamma_SC(orb,1,gamma_spin_index, gamma_lat_index) * pairing_1(ky) +&
                 & Gamma_SC(orb,2,gamma_spin_index, gamma_lat_index) * pairing_2(kx,ky) +&
                 & Gamma_SC(orb,3,gamma_spin_index, gamma_lat_index) * pairing_3(kx,ky)
 
-                gamma_lat_index = lat + 1
+                gamma_lat_index = 2*lat + 1
+
                 !Ti2 - Ti1 coupling
                 row = spin*TBA_DIM + orb + (lat+1)*ORBITALS
                 col = orb + DIM_POSITIVE_K + TBA_DIM*MOD(spin + 1, 2) + lat*ORBITALS
+                ! PRINT*, row, col
+
                 Hamiltonian(row, col) = Hamiltonian(row, col) + &
                 & Gamma_SC(orb,1,gamma_spin_index, gamma_lat_index) * CONJG(pairing_1(ky)) +&
                 & Gamma_SC(orb,2,gamma_spin_index, gamma_lat_index) * CONJG(pairing_2(kx,ky)) +&
@@ -434,12 +441,12 @@ RECURSIVE SUBROUTINE COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC)
 END SUBROUTINE COMPUTE_SC
 
 RECURSIVE SUBROUTINE COMPUTE_HUBBARD(Hamiltonian, Charge_dens)
-    IMPLICIT NONE 
+    IMPLICIT NONE
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
     REAL*8, INTENT(IN) :: Charge_dens(DIM_POSITIVE_K)
     INTEGER*4 :: orb, lat, orb_prime, spin, nambu, row
     REAL*8 :: sign
-    
+
     DO nambu = 0, 1
         sign = (-1)**nambu
         DO spin = 0, 1
@@ -481,7 +488,7 @@ RECURSIVE SUBROUTINE COMPUTE_ZEEMAN(Bfield, Hamiltonian)
     REAL*8, PARAMETER :: gFactor = 3.0d0
     REAL*8, PARAMETER :: muB = 0.5
     INTEGER*4 :: i
-    
+
     DO i =1, TBA_DIM
         !Electrons
         Hamiltonian(i,i) = Hamiltonian(i,i) + 0.5d0*muB*gFactor*Bfield(3)
