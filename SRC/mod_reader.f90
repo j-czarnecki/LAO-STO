@@ -11,6 +11,7 @@ SAVE
 INTEGER*4 :: k1_steps = 0
 INTEGER*4 :: k2_steps = 0
 INTEGER*4 :: SUBLATTICES = 2
+INTEGER*4 :: SUBBANDS = 1
 
 !Those parameters are in fact derived and recalculated if needed at GET_INPUT
 !(see SET_HAMILTONIAN_PARAMS)
@@ -38,6 +39,7 @@ REAL*8 :: U_HUB = 0.
 REAL*8 :: V_HUB = 0.
 REAL*8 :: E_Fermi = 0.
 REAL*8, ALLOCATABLE :: V_layer(:)
+REAL*8, ALLOCATABLE :: Subband_energies(:)
 
 !Self-consistency
 LOGICAL :: read_gamma_from_file = .FALSE.
@@ -114,12 +116,14 @@ NAMELIST /physical_params/  &
 & U_HUB,                    &
 & V_HUB,                    &
 & E_Fermi,                  &
-& V_layer
+& V_layer,                  &
+& Subband_energies
 
 NAMELIST /discretization/ &
 & k1_steps,               &
 & k2_steps,               &
-& SUBLATTICES
+& SUBLATTICES,            &
+& SUBBANDS
 
 NAMELIST /self_consistency/ &
 & read_gamma_from_file,     &
@@ -186,7 +190,8 @@ SUBROUTINE GET_INPUT(nmlfile)
     IF ((k1_steps .LE. 0) .OR. (k2_steps .LE. 0)) STOP "k_steps must be > 0"
     IF (SUBLATTICES .LE. 0) STOP "SUBLATTICES must be > 0"
     CALL SET_HAMILTONIAN_PARAMS()
-    WRITE(log_string, '(5(A, I0))') " SUBLATTICES: ", SUBLATTICES,&
+    WRITE(log_string, '(6(A, I0))') " SUBLATTICES: ", SUBLATTICES,&
+                                  & " SUBBANDS: ", SUBBANDS,&
                                   & " ORBITALS: ", ORBITALS, &
                                   & " TBA_DIM: ", TBA_DIM, &
                                   & " DIM_POSITIVE_K: ", DIM_POSITIVE_K, &
@@ -195,6 +200,7 @@ SUBROUTINE GET_INPUT(nmlfile)
 
     !This is crucial
     ALLOCATE(V_layer(SUBLATTICES))
+    ALLOCATE(Subband_energies(SUBBANDS))
 
     !TODO: WRITE BETTER CHECKS!!!!!!!!!!!!!!!!!!
     READ(9,NML=physical_params)
@@ -217,6 +223,8 @@ SUBROUTINE GET_INPUT(nmlfile)
     LOG_INFO(log_string)
     WRITE(log_string, *) "V_layer: ", (V_layer(i), i = 1, SUBLATTICES)
     LOG_INFO(log_string)
+    WRITE(log_string, *) "Subband_energies: ", (Subband_energies(i), i = 1, SUBBANDS)
+    LOG_INFO(log_string)
 
     !Check input data
     IF (T < 0) STOP "Temperature in kelvins must be >= 0!"
@@ -238,6 +246,7 @@ SUBROUTINE GET_INPUT(nmlfile)
     V_HUB = V_HUB * meV2au
     E_Fermi = E_Fermi * meV2au
     V_layer = V_layer * meV2au
+    Subband_energies = Subband_energies * meV2au
 
     READ(9,NML=self_consistency)
     WRITE(log_string, '(2(A, I0, 2A), 10(A, E15.5))') "read_gamma_from_file: ", read_gamma_from_file,&
@@ -339,37 +348,38 @@ END SUBROUTINE GET_POSTPROCESSING_INPUT
 
 SUBROUTINE GET_GAMMA_SC(Gamma_SC, path)
     CHARACTER(LEN=*), INTENT(IN) :: path
-    COMPLEX*16, INTENT(OUT) :: Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS)
-    INTEGER*4 :: n, lat, orb,spin
-    INTEGER*4 :: n_read, lat_read, orb_read, spin_read
+    COMPLEX*16, INTENT(OUT) :: Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS, SUBBANDS)
+    INTEGER*4 :: n, lat, orb,spin, band
+    INTEGER*4 :: n_read, lat_read, orb_read, spin_read, band_read
     REAL*8 :: Gamma_re, Gamma_im
     CHARACTER(LEN=20) :: output_format
 
-    output_format = '(4I5, 2E15.5)'
+    output_format = '(5I5, 2E15.5)'
 
     OPEN(unit = 9, FILE=path, FORM = "FORMATTED", ACTION = "READ", STATUS="OLD")
     READ(9,*)
-
-    DO spin =1, 2
-        DO n = 1, N_NEIGHBOURS
-            DO lat = 1, SUBLATTICES
-                DO orb = 1, ORBITALS
-                    READ(9, output_format) spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
-                    Gamma_SC(orb_read, n_read, spin_read, lat_read) = DCMPLX(Gamma_re, Gamma_im)*meV2au
+    DO band = 1, SUBBANDS
+        DO spin = 1, 2
+            DO n = 1, N_NEIGHBOURS
+                DO lat = 1, LAYER_COUPLINGS
+                    DO orb = 1, ORBITALS
+                        READ(9, output_format) band_read, spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
+                        Gamma_SC(orb_read, n_read, spin_read, lat_read, band_read) = DCMPLX(Gamma_re, Gamma_im)*meV2au
+                    END DO
                 END DO
+                READ(9,*)
+                READ(9,*)
             END DO
-            READ(9,*)
-            READ(9,*)
-        END DO
-        DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
-            DO lat = 1, SUBLATTICES
-                DO orb = 1, ORBITALS
-                    READ(9, output_format) spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
-                    Gamma_SC(orb_read, n_read, spin_read, lat_read) = DCMPLX(Gamma_re, Gamma_im)*meV2au
+            DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
+                DO lat = 1, SUBLATTICES
+                    DO orb = 1, ORBITALS
+                        READ(9, output_format) band_read, spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
+                        Gamma_SC(orb_read, n_read, spin_read, lat_read, band_read) = DCMPLX(Gamma_re, Gamma_im)*meV2au
+                    END DO
                 END DO
+                READ(9,*)
+                READ(9,*)
             END DO
-            READ(9,*)
-            READ(9,*)
         END DO
     END DO
     CLOSE(9)
@@ -378,17 +388,18 @@ END SUBROUTINE GET_GAMMA_SC
 
 SUBROUTINE GET_CHARGE_DENS(Charge_dens, path)
     CHARACTER(LEN=*), INTENT(IN) :: path
-    REAL*8, INTENT(OUT) :: Charge_dens(DIM_POSITIVE_K)
-    INTEGER*4 :: spin, lat, orb, n
+    REAL*8, INTENT(OUT) :: Charge_dens(DIM_POSITIVE_K, SUBBANDS)
+    INTEGER*4 :: spin, lat, orb, n, band, band_read
     CHARACTER(LEN=20) :: output_format
 
     output_format = '(3I5, 1E15.5)'
 
     OPEN(unit = 9, FILE=path, FORM = "FORMATTED", ACTION = "READ", STATUS="OLD")
     READ(9,*)
-
-    DO n = 1, DIM_POSITIVE_K
-        READ(9, output_format) spin, lat, orb, Charge_dens(n)
+    DO band = 1, SUBBANDS
+        DO n = 1, DIM_POSITIVE_K
+            READ(9, output_format) band_read, spin, lat, orb, Charge_dens(n, band)
+        END DO
     END DO
 
     CLOSE(9)

@@ -77,7 +77,7 @@ gnu: F90 = gfortran
 gnu: F90FLAGS = -O3 -Wall -Wextra -ffree-line-length-none $(LIB_OPENMP)
 gnu: $(TARGET)
 
-debug: F90FLAGS = -O0 -g -fpp -DDEBUG $(LIB_OPENMP)#-check all -debug all -warn all #-diag-enable sc
+debug: F90FLAGS = -O0 -g -fpp $(LIB_OPENMP) -module $(MOD_DIR) -check bounds -debug all #-diag-enable sc
 debug: $(TARGET)
 
 #To avoid Thread Sanitizer error about bad memory mapping

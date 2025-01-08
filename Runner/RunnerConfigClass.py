@@ -22,7 +22,7 @@ class RunnerConfig:
             """\
         #!/bin/bash -l
         ## Job name
-        #SBATCH -J KTO-SC
+        #SBATCH -J KTO-SC-SUBBANDS
         ## Number of allocated nodes
         #SBATCH -N 1
         ## Number of tasks per node (by default this corresponds to the number of cores allocated per node)
@@ -50,7 +50,8 @@ class RunnerConfig:
             f"&discretization \
                 k1_steps = 100, \
                 k2_steps = 100, \
-                SUBLATTICES = 2 / \
+                SUBLATTICES = 2, \
+                SUBBANDS = 1 / \
             &physical_params \
                 T = 0.0, \
                 t_D = 0.5e3, \
@@ -68,7 +69,8 @@ class RunnerConfig:
                 U_HUB = 0e3, \
                 V_HUB = 0e3, \
                 E_Fermi = -1.0e3, \
-                V_layer = 0.0, 0.0 / \
+                V_layer = 0.0, 0.0, \
+                Subband_energies = 0.0e3 / \
             &self_consistency \
                 read_gamma_from_file = .FALSE., \
                 path_to_gamma_start = '', \
@@ -98,14 +100,15 @@ class RunnerConfig:
             f"&discretization \
                 k1_steps = 100, \
                 k2_steps = 100, \
-                SUBLATTICES = 2 / \
+                SUBLATTICES = 2, \
+                SUBBANDS = 1 / \
             &physical_params \
                 T = 0.0, \
                 t_D = 0.65e3, \
                 t_I = 0.05e3, \
                 t_Rashba = 0.004e3, \
                 lambda_SOC = 0.265e3, \
-                DELTA_TRI = 0.01e3, \
+                DELTA_TRI = 0.0e3, \
                 v = 0.0e3, \
                 V_pdp = 0.028e3, \
                 V_pds = -0.065e3, \
@@ -116,7 +119,8 @@ class RunnerConfig:
                 U_HUB = 0e3, \
                 V_HUB = 0e3, \
                 E_Fermi = -1.0e3, \
-                V_layer = 0.0, 0.0 / \
+                V_layer = 0.0, 0.0, \
+                Subband_energies = 0.0e3 / \
             &self_consistency \
                 read_gamma_from_file = .FALSE., \
                 path_to_gamma_start = '', \

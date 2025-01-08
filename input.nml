@@ -1,7 +1,8 @@
 &discretization
     k1_steps = 100,
     k2_steps = 100,
-    SUBLATTICES = 3 /
+    SUBLATTICES = 3,
+    SUBBANDS = 2 /
 
 &physical_params
     T = 0.0,
@@ -19,8 +20,9 @@
     J_SC_PRIME_NNN = 0.02e3,
     U_HUB = 0e3,
     V_HUB = 0e3,
-    E_Fermi = -0.0e3,
-    V_layer = 2.011e3, 2.011e3, 2.011e3 /
+    E_Fermi = 0.0e3,
+    V_layer = 1.946e3, 1.946e3, 1.946e3,
+    Subband_energies = 0.0e3, 0.065e3 /
 
 &self_consistency
     read_gamma_from_file = .FALSE.,

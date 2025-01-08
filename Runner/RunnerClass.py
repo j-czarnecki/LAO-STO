@@ -25,13 +25,13 @@ class Runner(RunnerConfig):
         """
         if isAres:
             pathToAppend = os.path.join(self.aresScratch, runsDir)
-            os.makedirs(pathToAppend, exist_ok = True)
+            os.makedirs(pathToAppend, exist_ok=True)
             pathToAppend = os.path.join(pathToAppend, "RUN")
         else:
             pathToAppend = f"RUN"
 
         for pair in paramValuePairs:
-            if pair[0] != "self_consistency" and pair[1] != "V_layer":
+            if pair[0] != "self_consistency" and not isinstance(pair[2], list):
                 pathToAppend = pathToAppend + f"_{pair[1]}_{pair[2]}"
 
         runner_cwd = os.getcwd()
@@ -172,9 +172,9 @@ class Runner(RunnerConfig):
         print("!!! ALL SEQUENTIAL JOBS FINISHED !!!")
 
     def __set_derived_values(self, nml: f90nml.Namelist):
-        '''
+        """
         This method sets all values derived from other namelist parameters
-        '''
+        """
         # Setting inter-orbital pairing
         nml["physical_params"]["J_SC_PRIME"] = (
             nml["physical_params"]["J_SC"] / 10.0
@@ -185,7 +185,6 @@ class Runner(RunnerConfig):
 
         # Setting appropriate starting values
         if nml["physical_params"]["J_SC"] == 0.0:
-            nml["self_consistency"]["gamma_start"] = 0.
+            nml["self_consistency"]["gamma_start"] = 0.0
         if nml["physical_params"]["J_SC_NNN"] == 0.0:
-            nml["self_consistency"]["gamma_nnn_start"] = 0.
-
+            nml["self_consistency"]["gamma_nnn_start"] = 0.0

@@ -366,6 +366,22 @@ SUBROUTINE COMPUTE_LAYER_POTENTIAL(Hamiltonian)
     END DO
 END SUBROUTINE COMPUTE_LAYER_POTENTIAL
 
+SUBROUTINE COMPUTE_SUBBAND_POTENTIAL(Hamiltonian, n_band)
+    IMPLICIT NONE
+    COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)
+    INTEGER*4, INTENT(IN) :: n_band
+    INTEGER*4 :: nambu, row, i
+    REAL*8 :: sign
+
+    DO nambu = 0, 1
+        sign = (-1)**nambu
+        DO i = 1, DIM_POSITIVE_K
+            row = nambu*DIM_POSITIVE_K + i
+            Hamiltonian(row, row) = Hamiltonian(row, row) + sign*Subband_energies(n_band) !lat + 1, because we cannot start from 0
+        END DO
+    END DO
+END SUBROUTINE COMPUTE_SUBBAND_POTENTIAL
+
 SUBROUTINE COMPUTE_FERMI_ENERGY(Hamiltonian)
     IMPLICIT NONE
     COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM,DIM)

@@ -54,11 +54,11 @@ def plotDispersions():
     dispersionPlotter.shiftEnergies()
 
     dispersionPlotter.plotCrossection(
-        "../Plots/DispersionSliceKy", 5000, "ky", 0.0, 2, 18
+        "../Plots/DispersionSliceKy", 5000, "ky", 0.0, 2, 24
     )
 
     dispersionPlotter.plotCrossection(
-        "../Plots/DispersionSliceKx", 5000, "kx", 0.0, 2, 18
+        "../Plots/DispersionSliceKx", 5000, "kx", 0.0, 2, 24
     )
 
     dispersionPlotter.plotFermiCrossection(100, 1.0, "../Plots/FermiSlice100.png")

@@ -45,5 +45,6 @@ PROGRAM main_postprocessing
     CALL CLOSE_LOGGER()
 
     IF (ALLOCATED(V_layer)) DEALLOCATE(V_layer)
+    IF (ALLOCATED(Subband_energies)) DEALLOCATE(Subband_energies) !Deallocate global variable
 
 END PROGRAM main_postprocessing

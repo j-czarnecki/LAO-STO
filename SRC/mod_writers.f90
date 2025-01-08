@@ -58,57 +58,60 @@ SUBROUTINE PRINT_ENERGIES(Energies, k1_steps, k2_steps, dk1, dk2, filename, N)
 END SUBROUTINE
 
 SUBROUTINE PRINT_GAMMA(Gamma_SC, filename)
-    COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS, 2,LAYER_COUPLINGS)
+    COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS, 2,LAYER_COUPLINGS, SUBBANDS)
     CHARACTER(LEN=*), INTENT(IN) :: filename
     CHARACTER(LEN=20) :: output_format
 
-    INTEGER*4 :: orb, j,spin, lat
-    output_format = '(4I5, 2E15.5)'
+    INTEGER*4 :: orb, j,spin, lat, band
+    output_format = '(5I5, 2E15.5)'
 
     !Printing SC gammas in [meV]
     OPEN(unit = 9, FILE= "./OutputData/"//filename//".dat", FORM = "FORMATTED", ACTION = "WRITE")
-    WRITE(9,*) "#spin neighbour lattice orbital Re(Gamma) Im(Gamma)"
-    DO spin = 1, 2
-        !Do this, because we store LAYER_COUPLINGS for nearest neighbours, but only SUBLATTICES for next-to-nearest
-        DO j = 1, N_NEIGHBOURS
-            DO lat = 1, LAYER_COUPLINGS
-                DO orb = 1, ORBITALS
-                    WRITE(9, output_format) spin, j, lat, orb, REAL(Gamma_SC(orb,j, spin,lat))/meV2au, AIMAG(Gamma_SC(orb,j, spin,lat))/meV2au
+    WRITE(9,*) "#band spin neighbour lattice orbital Re(Gamma) Im(Gamma)"
+    DO band = 1, SUBBANDS
+        DO spin = 1, 2
+            !Do this, because we store LAYER_COUPLINGS for nearest neighbours, but only SUBLATTICES for next-to-nearest
+            DO j = 1, N_NEIGHBOURS
+                DO lat = 1, LAYER_COUPLINGS
+                    DO orb = 1, ORBITALS
+                        WRITE(9, output_format) band, spin, j, lat, orb, REAL(Gamma_SC(orb,j, spin,lat, band))/meV2au, AIMAG(Gamma_SC(orb,j, spin,lat, band))/meV2au
+                    END DO
                 END DO
+                WRITE(9,*)
+                WRITE(9,*)
             END DO
-            WRITE(9,*)
-            WRITE(9,*)
-        END DO
-        DO j = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
-            DO lat = 1, SUBLATTICES
-                DO orb = 1, ORBITALS
-                    WRITE(9, output_format) spin, j, lat, orb, REAL(Gamma_SC(orb,j, spin,lat))/meV2au, AIMAG(Gamma_SC(orb,j, spin,lat))/meV2au
+            DO j = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
+                DO lat = 1, SUBLATTICES
+                    DO orb = 1, ORBITALS
+                        WRITE(9, output_format) band, spin, j, lat, orb, REAL(Gamma_SC(orb,j, spin,lat, band))/meV2au, AIMAG(Gamma_SC(orb,j, spin,lat, band))/meV2au
+                    END DO
                 END DO
+                WRITE(9,*)
+                WRITE(9,*)
             END DO
-            WRITE(9,*)
-            WRITE(9,*)
-        END DO
 
+        END DO
     END DO
     CLOSE(9)
 END SUBROUTINE PRINT_GAMMA
 
 SUBROUTINE PRINT_CHARGE(Charge_dens, filename)
-    REAL*8, INTENT(IN) :: Charge_dens(DIM_POSITIVE_K)
+    REAL*8, INTENT(IN) :: Charge_dens(DIM_POSITIVE_K, SUBBANDS)
     CHARACTER(LEN=*), INTENT(IN) :: filename
     CHARACTER(LEN=20) :: output_format
-    INTEGER*4 :: spin, lat, orb, n
+    INTEGER*4 :: spin, lat, orb, n, band
 
-    output_format = '(3I5, 1E15.5)'
-    n = 1
-
+    output_format = '(4I5, 1E15.5)'
     OPEN(unit = 9, FILE= "./OutputData/"//filename//".dat", FORM = "FORMATTED", ACTION = "WRITE")
-    WRITE(9,*) "#spin lattice orbital Charge"
-    DO spin = 1, 2
-        DO lat = 1, SUBLATTICES
-            DO orb = 1, ORBITALS
-                WRITE(9, output_format) spin, lat, orb, Charge_dens(n)
-                n = n + 1
+    WRITE(9,*) "#band spin lattice orbital Charge"
+    DO band = 1, SUBBANDS
+        n = 1
+        DO spin = 1, 2
+            DO lat = 1, SUBLATTICES
+                DO orb = 1, ORBITALS
+                    WRITE(9, output_format) band, spin, lat, orb, Charge_dens(n, band)
+                    n = n + 1
+                END DO
             END DO
         END DO
     END DO

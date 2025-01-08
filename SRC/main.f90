@@ -15,17 +15,17 @@ PROGRAM MAIN
 
     IMPLICIT NONE
 
-    COMPLEX*16, ALLOCATABLE :: Hamiltonian(:,:), Hamiltonian_const(:,:), U_transformation(:,:)
+    COMPLEX*16, ALLOCATABLE :: Hamiltonian(:,:), Hamiltonian_const(:,:), Hamiltonian_const_band(:,:), U_transformation(:,:)
     REAL*8, ALLOCATABLE :: Energies(:)
-    COMPLEX*16, ALLOCATABLE :: Delta_local(:,:,:,:), Delta_new(:,:,:,:)
+    COMPLEX*16, ALLOCATABLE :: Delta_local(:,:,:,:,:), Delta_new(:,:,:,:,:)
     REAL*8, ALLOCATABLE :: Delta_broyden(:), Delta_new_broyden(:)
-    COMPLEX*16, ALLOCATABLE :: Gamma_SC(:,:,:,:), Gamma_SC_new(:,:,:,:)
-    REAL*8, ALLOCATABLE :: Charge_dens(:), Charge_dens_new(:), Charge_dens_local(:)
+    COMPLEX*16, ALLOCATABLE :: Gamma_SC(:,:,:,:,:), Gamma_SC_new(:,:,:,:,:)
+    REAL*8, ALLOCATABLE :: Charge_dens(:,:), Charge_dens_new(:,:), Charge_dens_local(:,:)
 
     REAL*8 :: gamma_error, gamma_max_error, charge_error, charge_max_error
     REAL*8 :: gamma_max_error_prev, charge_max_error_prev
 
-    INTEGER*4 :: i,j,n, lat, orb, orb_prime,spin
+    INTEGER*4 :: i,j,n, lat, orb, orb_prime,spin, band, band_prime
     INTEGER*4 :: sc_iter
     LOGICAL :: sc_flag
 
@@ -56,7 +56,7 @@ PROGRAM MAIN
     !2 because of complex number
     !LAYER_COUPLINGS because of Ti1-Ti2 coupling and Ti2 - Ti1 coupling (stored in this order) for nearest-neighbours
     !DIM_POSITIVE_K included due to Charge density self-consistency
-    delta_real_elems = DIM_POSITIVE_K + ORBITALS*2*2*(N_NEIGHBOURS*LAYER_COUPLINGS + N_NEXT_NEIGHBOURS*SUBLATTICES)
+    delta_real_elems = SUBBANDS*(DIM_POSITIVE_K + ORBITALS*2*2*(N_NEIGHBOURS*LAYER_COUPLINGS + N_NEXT_NEIGHBOURS*SUBLATTICES))
 
     !Basis
     !c_{k,yz,Ti1,up}, c_{k,zx,Ti1,up}, c_{k,xy,Ti1,up},
@@ -66,61 +66,62 @@ PROGRAM MAIN
     ! + H.c{-k}
     ALLOCATE(Hamiltonian(DIM,DIM))
     ALLOCATE(Hamiltonian_const(DIM,DIM))
+    ALLOCATE(Hamiltonian_const_band(DIM,DIM))
     ALLOCATE(U_transformation(DIM,DIM))
     ALLOCATE(Energies(DIM))
-    ALLOCATE(Delta_local(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS))    !Third dimension for spin coupling up-down and down-up
-                                                                           !Fourth dimension for coupling between sublattices/layers
-                                                                           !Coupling with nearest neighbours is inter-layer, thus we include both
-                                                                           !Ti1 - Ti2 coupling and Ti2 - Ti1 coupling separately.
-                                                                           !For next-to-nearest neighbours we only include Ti1-Ti1 etc. coupling
-                                                                           !Due to its intra-layer character
-    ALLOCATE(Delta_new(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS))
-    ALLOCATE(Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS))
-    ALLOCATE(Gamma_SC_new(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS))
+    ALLOCATE(Delta_local(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS, SUBBANDS))    !Third dimension for spin coupling up-down and down-up
+                                                                                     !Fourth dimension for coupling between sublattices/layers
+                                                                                     !Coupling with nearest neighbours is inter-layer, thus we include both
+                                                                                     !Ti1 - Ti2 coupling and Ti2 - Ti1 coupling separately.
+                                                                                     !For next-to-nearest neighbours we only include Ti1-Ti1 etc. coupling
+                                                                                     !Due to its intra-layer character
+    ALLOCATE(Delta_new(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS, SUBBANDS))
+    ALLOCATE(Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS, SUBBANDS))
+    ALLOCATE(Gamma_SC_new(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS, SUBBANDS))
     ALLOCATE(Delta_broyden(delta_real_elems))   !Flattened Gamma array
     ALLOCATE(Delta_new_broyden(delta_real_elems))
-    ALLOCATE(Charge_dens(DIM_POSITIVE_K))
-    ALLOCATE(Charge_dens_local(DIM_POSITIVE_K))
-    ALLOCATE(Charge_dens_new(DIM_POSITIVE_K))
+    ALLOCATE(Charge_dens(DIM_POSITIVE_K, SUBBANDS))
+    ALLOCATE(Charge_dens_local(DIM_POSITIVE_K, SUBBANDS))
+    ALLOCATE(Charge_dens_new(DIM_POSITIVE_K, SUBBANDS))
 
 
     !Initializations
-    Hamiltonian(:,:) = DCMPLX(0., 0.)
-    Hamiltonian_const(:,:) = DCMPLX(0., 0.)
-    U_transformation(:,:) = DCMPLX(0., 0.)
-    Energies(:) = 0.
+    Hamiltonian = DCMPLX(0., 0.)
+    Hamiltonian_const = DCMPLX(0., 0.)
+    Hamiltonian_const_band = DCMPLX(0., 0.)
+    U_transformation = DCMPLX(0., 0.)
+    Energies = 0.
 
-    Delta_local(:,:,:,:) = DCMPLX(0. , 0.)
-    Delta_new(:,:,:,:) = DCMPLX(0. , 0.)
+    Delta_local = DCMPLX(0. , 0.)
+    Delta_new = DCMPLX(0. , 0.)
 
     IF (read_gamma_from_file) THEN
         LOG_INFO("Reading gamma from file: "//TRIM(path_to_gamma_start))
-        CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(path_to_gamma_start))
+        CALL GET_GAMMA_SC(Gamma_SC, TRIM(path_to_gamma_start))
     ELSE
         !Breaking spin up-down down-up symmetry
         !coupling for nearest-neighbours
-        Gamma_SC(:, :N_NEIGHBOURS, 1, :) = DCMPLX(gamma_start, 0.)
-        Gamma_SC(:, :N_NEIGHBOURS, 2, :) = DCMPLX(-gamma_start, 0.)
+        Gamma_SC(:, :N_NEIGHBOURS, 1, :, :) = DCMPLX(gamma_start, 0.)
+        Gamma_SC(:, :N_NEIGHBOURS, 2, :, :) = DCMPLX(-gamma_start, 0.)
         !coupling for next nearest neighbours
-        Gamma_SC(:, (N_NEIGHBOURS + 1):, 1, :) = DCMPLX(gamma_nnn_start, 0.)
-        Gamma_SC(:, (N_NEIGHBOURS + 1):, 2, :) = DCMPLX(-gamma_nnn_start, 0.)
+        Gamma_SC(:, (N_NEIGHBOURS + 1):, 1, :, :) = DCMPLX(gamma_nnn_start, 0.)
+        Gamma_SC(:, (N_NEIGHBOURS + 1):, 2, :, :) = DCMPLX(-gamma_nnn_start, 0.)
     END IF
 
-    !Gamma_SC(:,:,:) = DCMPLX(0., 0.)
-    Gamma_SC_new(:,:,:,:) = DCMPLX(0., 0.)
+    Gamma_SC_new = DCMPLX(0., 0.)
 
     IF (read_charge_from_file) THEN
         LOG_INFO("Reading charge from file: "//TRIM(path_to_charge_start))
-        CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(path_to_charge_start))
+        CALL GET_CHARGE_DENS(Charge_dens, TRIM(path_to_charge_start))
     ELSE
-        Charge_dens(:) = charge_start
+        Charge_dens = charge_start
     END IF
 
-    Charge_dens_new(:) = 0.
-    Charge_dens_local(:) = 0.
+    Charge_dens_new = 0.
+    Charge_dens_local = 0.
 
-    Delta_broyden(:) = 0.
-    Delta_new_broyden(:) = 0.
+    Delta_broyden = 0.
+    Delta_new_broyden = 0.
 
     gamma_max_error = 0.
     charge_max_error = 0.
@@ -138,57 +139,32 @@ PROGRAM MAIN
     DO sc_iter = 1, max_sc_iter
         WRITE(log_string,'(a, I0)') "==== SC_ITER: ", sc_iter
         LOG_INFO(log_string)
-        !PRINT*, "============= SC_ITER: ", sc_iter
-        !PRINT*, "Gamma = ", Gamma_SC(1,1,1,1)/meV2au
-        !Those loops are only for slicing and future parallelization
-        !Integration over chunks is computed via Romberg algorithm.
-        !$omp parallel do collapse(2) schedule(dynamic, 1) private(Delta_local, Charge_dens_local)
-        DO i = -k1_steps/2, k1_steps/2 - 1
-            DO j = -k2_steps/2, k2_steps/2 - 1
-                ! WRITE(log_string, *) 'Integrating over chunk: ', i, j
-                ! LOG_INFO(log_string)
+        DO band = 1, SUBBANDS
+            WRITE(log_string,'(a, I0)') " **** BAND: ", band
+            LOG_INFO(log_string)
 
-                CALL ROMBERG_Y(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), Charge_dens(:), i*dk1, (i + 1)*dk1, j*dk2, (j + 1)*dk2, &
-                & Delta_local(:,:,:,:), Charge_dens_local(:), romb_eps_x, interpolation_deg_x, max_grid_refinements_x, &
-                & romb_eps_y, interpolation_deg_y, max_grid_refinements_y)
-                !This has to be atomic operations, since Delta_new and Charge_dens would be global variables for all threads
-                !$omp critical (update_delta_and_charge)
-                Delta_new(:,:,:,:) = Delta_new(:,:,:,:) + Delta_local(:,:,:,:)
-                Charge_dens_new(:) = Charge_dens_new(:) + Charge_dens_local(:)
-                !$omp end critical (update_delta_and_charge)
-            END DO
-        END DO !End of k-loop
-        !$omp end parallel do
+            Hamiltonian_const_band = Hamiltonian_const
+            CALL COMPUTE_SUBBAND_POTENTIAL(Hamiltonian_const_band, band)
 
-        !Due to change of sum to integral one has to divide by Brillouin zone volume
-        !Jacobian and volume of Brillouin zone cancel out thus no multiplier
-        Delta_new(:,:,:,:) = Delta_new(:,:,:,:)
-        Charge_dens_new(:) = Charge_dens_new(:)
+            !Integration over chunks is computed via Romberg algorithm.
+            !$omp parallel do collapse(2) schedule(dynamic, 1) private(Delta_local, Charge_dens_local)
+            DO i = -k1_steps/2, k1_steps/2 - 1
+                DO j = -k2_steps/2, k2_steps/2 - 1
+                    ! WRITE(log_string, *) 'Integrating over chunk: ', i, j
+                    ! LOG_INFO(log_string)
 
-        ! !Integration with simple trapezoid rule
-        ! DO i = 0, k1_steps
-        !     counter = counter + 1
-        !     PRINT*, counter
-
-        !     DO j = 0, k2_steps
-
-        !         CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const(:,:), Gamma_SC(:,:,:,:), &
-        !         & Charge_dens(:), i*dk1, j*dk2, Delta_local(:,:,:,:), Charge_dens_local(:))
-
-        !         Delta_new(:,:,:,:) = Delta_new(:,:,:,:) + Delta_local(:,:,:,:)*dk1*dk2
-        !         Charge_dens_new(:) = Charge_dens_new(:) + Charge_dens_local(:)*dk1*dk2
-
-        !     END DO
-        ! END DO
-        !Jacobian and volume of Brillouin zone cancel out thus no multiplier
-        ! Delta_new(:,:,:,:) = Delta_new(:,:,:,:)
-        ! Charge_dens_new(:) = Charge_dens_new(:)
-
-        ! DO i = 1, DIM_POSITIVE_K
-        !     PRINT*, "Charge elem ", i, " = ", Charge_dens_new(i)
-        ! END DO
-
-
+                    CALL ROMBERG_Y(Hamiltonian_const_band(:,:), Gamma_SC(:,:,:,:, band), Charge_dens(:, band), i*dk1, (i + 1)*dk1, j*dk2, (j + 1)*dk2, &
+                    & Delta_local(:,:,:,:, band), Charge_dens_local(:, band), romb_eps_x, interpolation_deg_x, max_grid_refinements_x, &
+                    & romb_eps_y, interpolation_deg_y, max_grid_refinements_y)
+                    !This has to be atomic operations, since Delta_new and Charge_dens would be global variables for all threads
+                    !$omp critical (update_delta_and_charge)
+                    Delta_new(:,:,:,:, band) = Delta_new(:,:,:,:, band) + Delta_local(:,:,:,:, band)
+                    Charge_dens_new(:, band) = Charge_dens_new(:, band) + Charge_dens_local(:, band)
+                    !$omp end critical (update_delta_and_charge)
+                END DO
+            END DO !End of k-loop
+            !$omp end parallel do
+        END DO
         !#########################################################################################################################
         !This is a critical section - only one thread can execute that and all thread should have ended their job up to that point
         !#########################################################################################################################
@@ -196,41 +172,62 @@ PROGRAM MAIN
         !Delta_new(:,:,:,:) = Delta_new(:,:,:,:) * domega ! because of changing sum to integral
         !Charge_dens(:) = Charge_dens(:) * domega
         !Gamma calculation
-        DO spin = 1,2   !Loop over spin coupling up-down or down-up
-            DO n = 1, N_NEIGHBOURS !Loop over neighbours
-                DO lat = 1, LAYER_COUPLINGS !Loop over LAYER_COUPLINGS to include Ti1-Ti2 and Ti2-Ti1 coupling
-                    DO orb = 1, ORBITALS
-                        Gamma_SC_new(orb,n,spin,lat) = -0.5*J_SC*Delta_new(orb,n,spin,lat)
-                        DO orb_prime = 1, ORBITALS
-                            IF(orb .NE. orb_prime) THEN
-                                Gamma_SC_new(orb,n,spin,lat) = Gamma_SC_new(orb,n,spin,lat) - 0.5 * J_SC_PRIME * Delta_new(orb_prime, n,spin,lat)
-                            END IF
+        DO band = 1, SUBBANDS
+            DO spin = 1,2   !Loop over spin coupling up-down or down-up
+                DO n = 1, N_NEIGHBOURS !Loop over neighbours
+                    DO lat = 1, LAYER_COUPLINGS !Loop over LAYER_COUPLINGS to include Ti1-Ti2 and Ti2-Ti1 coupling
+                        DO orb = 1, ORBITALS
+
+                            Gamma_SC_new(orb,n,spin,lat, band) = -0.5*J_SC*Delta_new(orb,n,spin,lat, band)
+                            ! To get same critical temperature in all orbitals
+                            DO orb_prime = 1, ORBITALS
+                                IF(orb .NE. orb_prime) THEN
+                                    Gamma_SC_new(orb,n,spin,lat, band) = Gamma_SC_new(orb,n,spin,lat, band) - 0.5 * J_SC_PRIME * Delta_new(orb_prime, n,spin,lat, band)
+                                END IF
+                            END DO
+                            ! To get same critical temperature in all subbands
+                            DO band_prime = 1, SUBBANDS
+                                IF(band .NE. band_prime) THEN
+                                    DO orb_prime = 1, ORBITALS
+                                        Gamma_SC_new(orb,n,spin,lat, band) = Gamma_SC_new(orb,n,spin,lat, band) - 0.5 * J_SC_PRIME * Delta_new(orb_prime, n,spin,lat, band_prime)
+                                    END DO
+                                END IF
+                            END DO
+
                         END DO
                     END DO
                 END DO
             END DO
         END DO
-
         !Gamma for next nearest neighbours pairing
-        DO spin = 1,2   !Loop over spin coupling up-down or down-up
-            DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS !Loop over next nearest neighbours
-                DO lat = 1, SUBLATTICES !Loop over sublattices coupling, since for next-to-nearest neighbours it has intra-layer character
-                    DO orb = 1, ORBITALS
-                        Gamma_SC_new(orb,n,spin,lat) = -0.5*J_SC_NNN*Delta_new(orb,n,spin,lat)
-                        DO orb_prime = 1, ORBITALS
-                            IF(orb .NE. orb_prime) THEN
-                                ! CHECK WHETHER THIS IS 0.25 OR 0.5
-                                Gamma_SC_new(orb,n,spin,lat) = Gamma_SC_new(orb,n,spin,lat) - 0.5 * J_SC_PRIME_NNN * Delta_new(orb_prime, n,spin,lat)
-                            END IF
+        DO band = 1, SUBBANDS
+            DO spin = 1,2   !Loop over spin coupling up-down or down-up
+                DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS !Loop over next nearest neighbours
+                    DO lat = 1, SUBLATTICES !Loop over sublattices coupling, since for next-to-nearest neighbours it has intra-layer character
+                        DO orb = 1, ORBITALS
+
+                            Gamma_SC_new(orb,n,spin,lat, band) = -0.5*J_SC_NNN*Delta_new(orb,n,spin,lat, band)
+                            ! To get same critical temperature in all orbitals
+                            DO orb_prime = 1, ORBITALS
+                                IF(orb .NE. orb_prime) THEN
+                                    ! CHECK WHETHER THIS IS 0.25 OR 0.5
+                                    Gamma_SC_new(orb,n,spin,lat, band) = Gamma_SC_new(orb,n,spin,lat, band) - 0.5 * J_SC_PRIME_NNN * Delta_new(orb_prime, n,spin,lat, band)
+                                END IF
+                            END DO
+                            ! To get same critical temperature in all subbands
+                            DO band_prime = 1, SUBBANDS
+                                IF(band .NE. band_prime) THEN
+                                    DO orb_prime = 1, ORBITALS
+                                        Gamma_SC_new(orb,n,spin,lat, band) = Gamma_SC_new(orb,n,spin,lat, band) - 0.5 * J_SC_PRIME_NNN * Delta_new(orb_prime, n,spin,lat, band_prime)
+                                    END DO
+                                END IF
+                            END DO
+
                         END DO
                     END DO
                 END DO
             END DO
         END DO
-
-
-        !PRINT*, "Gamma new = ", Gamma_SC_new(1,1,1,1)/meV2au
-        !PRINT*, "Filling ", SUM(Charge_dens(:)) / DIM_POSITIVE_K
 
         gamma_max_error_prev = gamma_max_error
         charge_max_error_prev = charge_max_error
@@ -238,38 +235,40 @@ PROGRAM MAIN
         charge_max_error = 0.
         !Here we check whether convergence was reached
         sc_flag = .TRUE.
-        DO spin = 1, 2
-            DO orb = 1, ORBITALS
-                DO n = 1, N_NEIGHBOURS
-                    DO lat = 1, LAYER_COUPLINGS
-                        !It should be considered whether relative or absolute error must be checked
-                        gamma_error = ABS( ABS(Gamma_SC_new(orb,n,spin,lat)) - ABS(Gamma_SC(orb,n,spin,lat)) )
-                        !Gamma convergence checking
-                        IF (gamma_error > gamma_eps_convergence) THEN
-                            sc_flag = .FALSE.
-                            !EXIT !Maybe go to???
-                        END IF
+        DO band = 1, SUBBANDS
+            DO spin = 1, 2
+                DO orb = 1, ORBITALS
+                    DO n = 1, N_NEIGHBOURS
+                        DO lat = 1, LAYER_COUPLINGS
+                            !It should be considered whether relative or absolute error must be checked
+                            gamma_error = ABS( ABS(Gamma_SC_new(orb,n,spin,lat, band)) - ABS(Gamma_SC(orb,n,spin,lat, band)) )
+                            !Gamma convergence checking
+                            IF (gamma_error > gamma_eps_convergence) THEN
+                                sc_flag = .FALSE.
+                                !EXIT !Maybe go to???
+                            END IF
 
-                        !Find biggest error in current iteration
-                        IF (gamma_error > gamma_max_error) gamma_max_error = gamma_error
+                            !Find biggest error in current iteration
+                            IF (gamma_error > gamma_max_error) gamma_max_error = gamma_error
 
+                        END DO
+                    END DO
+                    DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
+                        DO lat = 1, SUBLATTICES
+                            !It should be considered whether relative or absolute error must be checked
+                            gamma_error = ABS( ABS(Gamma_SC_new(orb,n,spin,lat, band)) - ABS(Gamma_SC(orb,n,spin,lat, band)) )
+                            !Gamma convergence checking
+                            IF (gamma_error > gamma_eps_convergence) THEN
+                                sc_flag = .FALSE.
+                                !EXIT !Maybe go to???
+                            END IF
+
+                            !Find biggest error in current iteration
+                            IF (gamma_error > gamma_max_error) gamma_max_error = gamma_error
+
+                        END DO
                     END DO
                 END DO
-                DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
-                    DO lat = 1, SUBLATTICES
-                        !It should be considered whether relative or absolute error must be checked
-                        gamma_error = ABS( ABS(Gamma_SC_new(orb,n,spin,lat)) - ABS(Gamma_SC(orb,n,spin,lat)) )
-                        !Gamma convergence checking
-                        IF (gamma_error > gamma_eps_convergence) THEN
-                            sc_flag = .FALSE.
-                            !EXIT !Maybe go to???
-                        END IF
-
-                        !Find biggest error in current iteration
-                        IF (gamma_error > gamma_max_error) gamma_max_error = gamma_error
-
-                    END DO
-                END DO                
             END DO
         END DO
         !Change Broyden mixing parameter if simulation diverges between iterations
@@ -281,13 +280,15 @@ PROGRAM MAIN
             sc_alpha = sc_alpha*sc_alpha_adapt
         END IF
 
-        DO n = 1, DIM_POSITIVE_K
-            charge_error = ABS(Charge_dens(n) - Charge_dens_new(n))
-            IF (charge_error > charge_eps_convergence) THEN
-                sc_flag = .FALSE.
-            END IF
+        DO band = 1, SUBBANDS
+            DO n = 1, DIM_POSITIVE_K
+                charge_error = ABS(Charge_dens(n, band) - Charge_dens_new(n, band))
+                IF (charge_error > charge_eps_convergence) THEN
+                    sc_flag = .FALSE.
+                END IF
 
-            IF (charge_error > charge_max_error) charge_max_error = charge_error
+                IF (charge_error > charge_max_error) charge_max_error = charge_error
+            END DO
         END DO
 
         IF (sc_flag) THEN
@@ -295,9 +296,9 @@ PROGRAM MAIN
             EXIT
         END IF
 
-        WRITE(99,'(I0, 8E15.5)') sc_iter, REAL(Gamma_SC(1,1,1,1)/meV2au), AIMAG(Gamma_SC(1,1,1,1)/meV2au), &
-        &                                 REAL(Gamma_SC_new(1,1,1,1)/meV2au), AIMAG(Gamma_SC_new(1,1,1,1)/meV2au), &
-        &                                 Charge_dens(1), Charge_dens_new(1), gamma_max_error/meV2au, charge_max_error
+        WRITE(99,'(I0, 8E15.5)') sc_iter, REAL(Gamma_SC(1,1,1,1,1)/meV2au), AIMAG(Gamma_SC(1,1,1,1,1)/meV2au), &
+        &                                 REAL(Gamma_SC_new(1,1,1,1,1)/meV2au), AIMAG(Gamma_SC_new(1,1,1,1,1)/meV2au), &
+        &                                 Charge_dens(1,1), Charge_dens_new(1,1), gamma_max_error/meV2au, charge_max_error
         WRITE(log_string,'(a, E15.5)') "gamma_max_error [meV]: ", gamma_max_error/meV2au
         LOG_INFO(log_string)
         WRITE(log_string,'(a, E15.5)') "charge_max_error: ", charge_max_error
@@ -311,43 +312,45 @@ PROGRAM MAIN
             !Broyden mixing
             !Flatten arrays for Broyden mixing
             broyden_index = 1
-            DO spin = 1, 2
-                DO orb = 1, ORBITALS
-                    DO n = 1, N_NEIGHBOURS
-                        DO lat = 1, LAYER_COUPLINGS
-                            Delta_broyden(broyden_index) = REAL(Gamma_SC(orb,n,spin,lat))
-                            Delta_new_broyden(broyden_index) = REAL(Gamma_SC_new(orb,n,spin,lat))
-                            broyden_index = broyden_index + 1
+            DO band = 1, SUBBANDS
+                DO spin = 1, 2
+                    DO orb = 1, ORBITALS
+                        DO n = 1, N_NEIGHBOURS
+                            DO lat = 1, LAYER_COUPLINGS
+                                Delta_broyden(broyden_index) = REAL(Gamma_SC(orb,n,spin,lat, band))
+                                Delta_new_broyden(broyden_index) = REAL(Gamma_SC_new(orb,n,spin,lat, band))
+                                broyden_index = broyden_index + 1
 
-                            Delta_broyden(broyden_index) = AIMAG(Gamma_SC(orb,n,spin,lat))
-                            Delta_new_broyden(broyden_index) = AIMAG(Gamma_SC_new(orb,n,spin,lat))
-                            broyden_index = broyden_index + 1
+                                Delta_broyden(broyden_index) = AIMAG(Gamma_SC(orb,n,spin,lat, band))
+                                Delta_new_broyden(broyden_index) = AIMAG(Gamma_SC_new(orb,n,spin,lat, band))
+                                broyden_index = broyden_index + 1
+                            END DO
                         END DO
-                    END DO
-                    DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
-                        DO lat = 1, SUBLATTICES
-                            Delta_broyden(broyden_index) = REAL(Gamma_SC(orb,n,spin,lat))
-                            Delta_new_broyden(broyden_index) = REAL(Gamma_SC_new(orb,n,spin,lat))
-                            broyden_index = broyden_index + 1
+                        DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
+                            DO lat = 1, SUBLATTICES
+                                Delta_broyden(broyden_index) = REAL(Gamma_SC(orb,n,spin,lat, band))
+                                Delta_new_broyden(broyden_index) = REAL(Gamma_SC_new(orb,n,spin,lat, band))
+                                broyden_index = broyden_index + 1
 
-                            Delta_broyden(broyden_index) = AIMAG(Gamma_SC(orb,n,spin,lat))
-                            Delta_new_broyden(broyden_index) = AIMAG(Gamma_SC_new(orb,n,spin,lat))
-                            broyden_index = broyden_index + 1
+                                Delta_broyden(broyden_index) = AIMAG(Gamma_SC(orb,n,spin,lat, band))
+                                Delta_new_broyden(broyden_index) = AIMAG(Gamma_SC_new(orb,n,spin,lat, band))
+                                broyden_index = broyden_index + 1
+                            END DO
                         END DO
-                    END DO
 
+                    END DO
                 END DO
             END DO
-
             !Must be +1!!!
             !Delta_broyden((delta_real_elems - DIM_POSITIVE_K + 1) : delta_real_elems) = Charge_dens(:)
             !Delta_new_broyden((delta_real_elems - DIM_POSITIVE_K + 1) : delta_real_elems) = Charge_dens_new(:)
-            DO n = 1, DIM_POSITIVE_K
-                Delta_broyden(broyden_index) = Charge_dens(n)
-                Delta_new_broyden(broyden_index) = Charge_dens_new(n)
-                broyden_index = broyden_index + 1
+            DO band = 1, SUBBANDS
+                DO n = 1, DIM_POSITIVE_K
+                    Delta_broyden(broyden_index) = Charge_dens(n, band)
+                    Delta_new_broyden(broyden_index) = Charge_dens_new(n, band)
+                    broyden_index = broyden_index + 1
+                END DO
             END DO
-
             !Sanity check
             IF (broyden_index - 1 /= delta_real_elems) THEN
                 WRITE(log_string,*) 'Broyden index - 1 /= delta_real_elems', broyden_index - 1, delta_real_elems
@@ -359,28 +362,30 @@ PROGRAM MAIN
 
             !PRINT*, "Finished mix_broyden, rewriting to Gamma"
             broyden_index = 1
-            DO spin = 1, 2
-                DO orb = 1, ORBITALS
-                    DO n = 1, N_NEIGHBOURS
-                        DO lat = 1, LAYER_COUPLINGS
-                            Gamma_SC(orb,n,spin,lat) = DCMPLX(Delta_broyden(broyden_index), Delta_broyden(broyden_index + 1))
-                            broyden_index = broyden_index + 2
+            DO band = 1, SUBBANDS
+                DO spin = 1, 2
+                    DO orb = 1, ORBITALS
+                        DO n = 1, N_NEIGHBOURS
+                            DO lat = 1, LAYER_COUPLINGS
+                                Gamma_SC(orb,n,spin,lat, band) = DCMPLX(Delta_broyden(broyden_index), Delta_broyden(broyden_index + 1))
+                                broyden_index = broyden_index + 2
+                            END DO
                         END DO
-                    END DO
-                    DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
-                        DO lat = 1, SUBLATTICES
-                            Gamma_SC(orb,n,spin,lat) = DCMPLX(Delta_broyden(broyden_index), Delta_broyden(broyden_index + 1))
-                            broyden_index = broyden_index + 2
+                        DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
+                            DO lat = 1, SUBLATTICES
+                                Gamma_SC(orb,n,spin,lat, band) = DCMPLX(Delta_broyden(broyden_index), Delta_broyden(broyden_index + 1))
+                                broyden_index = broyden_index + 2
+                            END DO
                         END DO
                     END DO
                 END DO
             END DO
-
-            DO n = 1, DIM_POSITIVE_K
-                Charge_dens(n) = Delta_broyden(broyden_index)
-                broyden_index = broyden_index + 1
+            DO band = 1, SUBBANDS
+                DO n = 1, DIM_POSITIVE_K
+                    Charge_dens(n, band) = Delta_broyden(broyden_index)
+                    broyden_index = broyden_index + 1
+                END DO
             END DO
-
             !Sanity check
             IF (broyden_index - 1 /= delta_real_elems) THEN
                 WRITE(log_string,*) 'Broyden index - 1 /= delta_real_elems', broyden_index - 1, delta_real_elems
@@ -395,20 +400,20 @@ PROGRAM MAIN
 
 
         !Gamma_SC(:,:,:,2) = CONJG(Gamma_SC(:,:,:,1)) !This is valid in asbence of magnetic field
-        Delta_new(:,:,:,:) = DCMPLX(0. , 0.)
-        Gamma_SC_new(:,:,:,:) = DCMPLX(0., 0.)
-        Charge_dens_new(:) = 0.
+        Delta_new = DCMPLX(0. , 0.)
+        Gamma_SC_new = DCMPLX(0., 0.)
+        Charge_dens_new = 0.
 
         !To check the state of the simulation
-        CALL PRINT_GAMMA(Gamma_SC(:,:,:,:), "Gamma_SC_iter")
-        CALL PRINT_CHARGE(Charge_dens(:), "Charge_dens_iter")
+        CALL PRINT_GAMMA(Gamma_SC(:,:,:,:,:), "Gamma_SC_iter")
+        CALL PRINT_CHARGE(Charge_dens(:,:), "Charge_dens_iter")
 
     END DO !End of SC loop
     CLOSE(99)
 
     !Printing results after the simulation is done
-    CALL PRINT_GAMMA(Gamma_SC(:,:,:,:), "Gamma_SC_final")
-    CALL PRINT_CHARGE(Charge_dens(:), "Charge_dens_final")
+    CALL PRINT_GAMMA(Gamma_SC(:,:,:,:,:), "Gamma_SC_final")
+    CALL PRINT_CHARGE(Charge_dens(:,:), "Charge_dens_final")
 
 
     !Just for memory deallocation, the .TRUE. flag is crucial
@@ -418,6 +423,7 @@ PROGRAM MAIN
 
     DEALLOCATE(Hamiltonian)
     DEALLOCATE(Hamiltonian_const)
+    DEALLOCATE(Hamiltonian_const_band)
     DEALLOCATE(Energies)
     DEALLOCATE(Delta_local)
     DEALLOCATE(Delta_new)
@@ -431,4 +437,6 @@ PROGRAM MAIN
     DEALLOCATE(Charge_dens_new)
 
     IF (ALLOCATED(V_layer)) DEALLOCATE(V_layer) !Deallocate global variable
+    IF (ALLOCATED(Subband_energies)) DEALLOCATE(Subband_energies) !Deallocate global variable
+
 END PROGRAM MAIN
