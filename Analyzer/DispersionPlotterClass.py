@@ -113,7 +113,7 @@ class DispersionPlotter(DataReader):
         sliceAlong: str,
         fixedKVal: float,
         kMax: float,
-        nBands: int,
+        isSuperconducting: bool = False,
     ):
 
         fixedK = ""
@@ -125,119 +125,121 @@ class DispersionPlotter(DataReader):
             xLabelOnPlot = r"$k_y~(\tilde{a}^{-1})$"
             fixedK = "kx"
 
-        plotEnergies = np.zeros((self.kPoints1D, nBands), dtype=np.float32)
-        currentIndex = np.zeros(nBands, dtype=int)
-        for i in range(self.dataLength):
-            if self.dispersionDataframe[fixedK][i] == fixedKVal:
-                bandNo = int(self.dispersionDataframe.N[i]) - 1
-                plotEnergies[currentIndex[bandNo], bandNo] = self.dispersionDataframe.E[
-                    i
-                ]
-                currentIndex[bandNo] += 1
-                plt.figure(0)
-                plt.plot(
-                    self.dispersionDataframe[sliceAlong][i],
-                    self.dispersionDataframe.E[i],
-                    marker=".",
-                    markersize=2,
-                    color=(
-                        self.dispersionDataframe.P_yz[i],
-                        self.dispersionDataframe.P_zx[i],
-                        self.dispersionDataframe.P_xy[i],
-                    ),
-                )
-                plt.figure(1)
-                plt.plot(
-                    self.dispersionDataframe[sliceAlong][i],
-                    self.dispersionDataframe.E[i],
-                    marker=".",
-                    markersize=2,
-                    color=(
-                        self.dispersionDataframe["P_lat1"][i],
-                        self.dispersionDataframe["P_lat2"][i],
-                        (
-                            self.dispersionDataframe["P_lat3"][i]
-                            if "P_lat3" in self.dispersionDataframe
-                            else 0
-                        ),
-                    ),
-                )
-                plt.figure(2)
-                plt.plot(
-                    self.dispersionDataframe[sliceAlong][i],
-                    self.dispersionDataframe.E[i],
-                    marker=".",
-                    markersize=2,
-                    color=(
-                        self.dispersionDataframe.P_up[i],
-                        0,
-                        self.dispersionDataframe.P_down[i],
-                    ),
-                )
+        filteredDispersion = self.dispersionDataframe[
+            self.dispersionDataframe[fixedK] == fixedKVal
+        ]
 
-        plt.figure(0)
+        minEnergy = filteredDispersion["E"].min() - 0.02 * maxEnergy
+        if isSuperconducting:
+            minEnergy = -maxEnergy
+        # Projecting orbitals as color
+        colors = filteredDispersion[["P_yz", "P_zx", "P_xy"]].values
+        plt.figure()
+        plt.scatter(
+            filteredDispersion[sliceAlong],
+            filteredDispersion["E"],
+            marker=".",
+            s=2,
+            c=colors,
+        )
         plt.xlim(-kMax, kMax)
-        # plt.ylim(bottom = self.lowestEnergy - 0.02*maxEnergy, top = maxEnergy
-        plt.ylim(bottom=-0.02 * maxEnergy, top=maxEnergy)
+        plt.ylim(bottom=minEnergy, top=maxEnergy)
         plt.xlabel(xLabelOnPlot)
         plt.ylabel(r"$E$ (meV)")
-        # plt.grid()
         plt.savefig(plotOutputPath + "_orbital.png")
         plt.close()
 
-        plt.figure(1)
+        # Projecting spin as color
+        colors = filteredDispersion[
+            ["P_up", "P_up", "P_down"]
+        ].values  # middle value for green color is a dummy variable and is set to 0 later
+        colors[:, 1] = 0.0
+        plt.figure()
+        plt.scatter(
+            filteredDispersion[sliceAlong],
+            filteredDispersion["E"],
+            marker=".",
+            s=2,
+            c=colors,
+        )
         plt.xlim(-kMax, kMax)
-        # plt.ylim(bottom = self.lowestEnergy - 0.02*maxEnergy, top = maxEnergy)
-        plt.ylim(bottom=-0.02 * maxEnergy, top=maxEnergy)
+        plt.ylim(bottom=minEnergy, top=maxEnergy)
         plt.xlabel(xLabelOnPlot)
         plt.ylabel(r"$E$ (meV)")
-        # plt.grid()
-        plt.savefig(plotOutputPath + "_lattice.png")
-        plt.close()
-
-        plt.figure(2)
-        plt.xlim(-kMax, kMax)
-        # plt.ylim(bottom = self.lowestEnergy - 0.02*maxEnergy, top = maxEnergy)
-        plt.ylim(bottom=-0.02 * maxEnergy, top=maxEnergy)
-        plt.xlabel(xLabelOnPlot)
-        plt.ylabel(r"$E$ (meV)")
-        # plt.grid()
         plt.savefig(plotOutputPath + "_spin.png")
         plt.close()
 
-        plt.figure(3)
-        plt.plot(
-            np.sort(list(set(self.dispersionDataframe[sliceAlong]))),
-            plotEnergies,
-            linewidth=1,
-            color="black",
+        # Projecting lattice as color
+        lat3 = "P_lat3" if "P_lat3" in self.dispersionDataframe else "P_lat1"
+        colors = filteredDispersion[
+            ["P_lat1", "P_lat2", lat3]
+        ].values  # if P_lat3 does not exist assign dummy column P_lat1
+        if lat3 == "P_lat1":
+            colors[:, 2] = 0.0
+
+        plt.figure()
+        plt.scatter(
+            filteredDispersion[sliceAlong],
+            filteredDispersion["E"],
+            marker=".",
+            s=2,
+            c=colors,
         )
         plt.xlim(-kMax, kMax)
-        # plt.ylim(bottom = self.lowestEnergy - 0.02*maxEnergy, top = maxEnergy)
-        plt.ylim(bottom=-0.02 * maxEnergy, top=maxEnergy)
+        plt.ylim(bottom=minEnergy, top=maxEnergy)
         plt.xlabel(xLabelOnPlot)
         plt.ylabel(r"$E$ (meV)")
-        # plt.grid()
+        plt.savefig(plotOutputPath + "_lattice.png")
+        plt.close()
+
+        # Projecting electron-hole occupation as color
+        colors = filteredDispersion[
+            ["P_elec", "P_elec", "P_hole"]
+        ].values  # middle value for green color is a dummy variable and is set to 0 later
+        colors[:, 1] = 0.0
+        plt.figure()
+        plt.scatter(
+            filteredDispersion[sliceAlong],
+            filteredDispersion["E"],
+            marker=".",
+            s=2,
+            c=colors,
+        )
+        plt.xlim(-kMax, kMax)
+        plt.ylim(bottom=minEnergy, top=maxEnergy)
+        plt.xlabel(xLabelOnPlot)
+        plt.ylabel(r"$E$ (meV)")
+        plt.savefig(plotOutputPath + "_elec_hole.png")
+        plt.close()
+
+        # Plotting all bands with line
+        groups = filteredDispersion.groupby("N")
+        plt.figure()
+        for _, group in groups:
+            plt.plot(
+                group[sliceAlong],
+                group["E"],
+                linewidth=1,
+                color="black",
+            )
+        plt.xlim(-kMax, kMax)
+        plt.ylim(bottom=minEnergy, top=maxEnergy)
+        plt.xlabel(xLabelOnPlot)
+        plt.ylabel(r"$E$ (meV)")
         plt.savefig(plotOutputPath + "_standard.png")
         plt.close()
 
     def plotFermiCrossection(self, eFermi: float, dE: float, plotOutputPath: str):
+
         plt.figure()
         self.plotFirstBrillouinZoneBoundary()
-
-        for i in range(len(self.dispersionDataframe.N)):
-            if np.abs(self.dispersionDataframe.E[i] - eFermi) < dE:
-                plt.plot(
-                    self.dispersionDataframe.kx[i],
-                    self.dispersionDataframe.ky[i],
-                    marker=".",
-                    markersize=0.6,
-                    color=(
-                        self.dispersionDataframe.P_yz[i],
-                        self.dispersionDataframe.P_zx[i],
-                        self.dispersionDataframe.P_xy[i],
-                    ),
-                )
+        filteredDispersion = self.dispersionDataframe[
+            np.abs(self.dispersionDataframe["E"] - eFermi) < dE
+        ]
+        groups = filteredDispersion.groupby("N")
+        for _, group in groups:
+            colors = group[["P_yz", "P_zx", "P_xy"]].values
+            plt.scatter(group["kx"], group["ky"], marker="o", s=0.6, c=colors)
 
         plt.title(r"$E_{Fermi} = $ " + str(eFermi) + " (meV)")
         plt.xlabel(r"$k_x~(\tilde{a}^{-1})$")
@@ -254,7 +256,6 @@ class DispersionPlotter(DataReader):
         plt.xlim(left=-eMax, right=eMax)
         plt.xlabel(r"DOS")
         plt.ylabel(r"E (meV)")
-        # plt.grid(True)
         plt.savefig(plotOutputPath)
         plt.close()
 
@@ -270,17 +271,6 @@ class DispersionPlotter(DataReader):
             cmap="inferno",
         )
         print("Minimal value of gap is ", self.superconductingGapDataframe.gap.min())
-        # for i in range(6):
-        #     for j in range(len(self.superconductingGapDataframe.kx)):
-        #         #if 3 == int(self.superconductingGapDataframe.state[j]):
-        #         if True:
-        #             plt.scatter(
-        #                 self.superconductingGapDataframe.kx[j],
-        #                 self.superconductingGapDataframe.ky[j],
-        #                 c=self.superconductingGapDataframe.gap[j],
-        #                 s=0.5,
-        #                 cmap="Reds",
-        #             )
 
         plt.colorbar(label=r"$\tilde{\Delta}$ (meV)")
         ticks = plt.gca().get_xticks()

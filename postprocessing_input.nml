@@ -1,8 +1,8 @@
 &sc_gap_calculation
     enable_sc_gap_calc = .FALSE.,
     path_to_run_dir_sc_gap = "/home/jczarnecki/LAO-STO/",
-    dE_sc_gap = 1e-2,
-    Nk_points_sc_gap = 1000 /
+    dE_sc_gap = 1e-1,
+    Nk_points_sc_gap = 500 /
 
 &chern_number_calculation
     enable_chern_number_calc = .FALSE.,
@@ -10,17 +10,17 @@
     Nk_points_chern_number = 2000 /
 
 &dispersion_relation_calculation
-    enable_dispersion_relation_calc = .TRUE.,
+    enable_dispersion_relation_calc = .FALSE.,
     path_to_run_dir_dispersion_relation = "/home/jczarnecki/LAO-STO/",
     include_sc_in_dispersion = .FALSE.,
-    Nk_points_dispersion_relation = 100 /
+    Nk_points_dispersion_relation = 200 /
 
 &dos_calculation
-    enable_dos_calc = .FALSE.,
-    path_to_run_dir_dos = "/home/jczarnecki/LAO-STO/",
-    E_DOS_min = -1.5e3,
-    E_DOS_max = -0.9e3,
-    dE0 = 1e-1,
-    zeta_DOS = 1e-1,
-    include_sc_in_dos = .FALSE.,
-    Nk_points_dos = 2000 /
+    enable_dos_calc = .TRUE.,
+    path_to_run_dir_dos = "/home/jczarnecki/LAO-STO-results/KTO-3-layers/RUN_E_Fermi_0.0_J_SC_400.0_SUBLATTICES_3/",
+    E_DOS_min = -10,
+    E_DOS_max = 10,
+    dE0 = 10,
+    zeta_DOS = 1,
+    include_sc_in_dos = .TRUE.,
+    Nk_points_dos = 100 /

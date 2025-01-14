@@ -201,6 +201,8 @@ SUBROUTINE GET_INPUT(nmlfile)
     !This is crucial
     ALLOCATE(V_layer(SUBLATTICES))
     ALLOCATE(Subband_energies(SUBBANDS))
+    V_layer = 0.0d0
+    Subband_energies = 0.0d0
 
     !TODO: WRITE BETTER CHECKS!!!!!!!!!!!!!!!!!!
     READ(9,NML=physical_params)
@@ -354,7 +356,8 @@ SUBROUTINE GET_GAMMA_SC(Gamma_SC, path)
     REAL*8 :: Gamma_re, Gamma_im
     CHARACTER(LEN=20) :: output_format
 
-    output_format = '(5I5, 2E15.5)'
+    !output_format = '(5I5, 2E15.5)'
+    output_format = '(4I5, 2E15.5)'
 
     OPEN(unit = 9, FILE=path, FORM = "FORMATTED", ACTION = "READ", STATUS="OLD")
     READ(9,*)
@@ -363,8 +366,13 @@ SUBROUTINE GET_GAMMA_SC(Gamma_SC, path)
             DO n = 1, N_NEIGHBOURS
                 DO lat = 1, LAYER_COUPLINGS
                     DO orb = 1, ORBITALS
+#ifndef READ_OLD
                         READ(9, output_format) band_read, spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
                         Gamma_SC(orb_read, n_read, spin_read, lat_read, band_read) = DCMPLX(Gamma_re, Gamma_im)*meV2au
+#else
+                        READ(9, output_format) spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
+                        Gamma_SC(orb_read, n_read, spin_read, lat_read, band) = DCMPLX(Gamma_re, Gamma_im)*meV2au
+#endif
                     END DO
                 END DO
                 READ(9,*)
@@ -373,8 +381,13 @@ SUBROUTINE GET_GAMMA_SC(Gamma_SC, path)
             DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
                 DO lat = 1, SUBLATTICES
                     DO orb = 1, ORBITALS
+#ifndef READ_OLD
                         READ(9, output_format) band_read, spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
                         Gamma_SC(orb_read, n_read, spin_read, lat_read, band_read) = DCMPLX(Gamma_re, Gamma_im)*meV2au
+#else
+                        READ(9, output_format) spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
+                        Gamma_SC(orb_read, n_read, spin_read, lat_read, band) = DCMPLX(Gamma_re, Gamma_im)*meV2au
+#endif
                     END DO
                 END DO
                 READ(9,*)
@@ -392,13 +405,21 @@ SUBROUTINE GET_CHARGE_DENS(Charge_dens, path)
     INTEGER*4 :: spin, lat, orb, n, band, band_read
     CHARACTER(LEN=20) :: output_format
 
+#ifndef READ_OLD
+    output_format = '(4I5, 1E15.5)'
+#else
     output_format = '(3I5, 1E15.5)'
+#endif
 
     OPEN(unit = 9, FILE=path, FORM = "FORMATTED", ACTION = "READ", STATUS="OLD")
     READ(9,*)
     DO band = 1, SUBBANDS
         DO n = 1, DIM_POSITIVE_K
+#ifndef READ_OLD
             READ(9, output_format) band_read, spin, lat, orb, Charge_dens(n, band)
+#else
+            READ(9, output_format) spin, lat, orb, Charge_dens(n, band)
+#endif
         END DO
     END DO
 

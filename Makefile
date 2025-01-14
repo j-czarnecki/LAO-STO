@@ -4,13 +4,20 @@ SRC_DIR = SRC
 OBJ_DIR = OBJ
 MOD_DIR = MOD
 
+
+ifeq ($(READ_OLD), TRUE)
+READ_OLD_FLAG = -DREAD_OLD
+else
+READ_OLD_FLAG =
+endif
+
 # the command shell
 SHELL = /bin/sh
 F90 = ifx
 CC = gcc
 CXX = g++
 LIB_OPENMP = -qopenmp
-F90FLAGS = -O3 -fpp -ipo $(LIB_OPENMP) -module $(MOD_DIR)
+F90FLAGS = -O3 -fpp -ipo $(LIB_OPENMP) -module $(MOD_DIR) $(READ_OLD_FLAG)
 LIBS = -llapack -lblas
 LIBS_MKL = -I${MKLROOT}/include \
 					 -I/opt/intel/mkl/include \
@@ -74,22 +81,22 @@ ares_post: LIBS = -lscalapack -lflexiblas
 ares_post: $(POSTPROCESSING_TARGET)
 
 gnu: F90 = gfortran
-gnu: F90FLAGS = -O3 -Wall -Wextra -ffree-line-length-none $(LIB_OPENMP)
+gnu: F90FLAGS = -O3 -Wall -Wextra -ffree-line-length-none $(LIB_OPENMP) $(READ_OLD_FLAG)
 gnu: $(TARGET)
 
-debug: F90FLAGS = -O0 -g -fpp $(LIB_OPENMP) -module $(MOD_DIR) -check bounds -debug all #-diag-enable sc
+debug: F90FLAGS = -O0 -g -fpp $(LIB_OPENMP) -module $(MOD_DIR) $(READ_OLD_FLAG) -check bounds -debug all #-diag-enable sc
 debug: $(TARGET)
 
 #To avoid Thread Sanitizer error about bad memory mapping
 #echo 0 | sudo tee /proc/sys/kernel/randomize_va_space
 #To include suppressions run as
 #TSAN_OPTIONS="suppressions=thread_suppressions.txt:history_size=7" bin/lao_sto_qd.x
-tsan: F90FLAGS = -O0 -g -fpp -DDEBUG -fsanitize=thread $(LIB_OPENMP)
+tsan: F90FLAGS = -O0 -g -fpp -DDEBUG -fsanitize=thread $(LIB_OPENMP) $(READ_OLD_FLAG)
 tsan: $(TARGET)
 
 post: $(POSTPROCESSING_TARGET)
 
-post_debug: F90FLAGS = -O0 -g -fpp -DDEBUG -traceback $(LIB_OPENMP)
+post_debug: F90FLAGS = -O0 -g -fpp -DDEBUG -module $(MOD_DIR) -debug all -traceback -check bounds $(LIB_OPENMP) $(READ_OLD_FLAG)
 post_debug:	$(POSTPROCESSING_TARGET)
 
 test:
@@ -100,6 +107,9 @@ test:
 
 analyze:
 	cd Analyzer && python3 mainAnalyzer.py && cd ..
+
+clean_plots:
+	cd Plots && rm -rf *.png && cd ..
 
 clean:
 	rm -rf $(MOD_DIR)

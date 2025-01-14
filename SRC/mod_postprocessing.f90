@@ -24,18 +24,19 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_poi
     INTEGER*4 :: DOS_steps
     INTEGER*4 :: hamiltonian_dim
 
-    COMPLEX*16, ALLOCATABLE :: Hamiltonian(:,:), Hamiltonian_const(:,:), U_transformation(:,:)
+    COMPLEX*16, ALLOCATABLE :: Hamiltonian(:,:), Hamiltonian_const(:,:), Hamiltonian_const_band(:,:), U_transformation(:,:)
     REAL*8, ALLOCATABLE :: Energies(:,:,:)
 
-    COMPLEX*16, ALLOCATABLE :: Gamma_SC(:,:,:,:)
-    REAL*8, ALLOCATABLE :: Charge_dens(:)
+    COMPLEX*16, ALLOCATABLE :: Gamma_SC(:,:,:,:,:)
+    REAL*8, ALLOCATABLE :: Charge_dens(:,:)
 
     REAL*8, ALLOCATABLE :: DOS(:)
     CHARACTER(LEN=20) :: output_format
 
 
     REAL*8 :: k1, k2, kx, ky, dk1, dk2
-    INTEGER*4 :: i,j,k,n, lat, orb, orb_prime,spin
+    REAL*8 :: sc_multiplier
+    INTEGER*4 :: i,j,k,n, lat, orb, orb_prime,spin, band
 
     LOGICAL :: fileExists
 
@@ -50,38 +51,41 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_poi
     !If superconductivity is to be included, we add Nambu space to the Hamiltonian and double the size.
     IF (include_sc) THEN
         hamiltonian_dim = DIM
+        sc_multiplier = 0.5
     ELSE
         hamiltonian_dim = DIM_POSITIVE_K
+        sc_multiplier = 1.0
     END IF
 
     ALLOCATE(Hamiltonian(DIM,DIM))
     ALLOCATE(Hamiltonian_const(DIM,DIM))
+    ALLOCATE(Hamiltonian_const_band(DIM,DIM))
     ALLOCATE(U_transformation(hamiltonian_dim, hamiltonian_dim))
     ALLOCATE(Energies(0:Nk_points, 0:Nk_points, hamiltonian_dim))
-    ALLOCATE(Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES))
-    ALLOCATE(Charge_dens(DIM_POSITIVE_K))
+    ALLOCATE(Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS, SUBBANDS))
+    ALLOCATE(Charge_dens(DIM_POSITIVE_K, SUBBANDS))
     ALLOCATE(DOS(0:DOS_steps))
 
-    Hamiltonian(:,:) = DCMPLX(0., 0.)
-    Hamiltonian_const(:,:) = DCMPLX(0. , 0.)
-    Energies(:,:,:) = 0.
-    Gamma_SC(:,:,:,:) = DCMPLX(0. , 0.)*meV2au
-    Charge_dens(:) = 0.
+    Hamiltonian = DCMPLX(0., 0.)
+    Hamiltonian_const = DCMPLX(0. , 0.)
+    Energies = 0.
+    Gamma_SC = DCMPLX(0. , 0.)
+    Charge_dens = 0.
 
     INQUIRE(FILE = TRIM(inputPath)//"OutputData/Charge_dens_final.dat", EXIST = fileExists)
     IF (fileExists) THEN
-        CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
+        CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
     ELSE
-        CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
+        CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
     END IF
 
     IF (include_sc) THEN
         !Then we should also read Gamma_SC
-        INQUIRE(FILE = TRIM(inputPath)//"OutputData/Gamma_SC__final.dat", EXIST = fileExists)
+        INQUIRE(FILE = TRIM(inputPath)//"OutputData/Gamma_SC_final.dat", EXIST = fileExists)
         IF (fileExists) THEN
-            CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(inputPath)//"OutputData/Gamma_SC_final.dat")
+            CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_final.dat")
         ELSE
-            CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
+            CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
         END IF
     END IF
 
@@ -89,64 +93,71 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_poi
     CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:,:))
     CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:,:))
     CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian_const(:,:))
+    CALL COMPUTE_LAYER_POTENTIAL(Hamiltonian_const(:,:))
     !Not shifting with the Fermi Energy, since we want "real" energy scale
     !However If we want to include SC, we have to take into account actual Fermi energy for which Gammas were calculated
     IF (include_sc) THEN
-        DO n = 1, DIM_POSITIVE_K
-            Hamiltonian_const(n,n) = Hamiltonian_const(n,n) - E_Fermi
-            Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) = Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) + E_Fermi
-        END DO
+        CALL COMPUTE_FERMI_ENERGY(Hamiltonian_const(:,:))
     END IF
     CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
 
 
-    WRITE (log_string,*) "Calculating energies for DOS calculation"
-    LOG_INFO(log_string)
-    !$omp parallel private(k1, k2, kx, ky, Hamiltonian, U_transformation)
-    !$omp do
-    DO i = 0, Nk_points
-        DO j = 0, Nk_points
-            k1 = i*dk1
-            k2 = j*dk2
+    DO band = 1, SUBBANDS
+        WRITE (log_string,*) "Band: ", band
+        LOG_INFO(log_string)
 
-            kx = 2.*PI/(SQRT(3.0d0)) * k1
-            ky = -2.*PI/3. * k1 + 4.*PI/3. * k2
-            Hamiltonian(:,:) = DCMPLX(0. , 0.)
-            CALL COMPUTE_TBA_TERM(Hamiltonian(:,:), kx, ky)
-            CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-            CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-            CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-            CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:,:), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
-            CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:))
-            CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
+        !Adapt potential of given subband (energy difference due to quantization)
+        Hamiltonian_const_band = Hamiltonian_const
+        CALL COMPUTE_SUBBAND_POTENTIAL(Hamiltonian_const_band, band)
 
-            CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
-
-            Hamiltonian(:,:) = Hamiltonian_const(:,:) + Hamiltonian(:,:) !Should by multiplied by 0.5 if in Nambu space
-
-            CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:hamiltonian_dim,:hamiltonian_dim), Energies(i,j,:), U_transformation(:,:), hamiltonian_dim)
-
-        END DO
-    END DO
-    !$omp end do
-    !$omp end parallel
-
-    WRITE (log_string,*) "Looping over E0 for DOS calculation"
-    LOG_INFO(log_string)
-    !$omp parallel private(E0)
-    !$omp do
-    DO n = 0, DOS_steps
+        WRITE (log_string,*) "Calculating energies for DOS calculation"
+        LOG_INFO(log_string)
+        !$omp parallel private(k1, k2, kx, ky, Hamiltonian, U_transformation)
+        !$omp do
         DO i = 0, Nk_points
             DO j = 0, Nk_points
-                DO k = 1, hamiltonian_dim
-                    E0 = E_DOS_min + n*dE0
-                    DOS(n) = DOS(n) + dirac_delta(Energies(i,j,k), E0, zeta_DOS)
+                k1 = i*dk1
+                k2 = j*dk2
+
+                kx = 2.*PI/(SQRT(3.0d0)) * k1
+                ky = -2.*PI/3. * k1 + 4.*PI/3. * k2
+                Hamiltonian(:,:) = DCMPLX(0. , 0.)
+                CALL COMPUTE_TBA_TERM(Hamiltonian(:,:), kx, ky)
+                CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:,:), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
+                CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:, band))
+                CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:, band))
+
+                CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
+
+                Hamiltonian(:,:) = sc_multiplier*(Hamiltonian_const_band + Hamiltonian) !Should by multiplied by 0.5 if in Nambu space
+
+                CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:hamiltonian_dim,:hamiltonian_dim), Energies(i,j,:), U_transformation(:,:), hamiltonian_dim)
+
+            END DO
+        END DO
+        !$omp end do
+        !$omp end parallel
+
+        WRITE (log_string,*) "Looping over E0 for DOS calculation"
+        LOG_INFO(log_string)
+        !$omp parallel private(E0)
+        !$omp do
+        DO n = 0, DOS_steps
+            DO i = 0, Nk_points
+                DO j = 0, Nk_points
+                    DO k = 1, hamiltonian_dim
+                        E0 = E_DOS_min + n*dE0
+                        DOS(n) = DOS(n) + dirac_delta(Energies(i,j,k), E0, zeta_DOS)
+                    END DO
                 END DO
             END DO
         END DO
+        !$omp end do
+        !$omp end parallel
     END DO
-    !$omp end do
-    !$omp end parallel
 
     WRITE (log_string,*) "Writing DOS to file"
     LOG_INFO(log_string)
@@ -162,11 +173,14 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_poi
 
     DEALLOCATE(Hamiltonian)
     DEALLOCATE(Hamiltonian_const)
+    DEALLOCATE(Hamiltonian_const_band)
     DEALLOCATE(U_transformation)
     DEALLOCATE(Energies)
     DEALLOCATE(Gamma_SC)
     DEALLOCATE(Charge_dens)
     DEALLOCATE(DOS)
+    IF (ALLOCATED(V_layer)) DEALLOCATE(V_layer)
+    IF (ALLOCATED(Subband_energies)) DEALLOCATE(Subband_energies) !Deallocate global variable
 
 END SUBROUTINE CALCULATE_DOS
 
@@ -181,17 +195,16 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
     LOGICAL, INTENT(IN) :: include_sc
     CHARACTER(LEN=20) :: output_format
 
-    COMPLEX*16, ALLOCATABLE :: Hamiltonian(:,:), Hamiltonian_const(:,:), U_transformation(:,:)
+    COMPLEX*16, ALLOCATABLE :: Hamiltonian(:,:), Hamiltonian_const(:,:), Hamiltonian_const_band(:,:), U_transformation(:,:)
     REAL*8, ALLOCATABLE :: Energies(:,:,:)
     REAL*8, ALLOCATABLE :: Probability(:,:,:,:) ! |Psi^2|
 
-    COMPLEX*16, ALLOCATABLE :: Gamma_SC(:,:,:,:)
-    REAL*8, ALLOCATABLE :: Charge_dens(:)
-
-    REAL*8, ALLOCATABLE :: DOS(:)
+    COMPLEX*16, ALLOCATABLE :: Gamma_SC(:,:,:,:,:)
+    REAL*8, ALLOCATABLE :: Charge_dens(:,:)
 
     REAL*8 :: k1, k2, kx, ky, dkx, dky
-    INTEGER*4 :: i,j,k,n, lat, orb, orb_prime,spin, l, m
+    REAL*8 :: sc_multiplier
+    INTEGER*4 :: i,j,k,n, lat, orb, orb_prime,spin, l, m, band
     INTEGER*4 :: kx_steps, ky_steps
     REAL*8 :: yz_contribution, zx_contribution, xy_contribution
     REAL*8 :: lat1_contribution, lat2_contribution
@@ -212,8 +225,10 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
     !If superconductivity is to be included, we add Nambu space to the Hamiltonian and double the size.
     IF (include_sc) THEN
         hamiltonian_dim = DIM
+        sc_multiplier = 0.5d0
     ELSE
         hamiltonian_dim = DIM_POSITIVE_K
+        sc_multiplier = 1.0d0
     END IF
 
     yz_contribution = 0.
@@ -237,26 +252,27 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
 
     ALLOCATE(Hamiltonian(DIM,DIM))
     ALLOCATE(Hamiltonian_const(DIM,DIM))
+    ALLOCATE(Hamiltonian_const_band(DIM,DIM))
     ALLOCATE(U_transformation(hamiltonian_dim, hamiltonian_dim))
     ALLOCATE(Probability(-kx_steps:kx_steps, -ky_steps:ky_steps, hamiltonian_dim, hamiltonian_dim))
     ALLOCATE(Energies(-kx_steps:kx_steps, -ky_steps:ky_steps, hamiltonian_dim))
-    ALLOCATE(Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, 2, LAYER_COUPLINGS))
-    ALLOCATE(Charge_dens(DIM_POSITIVE_K))
+    ALLOCATE(Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, 2, LAYER_COUPLINGS, SUBBANDS))
+    ALLOCATE(Charge_dens(DIM_POSITIVE_K, SUBBANDS))
     ALLOCATE(Lat_contributions(SUBLATTICES))
 
     Hamiltonian(:,:) = DCMPLX(0., 0.)
     Hamiltonian_const(:,:) = DCMPLX(0. , 0.)
     Probability(:,:,:,:) = 0.
     Energies(:,:,:) = 0.
-    Gamma_SC(:,:,:,:) = DCMPLX(0. , 0.)*meV2au
-    Charge_dens(:) = 0.
+    Gamma_SC = DCMPLX(0. , 0.)*meV2au
+    Charge_dens = 0.
 
     IF ((U_HUB .NE. 0.0) .OR. (V_HUB .NE. 0.0)) THEN
         INQUIRE(FILE = TRIM(inputPath)//"OutputData/Charge_dens_final.dat", EXIST = fileExists)
         IF (fileExists) THEN
-            CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
+            CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
         ELSE
-            CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
+            CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
         END IF
     END IF
 
@@ -264,11 +280,17 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
         !Then we should also read Gamma_SC
         INQUIRE(FILE = TRIM(inputPath)//"OutputData/Gamma_SC__final.dat", EXIST = fileExists)
         IF (fileExists) THEN
-            CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(inputPath)//"OutputData/Gamma_SC_final.dat")
+            CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_final.dat")
         ELSE
-            CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
+            CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
         END IF
     END IF
+
+    Gamma_SC(:,:,1,:,1) = 30. * meV2au
+    Gamma_SC(:,:,2,:,1) = -30. * meV2au
+    Gamma_SC(:,:,1,:,2) = 10. * meV2au
+    Gamma_SC(:,:,2,:,2) = -10. * meV2au
+
 
     !Computing k-independent terms
     CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:,:))
@@ -282,107 +304,117 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
     END IF
     CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
 
-    !$omp parallel private(kx, ky, Hamiltonian)
-    !$omp do
-    DO i = -kx_steps, kx_steps
-        DO j = -ky_steps, ky_steps
-            kx = i*dkx !* (2. * PI * 2./3.)
-            ky = j*dky !* (2. * PI * 2./3.)
-            IF (is_inside_polygon(brillouinZoneVertices, 6, kx, ky)) THEN
-
-                Hamiltonian(:,:) = DCMPLX(0. , 0.)
-                CALL COMPUTE_TBA_TERM(Hamiltonian(:,:), kx, ky)
-                CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-                CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-                CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-                CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:,:), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
-                CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:))
-                CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
-                CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
-                Hamiltonian(:,:) = Hamiltonian_const(:,:) + Hamiltonian(:,:) !Should by multiplied by 0.5 if in Nambu space
-
-                !CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:DIM_POSITIVE_K,:DIM_POSITIVE_K), Energies(i,j,:), U_transformation(:,:), DIM_POSITIVE_K)
-                !Probability(i,j,:,:) = ABS(U_transformation)**2
-
-                CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:hamiltonian_dim, :hamiltonian_dim), Energies(i,j,:), hamiltonian_dim)
-                Probability(i,j,:,:) = ABS(Hamiltonian(:hamiltonian_dim,:hamiltonian_dim))**2
-            END IF
-        END DO
-    END DO
-    !$omp end do
-    !$omp end parallel
-
     OPEN(unit = 9, FILE= TRIM(inputPath)//"OutputData/Energies.dat", FORM = "FORMATTED", ACTION = "WRITE")
     WRITE(9,'(A)') "#N kx[1/a] ky[1/a] Energy[meV] P(yz) P(zx) P(xy) P(lat1) P(lat2) ... P(latN) P(s_up) P(s_down) P(electron) P(hole)"
-    DO l = 1, hamiltonian_dim
+
+    DO band = 1, SUBBANDS
+        WRITE (log_string,*) "Band: ", band
+        LOG_INFO(log_string)
+
+        !Adapt potential of given subband (energy difference due to quantization)
+        Hamiltonian_const_band = Hamiltonian_const
+        CALL COMPUTE_SUBBAND_POTENTIAL(Hamiltonian_const_band, band)
+
+        !$omp parallel private(kx, ky, Hamiltonian)
+        !$omp do
         DO i = -kx_steps, kx_steps
             DO j = -ky_steps, ky_steps
                 kx = i*dkx !* (2. * PI * 2./3.)
                 ky = j*dky !* (2. * PI * 2./3.)
                 IF (is_inside_polygon(brillouinZoneVertices, 6, kx, ky)) THEN
 
+                    Hamiltonian(:,:) = DCMPLX(0. , 0.)
+                    CALL COMPUTE_TBA_TERM(Hamiltonian(:,:), kx, ky)
+                    CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                    CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                    CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                    CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:,:), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
+                    CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens)
+                    CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC)
+                    CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
+                    Hamiltonian(:,:) = sc_multiplier*(Hamiltonian_const_band(:,:) + Hamiltonian(:,:)) !Should by multiplied by 0.5 if in Nambu space
 
-                    !Calculate specific contributions
-                    !Distinguishing orbital contributions
-                    yz_contribution = 0.
-                    zx_contribution = 0.
-                    xy_contribution = 0.
-                    DO n = 1, hamiltonian_dim, ORBITALS
-                        yz_contribution = yz_contribution + Probability(i,j,n,l)
-                        zx_contribution = zx_contribution + Probability(i,j,n+1,l)
-                        xy_contribution = xy_contribution + Probability(i,j,n+2,l)
-                    END DO
+                    !CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:DIM_POSITIVE_K,:DIM_POSITIVE_K), Energies(i,j,:), U_transformation(:,:), DIM_POSITIVE_K)
+                    !Probability(i,j,:,:) = ABS(U_transformation)**2
 
-                    !Distinguishing lattice contributions
-                    lat1_contribution = 0.
-                    lat2_contribution = 0.
-                    Lat_contributions(:) = 0.
-                    DO m = 0, SUBLATTICES - 1
-                        DO spin = 0, 1
-                            DO n = 1, ORBITALS
-                                Lat_contributions(m + 1) = Lat_contributions(m + 1) + Probability(i,j,spin*TBA_DIM + m*ORBITALS + n,l)
-                                IF (include_sc) THEN
-                                    Lat_contributions(m + 1) = Lat_contributions(m + 1) + Probability(i,j,DIM_POSITIVE_K + spin*TBA_DIM + m*ORBITALS + n,l)
-                                END IF
-                            END DO
-                        END DO
-                    END DO
-
-                    !Distinguishing spin contributions
-                    spin_up_contribution = 0.
-                    spin_down_contribution = 0.
-                    DO n = 1, TBA_DIM
-                        spin_up_contribution = spin_up_contribution + Probability(i,j,n,l)
-                        spin_down_contribution = spin_down_contribution + Probability(i,j,TBA_DIM + n,l)
-                        IF (include_sc) THEN
-                            spin_up_contribution = spin_up_contribution + Probability(i,j,DIM_POSITIVE_K + n,l)
-                            spin_down_contribution = spin_down_contribution + Probability(i,j,DIM_POSITIVE_K + TBA_DIM + n,l)
-                        END IF
-                    END DO
-
-                    electron_contribution = 0.
-                    hole_contribution = 0.
-                    IF (include_sc) THEN
-                        DO n = 1, DIM_POSITIVE_K
-                            electron_contribution = electron_contribution + Probability(i,j,n,l)
-                            hole_contribution = hole_contribution + Probability(i,j,DIM_POSITIVE_K + n,l)
-                        END DO
-                    ELSE
-                        electron_contribution = 1.
-                        hole_contribution = 0.
-                    END IF
-
-                    WRITE(9, output_format) l, kx, ky, Energies(i, j, l)/meV2au, &
-                    & yz_contribution, zx_contribution, xy_contribution, &
-                    & (Lat_contributions(lat), lat = 1, SUBLATTICES), &
-                    & spin_up_contribution, spin_down_contribution, &
-                    & electron_contribution, hole_contribution
+                    CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:hamiltonian_dim, :hamiltonian_dim), Energies(i,j,:), hamiltonian_dim)
+                    Probability(i,j,:,:) = ABS(Hamiltonian(:hamiltonian_dim,:hamiltonian_dim))**2
                 END IF
             END DO
         END DO
-        ! WRITE(9,*)
-        ! WRITE(9,*)
-    END DO
+        !$omp end do
+        !$omp end parallel
+
+        DO l = 1, hamiltonian_dim
+            DO i = -kx_steps, kx_steps
+                DO j = -ky_steps, ky_steps
+                    kx = i*dkx !* (2. * PI * 2./3.)
+                    ky = j*dky !* (2. * PI * 2./3.)
+                    IF (is_inside_polygon(brillouinZoneVertices, 6, kx, ky)) THEN
+
+
+                        !Calculate specific contributions
+                        !Distinguishing orbital contributions
+                        yz_contribution = 0.
+                        zx_contribution = 0.
+                        xy_contribution = 0.
+                        DO n = 1, hamiltonian_dim, ORBITALS
+                            yz_contribution = yz_contribution + Probability(i,j,n,l)
+                            zx_contribution = zx_contribution + Probability(i,j,n+1,l)
+                            xy_contribution = xy_contribution + Probability(i,j,n+2,l)
+                        END DO
+
+                        !Distinguishing lattice contributions
+                        lat1_contribution = 0.
+                        lat2_contribution = 0.
+                        Lat_contributions(:) = 0.
+                        DO m = 0, SUBLATTICES - 1
+                            DO spin = 0, 1
+                                DO n = 1, ORBITALS
+                                    Lat_contributions(m + 1) = Lat_contributions(m + 1) + Probability(i,j,spin*TBA_DIM + m*ORBITALS + n,l)
+                                    IF (include_sc) THEN
+                                        Lat_contributions(m + 1) = Lat_contributions(m + 1) + Probability(i,j,DIM_POSITIVE_K + spin*TBA_DIM + m*ORBITALS + n,l)
+                                    END IF
+                                END DO
+                            END DO
+                        END DO
+
+                        !Distinguishing spin contributions
+                        spin_up_contribution = 0.
+                        spin_down_contribution = 0.
+                        DO n = 1, TBA_DIM
+                            spin_up_contribution = spin_up_contribution + Probability(i,j,n,l)
+                            spin_down_contribution = spin_down_contribution + Probability(i,j,TBA_DIM + n,l)
+                            IF (include_sc) THEN
+                                spin_up_contribution = spin_up_contribution + Probability(i,j,DIM_POSITIVE_K + n,l)
+                                spin_down_contribution = spin_down_contribution + Probability(i,j,DIM_POSITIVE_K + TBA_DIM + n,l)
+                            END IF
+                        END DO
+
+                        electron_contribution = 0.
+                        hole_contribution = 0.
+                        IF (include_sc) THEN
+                            DO n = 1, DIM_POSITIVE_K
+                                electron_contribution = electron_contribution + Probability(i,j,n,l)
+                                hole_contribution = hole_contribution + Probability(i,j,DIM_POSITIVE_K + n,l)
+                            END DO
+                        ELSE
+                            electron_contribution = 1.
+                            hole_contribution = 0.
+                        END IF
+
+                        WRITE(9, output_format) band*hamiltonian_dim + l, kx, ky, Energies(i, j, l)/meV2au, &
+                        & yz_contribution, zx_contribution, xy_contribution, &
+                        & (Lat_contributions(lat), lat = 1, SUBLATTICES), &
+                        & spin_up_contribution, spin_down_contribution, &
+                        & electron_contribution, hole_contribution
+                    END IF
+                END DO
+            END DO
+            ! WRITE(9,*)
+            ! WRITE(9,*)
+        END DO
+    END DO !End of iteration over subbands
     CLOSE(9)
 
     DEALLOCATE(Hamiltonian)
@@ -393,6 +425,8 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
     DEALLOCATE(Gamma_SC)
     DEALLOCATE(Charge_dens)
     DEALLOCATE(Lat_contributions)
+    IF (ALLOCATED(V_layer)) DEALLOCATE(V_layer)
+    IF (ALLOCATED(Subband_energies)) DEALLOCATE(Subband_energies) !Deallocate global variable
 
 END SUBROUTINE CALCULATE_DISPERSION
 
@@ -530,11 +564,11 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
     INTEGER*4, INTENT(IN) :: nBrillouinPoints
     CHARACTER(LEN=20) :: output_format
 
-    COMPLEX*16, ALLOCATABLE :: Hamiltonian(:,:), Hamiltonian_const(:,:)
+    COMPLEX*16, ALLOCATABLE :: Hamiltonian(:,:), Hamiltonian_const(:,:), Hamiltonian_const_band(:,:)
     REAL*8, ALLOCATABLE :: Energies(:)
 
-    COMPLEX*16, ALLOCATABLE :: Gamma_SC(:,:,:,:)
-    REAL*8, ALLOCATABLE :: Charge_dens(:)
+    COMPLEX*16, ALLOCATABLE :: Gamma_SC(:,:,:,:,:)
+    REAL*8, ALLOCATABLE :: Charge_dens(:,:)
 
     INTEGER*1, ALLOCATABLE :: IsFermiSurface(:,:) !! This indicates whether given (kx,ky) point is at Fermi surface
     INTEGER*2, ALLOCATABLE :: OrbitalAtFermiSurface(:,:) !! This indicates which state consitutes to the Fermi surface.
@@ -545,7 +579,7 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
     REAL*8 :: brillouinZoneVertices(6,2)
 
     REAL*8 :: k1, k2, kx, ky, dkx, dky
-    INTEGER*4 :: i,j,n, m
+    INTEGER*4 :: i,j,n, m, band
     INTEGER*4 :: kx_steps, ky_steps
 
     LOGICAL :: fileExists
@@ -559,149 +593,151 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
     kx_steps = INT(nBrillouinPoints)
     ky_steps = INT(nBrillouinPoints)
 
-
-
+    !Get parameters from simulation
+    CALL GET_INPUT(TRIM(inputPath)//"input.nml")
 
     ALLOCATE(Hamiltonian(DIM,DIM))
     ALLOCATE(Hamiltonian_const(DIM,DIM))
+    ALLOCATE(Hamiltonian_const_band(DIM,DIM))
     ALLOCATE(Energies(DIM))
     ALLOCATE(IsFermiSurface(-kx_steps:kx_steps, -ky_steps:ky_steps))
     ALLOCATE(OrbitalAtFermiSurface(-kx_steps:kx_steps, -ky_steps:ky_steps))
-    ALLOCATE(Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, SUBLATTICES))
-    ALLOCATE(Charge_dens(DIM_POSITIVE_K))
+    ALLOCATE(Gamma_SC(ORBITALS,N_ALL_NEIGHBOURS,2, LAYER_COUPLINGS, SUBBANDS))
+    ALLOCATE(Charge_dens(DIM_POSITIVE_K, SUBBANDS))
 
 
     Hamiltonian(:,:) = DCMPLX(0., 0.)
     Hamiltonian_const(:,:) = DCMPLX(0. , 0.)
     Energies(:) = 0.
-    Gamma_SC(:,:,:,:) = DCMPLX(0. , 0.)*meV2au
-    Charge_dens(:) = 0.
-    IsFermiSurface(:,:) = 0
-    OrbitalAtFermiSurface(:,:) = 0
-    output_format = '(2E15.5, 2I10)'
+    Gamma_SC = DCMPLX(0. , 0.)*meV2au
+    Charge_dens = 0.
+
+    output_format = '(3E15.5, I10)'
+
+    !Calculation of superconducting gap
+    INQUIRE(FILE = TRIM(inputPath)//"OutputData/Gamma_SC_final.dat", EXIST = fileExists)
+    IF (fileExists) THEN
+        CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_final.dat")
+    ELSE
+        CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
+    END IF
 
 
-    !Get parameters from simulation
-    CALL GET_INPUT(TRIM(inputPath)//"input.nml")
+    ! Gamma_SC(:,:,1,:,1) = 30. * meV2au
+    ! Gamma_SC(:,:,2,:,1) = -30. * meV2au
+    ! Gamma_SC(:,:,1,:,2) = 10. * meV2au
+    ! Gamma_SC(:,:,2,:,2) = -10. * meV2au
 
     INQUIRE(FILE = TRIM(inputPath)//"OutputData/Charge_dens_final.dat", EXIST = fileExists)
     IF (fileExists) THEN
-        CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
+        CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
     ELSE
-        CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
+        CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
     END IF
     !Computing k-independent terms
     CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:,:))
     CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:,:))
     CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian_const(:,:))
-    DO n = 1, DIM_POSITIVE_K
-        Hamiltonian_const(n,n) = Hamiltonian_const(n,n) - E_Fermi
-        Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) = Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) + E_Fermi
-    END DO
+    CALL COMPUTE_LAYER_POTENTIAL(Hamiltonian_const(:,:))
+    CALL COMPUTE_FERMI_ENERGY(Hamiltonian_const(:,:))
     CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
-
-    OPEN(unit = 9, FILE= TRIM(inputPath)//"OutputData/FermiSurface.dat", FORM = "FORMATTED", ACTION = "WRITE")
-    WRITE(9,*) '#kx[1/a] ky[1/a] is_fermi_surface N_orbital'
-    !Dispersion relation in a normal state
-    !$omp parallel private(kx, ky, Hamiltonian, Energies)
-    !$omp do
-    DO i = -kx_steps, kx_steps
-        DO j = -ky_steps, ky_steps
-            kx = i*dkx !* (2. * PI * 2./3.)
-            ky = j*dky !* (2. * PI * 2./3.)
-
-            IF (is_inside_polygon(brillouinZoneVertices, 6, kx, ky)) THEN
-
-                Hamiltonian(:,:) = DCMPLX(0. , 0.)
-                Energies(:) = 0.
-                CALL COMPUTE_TBA_TERM(Hamiltonian(:,:), kx, ky)
-                CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-                CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-                CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-                CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:,:), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
-                CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:))
-                !CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
-
-                CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
-
-                Hamiltonian(:,:) = Hamiltonian_const(:,:) + Hamiltonian(:,:) !Should by multiplied by 0.5 if in Nambu space
-
-                CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:DIM_POSITIVE_K, :DIM_POSITIVE_K), Energies(:DIM_POSITIVE_K), DIM_POSITIVE_K)
-                !CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:DIM_POSITIVE_K, :DIM_POSITIVE_K), Energies(:DIM_POSITIVE_K), U_transformation(:DIM_POSITIVE_K, :DIM_POSITIVE_K), DIM_POSITIVE_K)
-
-                !Check whether current wavevector is in the Fermi surface
-                IF (MINVAL(ABS(Energies(:DIM_POSITIVE_K))) < dE) THEN
-                    IsFermiSurface(i,j) = 1
-                    OrbitalAtFermiSurface(i,j) = MINLOC(ABS(Energies(:DIM_POSITIVE_K)), 1)
-                END IF
-                WRITE(9, output_format) kx, ky, IsFermiSurface(i,j), OrbitalAtFermiSurface(i,j)
-            END IF
-        END DO
-    END DO
-    !$omp end do
-    !$omp end parallel
-    CLOSE(9)
-
-    PRINT*, "Fermi surface done"
-
-    !Calculation of superconducting gap
-    INQUIRE(FILE = TRIM(inputPath)//"OutputData/Gamma_SC_final.dat", EXIST = fileExists)
-    IF (fileExists) THEN
-        CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(inputPath)//"OutputData/Gamma_SC_final.dat")
-    ELSE
-        CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
-    END IF
-
-    ! Gamma_SC(:,:,:,:) = DCMPLX(0.0d0, 0.0d0)
-    ! Gamma_SC(:, 4:, 1, :) = DCMPLX(10*meV2au, 10*meV2au)
-    ! Gamma_SC(:, 4:, 2, :) = DCMPLX(-10*meV2au, 10*meV2au)
-    ! Gamma_SC(:, 4, 1, :) = DCMPLX(40*meV2au, 40*meV2au)
-    ! Gamma_SC(:, 4, 2, :) = DCMPLX(-40*meV2au, 40*meV2au)
-    ! Gamma_SC(:, 7, 1, :) = DCMPLX(40*meV2au, 40*meV2au)
-    ! Gamma_SC(:, 7, 2, :) = DCMPLX(-40*meV2au, 40*meV2au)
 
     OPEN(unit = 9, FILE= TRIM(inputPath)//"OutputData/SuperconductingGap.dat", FORM = "FORMATTED", ACTION = "WRITE")
     WRITE(9,*) '#kx[1/a] ky[1/a] gap_SC[meV] N_orbital'
-    output_format = '(3E15.5, I10)'
+    DO band = 1, SUBBANDS
+        WRITE (log_string,*) "Band: ", band
+        LOG_INFO(log_string)
 
-    !$omp parallel private(kx, ky, Hamiltonian, Energies)
-    !$omp do
-    DO i = -kx_steps, kx_steps
-        DO j = -ky_steps, ky_steps
-            IF (IsFermiSurface(i,j) == 1) THEN
+        IsFermiSurface(:,:) = 0
+        OrbitalAtFermiSurface(:,:) = 0
+
+        Hamiltonian_const_band = Hamiltonian_const
+        CALL COMPUTE_SUBBAND_POTENTIAL(Hamiltonian_const_band, band)
+
+        !Dispersion relation in a normal state
+        !$omp parallel private(kx, ky, Hamiltonian, Energies)
+        !$omp do
+        DO i = -kx_steps, kx_steps
+            DO j = -ky_steps, ky_steps
                 kx = i*dkx !* (2. * PI * 2./3.)
                 ky = j*dky !* (2. * PI * 2./3.)
 
-                Hamiltonian(:,:) = DCMPLX(0. , 0.)
-                Energies(:) = 0.
-                CALL COMPUTE_TBA_TERM(Hamiltonian(:,:), kx, ky)
-                CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-                CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-                CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-                CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:,:), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
-                CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:))
-                CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
-                ! DO n = 1, DIM_POSITIVE_K
-                !     IF (n .le. DIM_POSITIVE_K - ORBITALS) THEN
-                !         Hamiltonian(n, ORBITALS + DIM_POSITIVE_K + n) = 20 * meV2au
-                !     END IF
-                !     IF (n .ge. ORBITALS) THEN
-                !         Hamiltonian(n, DIM_POSITIVE_K + n - ORBITALS) = 20 * meV2au
-                !     END IF
-                ! END DO
-                CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
+                IF (is_inside_polygon(brillouinZoneVertices, 6, kx, ky)) THEN
 
-                Hamiltonian(:,:) = 0.5*(Hamiltonian_const(:,:) + Hamiltonian(:,:)) !Should by multiplied by 0.5 if in Nambu space
+                    Hamiltonian(:,:) = DCMPLX(0. , 0.)
+                    Energies(:) = 0.
+                    CALL COMPUTE_TBA_TERM(Hamiltonian(:,:), kx, ky)
+                    CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                    CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                    CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                    CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:,:), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
+                    CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:, band))
+                    !CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
 
-                CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:,:), Energies(:), DIM)
-                !Write superconducting gap
-                WRITE(9,output_format) kx, ky, ABS(Energies(DIM_POSITIVE_K) - Energies(DIM_POSITIVE_K + 1)) / meV2au, OrbitalAtFermiSurface(i,j)
-            END IF
+                    CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
+
+                    Hamiltonian(:,:) = Hamiltonian_const_band(:,:) + Hamiltonian(:,:) !Should by multiplied by 0.5 if in Nambu space
+
+                    CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:DIM_POSITIVE_K, :DIM_POSITIVE_K), Energies(:DIM_POSITIVE_K), DIM_POSITIVE_K)
+                    !CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:DIM_POSITIVE_K, :DIM_POSITIVE_K), Energies(:DIM_POSITIVE_K), U_transformation(:DIM_POSITIVE_K, :DIM_POSITIVE_K), DIM_POSITIVE_K)
+
+                    !Check whether current wavevector is in the Fermi surface
+                    IF (MINVAL(ABS(Energies(:DIM_POSITIVE_K))) < dE) THEN
+                        IsFermiSurface(i,j) = 1
+                        OrbitalAtFermiSurface(i,j) = band*DIM_POSITIVE_K + MINLOC(ABS(Energies(:DIM_POSITIVE_K)), 1)
+                    END IF
+                END IF
+            END DO
         END DO
+        !$omp end do
+        !$omp end parallel
+
+        WRITE (log_string,*) "Fermi surface done, reading Gamma_SC"
+        LOG_INFO(log_string)
+
+        !$omp parallel private(kx, ky, Hamiltonian, Energies)
+        !$omp do
+        DO i = -kx_steps, kx_steps
+            DO j = -ky_steps, ky_steps
+                IF (IsFermiSurface(i,j) == 1) THEN
+                    kx = i*dkx
+                    ky = j*dky
+
+                    Hamiltonian(:,:) = DCMPLX(0. , 0.)
+                    Energies(:) = 0.
+                    CALL COMPUTE_TBA_TERM(Hamiltonian(:,:), kx, ky)
+                    CALL COMPUTE_TI1_TI2(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                    CALL COMPUTE_H_PI(Hamiltonian(:,:), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                    CALL COMPUTE_H_SIGMA(Hamiltonian(:,:), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+                    CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:,:), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
+                    CALL COMPUTE_HUBBARD(Hamiltonian(:,:), Charge_dens(:, band))
+                    CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:,band))
+                    ! DO n = 1, DIM_POSITIVE_K
+                    !     IF (n .le. DIM_POSITIVE_K - ORBITALS) THEN
+                    !         Hamiltonian(n, ORBITALS + DIM_POSITIVE_K + n) = 20 * meV2au
+                    !     END IF
+                    !     IF (n .ge. ORBITALS) THEN
+                    !         Hamiltonian(n, DIM_POSITIVE_K + n - ORBITALS) = 20 * meV2au
+                    !     END IF
+                    ! END DO
+                    CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:,:), DIM) !This is not needed, since ZHEEV takes only upper triangle
+
+                    Hamiltonian(:,:) = 0.5*(Hamiltonian_const_band(:,:) + Hamiltonian(:,:)) !Should by multiplied by 0.5 if in Nambu space
+
+                    CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:,:), Energies(:), DIM)
+                    !Write superconducting gap
+                    WRITE(9,output_format) kx, ky, ABS(Energies(DIM_POSITIVE_K) - Energies(DIM_POSITIVE_K + 1)) / meV2au, OrbitalAtFermiSurface(i,j)
+                END IF
+            END DO
+        END DO
+        !$omp end do
+        !$omp end parallel
     END DO
-    !$omp end do
-    !$omp end parallel
     CLOSE(9)
+
+
+    IF (ALLOCATED(V_layer)) DEALLOCATE(V_layer)
+    IF (ALLOCATED(Subband_energies)) DEALLOCATE(Subband_energies) !Deallocate global variable
 
 
 END SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP
@@ -712,7 +748,7 @@ SUBROUTINE TRANSFORM_DELTA_MATRIX(inputPath, nBrillouinPoints)
     INTEGER*4, INTENT(IN) :: nBrillouinPoints
 
     CHARACTER(LEN=20) :: output_format
- 
+
     COMPLEX*16, ALLOCATABLE :: Hamiltonian(:,:), Hamiltonian_const(:,:), Gamma_matrix(:,:), Gamma_matrix_temp(:,:), Gamma_matrix_diagonal(:,:)
     COMPLEX*16, ALLOCATABLE :: U_transformation(:,:)
     REAL*8, ALLOCATABLE :: Energies(:)
@@ -736,7 +772,7 @@ SUBROUTINE TRANSFORM_DELTA_MATRIX(inputPath, nBrillouinPoints)
     kx_steps = INT(nBrillouinPoints)
     ky_steps = INT(nBrillouinPoints)
 
-    ALLOCATE(Hamiltonian(DIM,DIM)) 
+    ALLOCATE(Hamiltonian(DIM,DIM))
     ALLOCATE(Hamiltonian_const(DIM,DIM))
     ALLOCATE(U_transformation(DIM,DIM))
     ALLOCATE(Gamma_matrix(DIM,DIM))
@@ -783,7 +819,7 @@ SUBROUTINE TRANSFORM_DELTA_MATRIX(inputPath, nBrillouinPoints)
         DO j = -ky_steps, ky_steps
             kx = i*dkx !* (2. * PI * 2./3.)
             ky = j*dky !* (2. * PI * 2./3.)
-            
+
             IF (is_inside_polygon(brillouinZoneVertices, 6, kx, ky)) THEN
 
                 Hamiltonian(:,:) = DCMPLX(0. , 0.)
@@ -819,7 +855,7 @@ SUBROUTINE TRANSFORM_DELTA_MATRIX(inputPath, nBrillouinPoints)
                         Gamma_matrix_temp(n,m) = SUM(Gamma_matrix(n,:)*U_transformation(:,m))
                     END DO
                 END DO
-                
+
                 DO n = 1, DIM
                     DO m = 1, DIM
                         Gamma_matrix_diagonal(n,m) = SUM(CONJG(U_transformation(:,n))*Gamma_matrix_temp(:,m))

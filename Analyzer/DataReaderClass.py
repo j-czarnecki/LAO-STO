@@ -8,7 +8,9 @@ import shutil
 
 class DataReader:
 
-    def __init__(self, runsPath: str, matchPattern: str, sublattices: int):
+    def __init__(
+        self, runsPath: str, matchPattern: str, sublattices: int, subbands: int
+    ):
         """
         Initializes DataReader object, which contains all data from a series of simulations.
         Arguments:
@@ -28,9 +30,11 @@ class DataReader:
             self.dosDataFrame - contains DOS data
         """
         # TODO: improve annotations
-        self.matchPattern = matchPattern
-        self.runsPath = runsPath
-        self.sublattices = sublattices
+        self.matchPattern: str = matchPattern
+        self.runsPath: str = runsPath
+        self.sublattices: int = sublattices
+        self.layerCouplings: int = 2 * (self.sublattices - 1)
+        self.subbands: int = subbands
         self.gamma: dict = {}
         self.filling: dict = {}
         self.fillingTotal: list = []
@@ -46,91 +50,21 @@ class DataReader:
             5: {"kx": [], "ky": [], "gap": []},
             6: {"kx": [], "ky": [], "gap": []},
         }
+        self.colnamesGamma: list[str] = (
+            ["spin", "neighbor", "sublat", "orbital", "gammaR", "gammaIm"]
+            if subbands == 0
+            else ["band", "spin", "neighbor", "sublat", "orbital", "gammaR", "gammaIm"]
+        )
 
-    def __str__(self) -> str:
-        dataStr = {"matchPattern": self.matchPattern, "runsPath": self.runsPath}
-        return str(dataStr)
+        self.colnamesCharge: list[str] = (
+            ["spin", "sublat", "orbital", "filling"]
+            if subbands == 0
+            else ["band", "spin", "sublat", "orbital", "filling"]
+        )
 
-    def FillDictGamma(
-        self, pandasFile: pd.DataFrame, firstIter: bool, fillNones: bool = False
-    ):
-        """
-        Extracts proper key from simulation files, converts gamma back to complex value and writes do dict
-        """
-        if len(pandasFile.spin) == 0:
-            print("ERROR: empty gamma file")
-            for key in list(self.gamma.keys()):
-                self.gamma[key].append(np.nan)
-            return
-
-        for row in range(len(pandasFile.spin)):
-            dictKey = (
-                int(pandasFile.spin[row]),
-                int(pandasFile.neighbor[row]),
-                int(pandasFile.sublat[row]),
-                int(pandasFile.orbital[row]),
-            )
-            if firstIter:
-                # self.gamma[dictKey] = [np.sqrt(pandasFile.gammaR[row]**2 + pandasFile.gammaIm[row]**2)]
-                if not fillNones:
-                    self.gamma[dictKey] = [
-                        pandasFile.gammaR[row] + pandasFile.gammaIm[row] * 1j
-                    ]
-                else:
-                    self.gamma[dictKey] = np.nan
-                # print(dictKey)
-            else:
-                # self.gamma[dictKey].append(np.sqrt(pandasFile.gammaR[row]**2 + pandasFile.gammaIm[row]**2))
-                if not fillNones:
-                    self.gamma[dictKey].append(
-                        pandasFile.gammaR[row] + pandasFile.gammaIm[row] * 1j
-                    )
-                else:
-                    self.gamma[dictKey].append(np.nan)
-
-    def FillDictFilling(
-        self, pandasFile: pd.DataFrame, firstIter: bool, fillNones: bool = False
-    ):
-        """
-        Extracts proper key from simulation files and appends to filling dict
-        """
-        if len(pandasFile.spin) == 0:
-            print("ERROR: empty filling file")
-            for key in list(self.filling.keys()):
-                self.filling[key].append(np.nan)
-            self.fillingTotal.append(np.nan)
-            return
-
-        self.fillingTotal.append(sum(pandasFile.filling[:]))
-        for row in range(len(pandasFile.spin)):
-            dictKey = (
-                int(pandasFile.spin[row]),
-                int(pandasFile.sublat[row]),
-                int(pandasFile.orbital[row]),
-            )
-            if firstIter:
-                if not fillNones:
-                    self.filling[dictKey] = [pandasFile.filling[row]]
-                else:
-                    self.filling[dictKey] = np.nan
-                # print(dictKey)
-            else:
-                if not fillNones:
-                    self.filling[dictKey].append(pandasFile.filling[row])
-                else:
-                    self.filling[dictKey].append(np.nan)
-
-    def FillDictScGap(self, pandasFile: pd.DataFrame, fillNones: bool = False):
-        for row in range(len(pandasFile["kx"])):
-            self.superconductingGapMap[int(pandasFile["state"][row])]["kx"].append(
-                pandasFile["kx"][row]
-            )
-            self.superconductingGapMap[int(pandasFile["state"][row])]["ky"].append(
-                pandasFile["ky"][row]
-            )
-            self.superconductingGapMap[int(pandasFile["state"][row])]["gap"].append(
-                pandasFile["gap"][row]
-            )
+    """ ---------------------------------------------------------------------------------- """
+    """ ---------------------------- Interface methods ----------------------------------- """
+    """ ---------------------------------------------------------------------------------- """
 
     def LoadFilling(self, loadUnfinished: bool):
         """
@@ -156,42 +90,28 @@ class DataReader:
                 currentFilling = pd.read_fwf(
                     filePathConverged,
                     skiprows=1,
-                    colspecs=[(0, 6), (7, 11), (12, 16), (17, 31)],
-                    names=["spin", "sublat", "orbital", "filling"],
+                    names=self.colnamesCharge,
+                    infer_nrows=100,
+                    dtype=np.float64,
                 )
-                self.FillDictFilling(currentFilling, isFirstIter)
+                self.__FillDictFilling(currentFilling, isFirstIter)
             elif os.path.exists(filePathIter):
                 print("No convergence in ", dir)
                 if loadUnfinished:
                     currentFilling = pd.read_fwf(
                         filePathIter,
                         skiprows=1,
-                        colspecs=[(0, 6), (7, 11), (12, 16), (17, 31)],
-                        names=["spin", "sublat", "orbital", "filling"],
+                        names=self.colnamesCharge,
+                        infer_nrows=100,
+                        dtype=np.float64,
                     )
-                    self.FillDictFilling(currentFilling, isFirstIter)
+                    self.__FillDictFilling(currentFilling, isFirstIter)
                 else:
-                    self.FillDictFilling(currentFilling, isFirstIter, fillNones=True)
+                    self.__FillDictFilling(currentFilling, isFirstIter, fillNones=True)
             else:
                 print("No Charge dens file in ", dir)
                 continue
             isFirstIter = False
-
-    def sortData(self):
-        """
-        Sorts datafrom self.gamma, self.filling and self.fillingTotal dicts.
-        Based on the order of self.params list of tuples (first elements ???)
-        """
-        sortedIndexes = sorted(range(len(self.params)), key=lambda x: self.params[x])
-        for key, yList in self.gamma.items():
-            self.gamma[key] = [yList[i] for i in sortedIndexes]
-
-        for key, yList in self.filling.items():
-            self.filling[key] = [yList[i] for i in sortedIndexes]
-
-        self.fillingTotal = [self.fillingTotal[i] for i in sortedIndexes]
-
-        self.params = sorted(self.params)
 
     def LoadGamma(self, xKeywords: tuple, loadUnfinished: bool):
         """
@@ -231,18 +151,11 @@ class DataReader:
                 currentGamma = pd.read_fwf(
                     filePathGammaConverged,
                     skiprows=1,
-                    colspecs=[(0, 6), (7, 11), (12, 16), (17, 21), (22, 36), (37, 51)],
-                    names=[
-                        "spin",
-                        "neighbor",
-                        "sublat",
-                        "orbital",
-                        "gammaR",
-                        "gammaIm",
-                    ],
+                    names=self.colnamesGamma,
+                    infer_nrows=100,
                     dtype=np.float64,
                 )
-                self.FillDictGamma(currentGamma, firstIter)
+                self.__FillDictGamma(currentGamma, firstIter)
 
             # If simulation did NOT converge, iteration file should exists
             elif os.path.exists(filePathGammaIter):
@@ -251,27 +164,13 @@ class DataReader:
                     currentGamma = pd.read_fwf(
                         filePathGammaIter,
                         skiprows=1,
-                        colspecs=[
-                            (0, 6),
-                            (7, 11),
-                            (12, 16),
-                            (17, 21),
-                            (22, 36),
-                            (37, 51),
-                        ],
-                        names=[
-                            "spin",
-                            "neighbor",
-                            "sublat",
-                            "orbital",
-                            "gammaR",
-                            "gammaIm",
-                        ],
+                        names=self.colnamesGamma,
+                        infer_nrows=100,
                         dtype=np.float64,
                     )
-                    self.FillDictGamma(currentGamma, firstIter)
+                    self.__FillDictGamma(currentGamma, firstIter)
                 else:
-                    self.FillDictGamma(currentGamma, firstIter, fillNones=True)
+                    self.__FillDictGamma(currentGamma, firstIter, fillNones=True)
             else:
                 print("No Gamma file in ", dir)
                 # shutil.rmtree(os.path.join(self.runsPath, dir))
@@ -375,3 +274,120 @@ class DataReader:
             else:
                 print("No such file ", filePath)
             isFirstIter = False
+
+    def sortData(self):
+        """
+        Sorts datafrom self.gamma, self.filling and self.fillingTotal dicts.
+        Based on the order of self.params list of tuples (first elements ???)
+        """
+        sortedIndexes = sorted(range(len(self.params)), key=lambda x: self.params[x])
+        for key, yList in self.gamma.items():
+            self.gamma[key] = [yList[i] for i in sortedIndexes]
+
+        for key, yList in self.filling.items():
+            self.filling[key] = [yList[i] for i in sortedIndexes]
+
+        self.fillingTotal = [self.fillingTotal[i] for i in sortedIndexes]
+
+        self.params = sorted(self.params)
+
+    """ ---------------------------------------------------------------------------------- """
+    """ ---------------------------- Private methods ------------------------------------- """
+    """ ---------------------------------------------------------------------------------- """
+
+    def __FillDictGamma(
+        self, pandasFile: pd.DataFrame, firstIter: bool, fillNones: bool = False
+    ):
+        """
+        Extracts proper key from simulation files, converts gamma back to complex value and writes do dict
+        """
+        if len(pandasFile.spin) == 0:
+            print("ERROR: empty gamma file")
+            for key in list(self.gamma.keys()):
+                self.gamma[key].append(np.nan)
+            return
+
+        for row in range(len(pandasFile.spin)):
+            # Key is everything apart from Gamma values (two last columns)
+            dictKey = tuple(
+                int(x) for x in pandasFile.loc[row, self.colnamesGamma[:-2]]
+            )
+            # print(dictKey)
+            # dictKey = (
+            #     int(pandasFile.spin[row]),
+            #     int(pandasFile.neighbor[row]),
+            #     int(pandasFile.sublat[row]),
+            #     int(pandasFile.orbital[row]),
+            # )
+            if firstIter:
+                # self.gamma[dictKey] = [np.sqrt(pandasFile.gammaR[row]**2 + pandasFile.gammaIm[row]**2)]
+                if not fillNones:
+                    self.gamma[dictKey] = [
+                        pandasFile.gammaR[row] + pandasFile.gammaIm[row] * 1j
+                    ]
+                else:
+                    self.gamma[dictKey] = np.nan
+                # print(dictKey)
+            else:
+                # self.gamma[dictKey].append(np.sqrt(pandasFile.gammaR[row]**2 + pandasFile.gammaIm[row]**2))
+                if not fillNones:
+                    self.gamma[dictKey].append(
+                        pandasFile.gammaR[row] + pandasFile.gammaIm[row] * 1j
+                    )
+                else:
+                    self.gamma[dictKey].append(np.nan)
+
+    def __FillDictFilling(
+        self, pandasFile: pd.DataFrame, firstIter: bool, fillNones: bool = False
+    ):
+        """
+        Extracts proper key from simulation files and appends to filling dict
+        """
+        if len(pandasFile.spin) == 0:
+            print("ERROR: empty filling file")
+            for key in list(self.filling.keys()):
+                self.filling[key].append(np.nan)
+            self.fillingTotal.append(np.nan)
+            return
+
+        self.fillingTotal.append(sum(pandasFile.filling[:]))
+        for row in range(len(pandasFile.spin)):
+            dictKey = tuple(
+                int(x) for x in pandasFile.loc[row, self.colnamesCharge[:-2]]
+            )
+            # dictKey = (
+            #     int(pandasFile.spin[row]),
+            #     int(pandasFile.sublat[row]),
+            #     int(pandasFile.orbital[row]),
+            # )
+            if firstIter:
+                if not fillNones:
+                    self.filling[dictKey] = [pandasFile.filling[row]]
+                else:
+                    self.filling[dictKey] = np.nan
+                # print(dictKey)
+            else:
+                if not fillNones:
+                    self.filling[dictKey].append(pandasFile.filling[row])
+                else:
+                    self.filling[dictKey].append(np.nan)
+
+    def FillDictScGap(self, pandasFile: pd.DataFrame, fillNones: bool = False):
+        for row in range(len(pandasFile["kx"])):
+            self.superconductingGapMap[int(pandasFile["state"][row])]["kx"].append(
+                pandasFile["kx"][row]
+            )
+            self.superconductingGapMap[int(pandasFile["state"][row])]["ky"].append(
+                pandasFile["ky"][row]
+            )
+            self.superconductingGapMap[int(pandasFile["state"][row])]["gap"].append(
+                pandasFile["gap"][row]
+            )
+
+    """ ---------------------------------------------------------------------------------- """
+    """ ---------------------------- Special methods ------------------------------------- """
+    """ ---------------------------------------------------------------------------------- """
+
+    def __str__(self) -> str:
+        dataStr = {"matchPattern": self.matchPattern, "runsPath": self.runsPath}
+        return str(dataStr)
