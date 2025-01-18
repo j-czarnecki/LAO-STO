@@ -9,8 +9,8 @@ import seaborn as sns
 # Data reader is in fact not used here, rethink this architecture
 class DispersionPlotter(DataReader):
 
-    def __init__(self, sublattices: int):
-        DataReader.__init__(self, "./", "xxx", sublattices)
+    def __init__(self, sublattices: int, subbands: int):
+        DataReader.__init__(self, "./", "xxx", sublattices, subbands)
         self.dataLength: int = 0
         self.kPoints1D: int = 0
         self.maxBands: int = 0

@@ -42,6 +42,7 @@ OBJS = 	$(OBJ_DIR)/main.o \
 				$(OBJ_DIR)/mod_broydenV2.o \
 				$(OBJ_DIR)/mod_compute_hamiltonians.o \
 				$(OBJ_DIR)/mod_integrate.o \
+				$(OBJ_DIR)/mod_types.o \
 				$(OBJ_DIR)/mod_logger.o
 
 ###### Plotting dispersion relation, calculating DOS and Chern number
@@ -53,6 +54,7 @@ POSTPROCESSING_OBJS = 	$(OBJ_DIR)/main_postprocessing.o \
 						$(OBJ_DIR)/mod_writers.o \
 						$(OBJ_DIR)/mod_reader.o \
 						$(OBJ_DIR)/mod_compute_hamiltonians.o \
+						$(OBJ_DIR)/mod_types.o \
 						$(OBJ_DIR)/mod_logger.o
 
 # Superconductivity calculation target
@@ -107,6 +109,9 @@ test:
 
 analyze:
 	cd Analyzer && python3 mainAnalyzer.py && cd ..
+
+run_slurm:
+	cd Runner && python3 mainRunner.py && cd ..
 
 clean_plots:
 	cd Plots && rm -rf *.png && cd ..

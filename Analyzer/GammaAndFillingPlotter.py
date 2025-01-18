@@ -204,15 +204,15 @@ class GammaAndFillingPlotter(SymmetryResolver):
                             total += np.abs(self.symmetryGammaDict[gammaKey][i])
                         gammaKey = (*key, "s")
                         gammaSRatio.append(
-                            np.abs(self.symmetryGammaDict[gammaKey][i]) / total
+                            np.abs(self.symmetryGammaDict[gammaKey][i]) / total * 100
                         )
                         gammaKey = (*key, "p+")
                         gammaPRatio.append(
-                            np.abs(self.symmetryGammaDict[gammaKey][i]) / total
+                            np.abs(self.symmetryGammaDict[gammaKey][i]) / total * 100
                         )
                         gammaKey = (*key, "d+")
                         gammaDRatio.append(
-                            np.abs(self.symmetryGammaDict[gammaKey][i]) / total
+                            np.abs(self.symmetryGammaDict[gammaKey][i]) / total * 100
                         )
                         ef_plot.append(self.params[i][0] - self.eMinimal)
 
@@ -224,8 +224,8 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 # plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}')
                 plt.legend(title=r"$\xi$", loc="center left")
                 plt.xlabel(r"$E_{Fermi}$ (meV)")
-                plt.ylabel(r"$\Gamma_\xi$", labelpad=20)
-                plt.ylim(bottom=0, top=1)
+                plt.ylabel(r"$\Gamma_\xi$ (\%)", labelpad=20)
+                plt.ylim(bottom=0, top=100)
                 plt.savefig(
                     f"../Plots/GammaSymmetryRatios_band{band}_spin{spin}_lat{sublat}_{self.orbitalNameMapping[orbital - 1]}_J_SC_{secondParam}.png"
                 )

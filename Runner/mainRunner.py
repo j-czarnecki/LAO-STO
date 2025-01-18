@@ -4,24 +4,26 @@ import re
 
 def configureAndRunPostprocessing():
     runner = Runner()
-    pathToRuns = "/net/ascratch/people/plgjczarnecki/LAO-STO-test/"
+    pathToRuns = os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-3-layers-2-subbands")
     # Adding '' at the end to terminate path with /
     directories = [
         os.path.join(pathToRuns, dir, "")
         for dir in os.listdir(pathToRuns)
-        if re.match("RUN_.*", dir)
+        if re.match("RUN_E_Fermi_80.0.*", dir)
     ]
-    enable_sc = ("sc_gap_calculation", "enable_sc_gap_calc", True)
+    enable_sc = ("sc_gap_calculation", "enable_sc_gap_calc", False)
     enable_chern = ("chern_number_calculation", "enable_chern_number_calc", False)
+    enable_dos = ("dos_calculation", "enable_dos_calc", True)
     for dir in directories:
-        nmlDirectorySC = ("sc_gap_calculation", "path_to_run_dir_sc_gap", dir)
+        nmlDirectorySC = ("sc_gap_calculation", "enable_dos_calc", dir)
         nmlDirectoryChern = (
             "chern_number_calculation",
             "path_to_run_dir_chern_number",
             dir,
         )
+        nmlDirectoryDos = ("dos_calculation", "path_to_run_dir_dos", dir)
         runner.run_slurm_postprocessing(
-            dir, [enable_sc, nmlDirectorySC, enable_chern, nmlDirectoryChern], True
+            dir, [enable_dos, nmlDirectoryDos], True
         )
 
 
@@ -76,9 +78,8 @@ def configureAndRunSc():
 
 
 def main():
-    configureAndRunSc()
-    # configureAndRunPostprocessing()
-
+    #configureAndRunSc()
+    configureAndRunPostprocessing()
 
 if __name__ == "__main__":
     main()

@@ -356,8 +356,12 @@ SUBROUTINE GET_GAMMA_SC(Gamma_SC, path)
     REAL*8 :: Gamma_re, Gamma_im
     CHARACTER(LEN=20) :: output_format
 
-    !output_format = '(5I5, 2E15.5)'
+#ifndef READ_OLD
+    output_format = '(5I5, 2E15.5)'
+#else
     output_format = '(4I5, 2E15.5)'
+#endif
+
 
     OPEN(unit = 9, FILE=path, FORM = "FORMATTED", ACTION = "READ", STATUS="OLD")
     READ(9,*)

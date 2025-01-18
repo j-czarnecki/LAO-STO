@@ -9,10 +9,11 @@ import time
 from RunnerConfigClass import *
 
 
+SCRATCH_PATH = os.getenv('SCRATCH')
+
 class Runner(RunnerConfig):
     def __init__(self):
         RunnerConfig.__init__(self)
-        self.aresScratch = "/net/ascratch/people/plgjczarnecki/"
 
     def run_slurm_param_value(
         self, paramValuePairs: list, runsDir: str, material: str, isAres: bool = False
@@ -24,7 +25,7 @@ class Runner(RunnerConfig):
         Also starting values of gamma parameters are automatically set to 0 if corresponding J is 0.
         """
         if isAres:
-            pathToAppend = os.path.join(self.aresScratch, runsDir)
+            pathToAppend = os.path.join(SCRATCH_PATH, runsDir)
             os.makedirs(pathToAppend, exist_ok=True)
             pathToAppend = os.path.join(pathToAppend, "RUN")
         else:
