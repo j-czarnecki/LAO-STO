@@ -205,6 +205,7 @@ SUBROUTINE GET_INPUT(nmlfile)
     Subband_energies = 0.0d0
 
     !TODO: WRITE BETTER CHECKS!!!!!!!!!!!!!!!!!!
+    REWIND(9) !Always read from the beginning
     READ(9,NML=physical_params)
     WRITE(log_string, '(16(A, E15.5))') "T: ", T,&
                                      & " t_D: ", t_D,&
@@ -250,6 +251,7 @@ SUBROUTINE GET_INPUT(nmlfile)
     V_layer = V_layer * meV2au
     Subband_energies = Subband_energies * meV2au
 
+    REWIND(9) !Always read from the beginning
     READ(9,NML=self_consistency)
     WRITE(log_string, '(2(A, I0, 2A), 10(A, E15.5))') "read_gamma_from_file: ", read_gamma_from_file,&
                                                     & " path_to_gamma_start: ", TRIM(path_to_gamma_start),&
@@ -283,6 +285,7 @@ SUBROUTINE GET_INPUT(nmlfile)
     domega = ABS(dk1*dk2*SIN(2*PI/3.))/(SIN(2*PI/3.)*K1_MAX*K2_MAX)
     eta_p = v * SQRT(3.) / 3.905 * nm2au
 
+    REWIND(9) !Always read from the beginning
     READ(9, NML=romberg_integration)
     WRITE(log_string, '(2((A, E15.5), 2(A, I0)))') "romb_eps_x: ", romb_eps_x, &
                                                  & " interpolation_deg_x: ", interpolation_deg_x, &

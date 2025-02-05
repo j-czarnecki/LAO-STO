@@ -17,7 +17,7 @@ F90 = ifx
 CC = gcc
 CXX = g++
 LIB_OPENMP = -qopenmp
-F90FLAGS = -O3 -fpp -ipo $(LIB_OPENMP) -module $(MOD_DIR) $(READ_OLD_FLAG)
+F90FLAGS = -Ofast -fpp -ipo $(LIB_OPENMP) -module $(MOD_DIR) $(READ_OLD_FLAG)
 LIBS = -llapack -lblas
 LIBS_MKL = -I${MKLROOT}/include \
 					 -I/opt/intel/mkl/include \

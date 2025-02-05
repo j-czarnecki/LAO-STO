@@ -6,39 +6,39 @@ from GammaAndFillingPlotter import *
 SCRATCH_PATH = os.getenv('SCRATCH')
 
 def plotGammas():
-    # eMin = -1053
+    eMin = -1053
     # eMin = -1480
-    eMin = 0
+    #eMin = 0
     gammaAndFillingPlotter = GammaAndFillingPlotter(
-        runsPath=os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-3-layers"),
+        runsPath=os.path.join(SCRATCH_PATH, "STO-SC", "LAO-STO-NNN-corrected"),
         matchPattern="RUN_.*",
         nNeighbors=3,
-        nNextNeighbors=0,
+        nNextNeighbors=6,
         eMinimal=eMin,
-        sublattices=3,
+        sublattices=2,
         subbands=0,
+        material='STO'
     )
 
     gammaAndFillingPlotter.LoadFilling(loadUnfinished=True)
-    gammaAndFillingPlotter.LoadGamma(xKeywords=("e_fermi", "j_sc"), loadUnfinished=True)
+    gammaAndFillingPlotter.LoadGamma(xKeywords=("e_fermi", "j_sc_nnn"), loadUnfinished=True)
     gammaAndFillingPlotter.sortData()
     gammaAndFillingPlotter.CalculateSymmetryGamma()
     gammaAndFillingPlotter.getMaxvalSymmetrizedGamma()
-    gammaAndFillingPlotter.plotGammasFermi()
-    #gammaAndFillingPlotter.plotSymmetryRatios()
-    # gammaAndFillingPlotter.plotGammasFilling()
-    # gammaAndFillingPlotter.plotNnnGammasFermi()
-    # gammaAndFillingPlotter.plotNnnGammasFilling()
+    #gammaAndFillingPlotter.plotGammasFermi()
+    #gammaAndFillingPlotter.plotSymmetryRatios(eMax = 150)
+    #gammaAndFillingPlotter.plotNnnGammasFermi(eMax = 150)
+    #gammaAndFillingPlotter.plotNnnSymmetryRatios(eMax = 100)
     # gammaAndFillingPlotter.plotGammaFermiUnsymmetrized()
     # gammaAndFillingPlotter.plotFillingFermi()
     # gammaAndFillingPlotter.plotGammasJ()
     # gammaAndFillingPlotter.plotFillingFermi()
-    # gammaAndFillingPlotter.plotGammasTemperature()
-    # gammaAndFillingPlotter.plotGammasTemperatureMap()
+    #gammaAndFillingPlotter.plotGammasTemperature()
+    #gammaAndFillingPlotter.plotGammasTemperatureMap(eMax = 120)
 
 
 def plotDispersions():
-    # eMin = -1053
+    #eMin = -1053
     dispersionPlotter = DispersionPlotter(sublattices=3, subbands=2)
     # dispersionPlotter.LoadSuperconductingGap("../OutputData/SuperconductingGap.dat")
     # dispersionPlotter.plotSuperconductingGap(postfix="_test", title=rf"test")
@@ -50,17 +50,38 @@ def plotDispersions():
     #         postfix=f"_J_100_Ef_{ef}", title=rf"$E_{{Fermi}} = {ef - eMin}$ (meV)"
     #     )
 
-    # dispersionPlotter.LoadDispersion("../OutputData/Energies.dat")
-    dispersionPlotter.LoadDos(
-        os.path.join(
-            SCRATCH_PATH,
-            "KTO-SC",
-            "KTO-3-layers-2-subbands",
-            "RUN_E_Fermi_60.0_J_SC_290.0_SUBLATTICES_3_SUBBANDS_2",
-            "OutputData",
-            "DOS.dat"
-        )
-    )
+    dispersionPlotter.LoadDispersion("../OutputData/Energies.dat")
+    for j_sc in range (370, 380, 10):
+        for ef in range(50, 130, 10):
+            try:
+                dispersionPlotter.LoadDos(
+                    os.path.join(
+                        SCRATCH_PATH,
+                        "KTO-SC",
+                        "KTO-fit-E_Fermi_100-150meV",
+                        f"RUN_E_Fermi_{ef}.0_J_SC_{j_sc}.0_SUBLATTICES_3_SUBBANDS_2",
+                        "OutputData",
+                        "DOS.dat"
+                    )
+                )
+                dispersionPlotter.plotDos(0.8, f"../Plots/DOS_J{j_sc}_Ef_{ef}.png", False, 8e-2)
+            except:
+                continue
+
+
+    # fermiList = [ef for ef in range(50,130, 10)]
+    # dirsList = [os.path.join(
+    #                     SCRATCH_PATH,
+    #                     "KTO-SC",
+    #                     "KTO-fit-E_Fermi_100-150meV",
+    #                     f"RUN_E_Fermi_{ef}.0_J_SC_370.0_SUBLATTICES_3_SUBBANDS_2",
+    #                     "OutputData",
+    #                     "DOS.dat"
+    #                 ) for ef in fermiList]
+    # dispersionPlotter.plotStackedDos(0.8, f"../Plots/DOS_stack.png", True, 8e-2, dirsList, fermiList)
+
+
+
     # dispersionPlotter.GetStatistics()
     # dispersionPlotter.shiftEnergies()
 
@@ -74,7 +95,7 @@ def plotDispersions():
 
     # dispersionPlotter.plotFermiCrossection(100, 1.0, "../Plots/FermiSlice100.png")
     # dispersionPlotter.plotFermiCrossection(500, 1.0, "../Plots/FermiSlice500.png")
-    dispersionPlotter.plotDos(1, "../Plots/DOS.png")
+    # dispersionPlotter.plotDos(0.7, "../Plots/DOS.png", False, 1e-2)
 
 
 def main():

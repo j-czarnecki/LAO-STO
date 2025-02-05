@@ -17,10 +17,10 @@
 
 &dos_calculation
     enable_dos_calc = .TRUE.,
-    path_to_run_dir_dos = "/home/jczarnecki/LAO-STO-results/KTO-3-layers/RUN_E_Fermi_0.0_J_SC_400.0_SUBLATTICES_3/",
-    E_DOS_min = -10,
-    E_DOS_max = 10,
-    dE0 = 10,
-    zeta_DOS = 1,
+    path_to_run_dir_dos = "/net/afscra/people/plgjczarnecki/TEST-instant/",
+    E_DOS_min = -1,
+    E_DOS_max = 1,
+    dE0 = 1e-2,
+    zeta_DOS = 1e-2,
     include_sc_in_dos = .TRUE.,
-    Nk_points_dos = 100 /
+    Nk_points_dos = 4000 /

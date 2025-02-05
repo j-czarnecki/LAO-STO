@@ -1,0 +1,247 @@
+ intel-compilers/2023.0.0 unloaded.
+ gcccore/11.2.0 unloaded.
+ gcccore/12.2.0 loaded.
+ binutils/2.37-gcccore-11.2.0 unloaded.
+ zlib/1.2.11-gcccore-11.2.0 unloaded.
+ zlib/1.2.12-gcccore-12.2.0 loaded.
+ binutils/2.39-gcccore-12.2.0 loaded.
+ intel-compilers/2023.0.0 loaded.
+
+The following have been reloaded with a version change:
+  1) binutils/2.37-gcccore-11.2.0 => binutils/2.39-gcccore-12.2.0
+  2) gcccore/11.2.0 => gcccore/12.2.0
+  3) zlib/1.2.11-gcccore-11.2.0 => zlib/1.2.12-gcccore-12.2.0
+
+ python/3.9.6-gcccore-11.2.0 unloaded.
+ bzip2/1.0.8-gcccore-11.2.0 unloaded.
+ bzip2/1.0.8-gcccore-12.2.0 loaded.
+ libreadline/8.1-gcccore-11.2.0 unloaded.
+ ncurses/6.2-gcccore-11.2.0 unloaded.
+ ncurses/6.3-gcccore-12.2.0 loaded.
+ libreadline/8.2-gcccore-12.2.0 loaded.
+ sqlite/3.36-gcccore-11.2.0 unloaded.
+ tcl/8.6.11-gcccore-11.2.0 unloaded.
+ tcl/8.6.12-gcccore-12.2.0 loaded.
+ sqlite/3.39.4-gcccore-12.2.0 loaded.
+ xz/5.2.5-gcccore-11.2.0 unloaded.
+ xz/5.2.7-gcccore-12.2.0 loaded.
+ gmp/6.2.1-gcccore-11.2.0 unloaded.
+ gmp/6.2.1-gcccore-12.2.0 loaded.
+ libffi/3.4.2-gcccore-11.2.0 unloaded.
+ libffi/3.4.4-gcccore-12.2.0 loaded.
+ python/3.10.8-gcccore-12.2.0 loaded.
+
+The following have been reloaded with a version change:
+  1) bzip2/1.0.8-gcccore-11.2.0 => bzip2/1.0.8-gcccore-12.2.0
+  2) gmp/6.2.1-gcccore-11.2.0 => gmp/6.2.1-gcccore-12.2.0
+  3) libffi/3.4.2-gcccore-11.2.0 => libffi/3.4.4-gcccore-12.2.0
+  4) libreadline/8.1-gcccore-11.2.0 => libreadline/8.2-gcccore-12.2.0
+  5) ncurses/6.2-gcccore-11.2.0 => ncurses/6.3-gcccore-12.2.0
+  6) python/3.9.6-gcccore-11.2.0 => python/3.10.8-gcccore-12.2.0
+  7) sqlite/3.36-gcccore-11.2.0 => sqlite/3.39.4-gcccore-12.2.0
+  8) tcl/8.6.11-gcccore-11.2.0 => tcl/8.6.12-gcccore-12.2.0
+  9) xz/5.2.5-gcccore-11.2.0 => xz/5.2.7-gcccore-12.2.0
+
+ git/2.38.1-gcccore-12.2.0-nodocs unloaded.
+ expat/2.4.1-gcccore-11.2.0 unloaded.
+ expat/2.4.9-gcccore-12.2.0 loaded.
+ gettext/0.21-gcccore-11.2.0 unloaded.
+ libxml2/2.9.10-gcccore-11.2.0 unloaded.
+ libxml2/2.10.3-gcccore-12.2.0 loaded.
+ gettext/0.21.1-gcccore-12.2.0 loaded.
+ perl/5.34.0-gcccore-11.2.0 unloaded.
+ db/18.1.40-gcccore-11.2.0 unloaded.
+ db/18.1.40-gcccore-12.2.0 loaded.
+ perl/5.36.0-gcccore-12.2.0 loaded.
+ git/2.38.1-gcccore-12.2.0-nodocs loaded.
+
+The following have been reloaded with a version change:
+  1) db/18.1.40-gcccore-11.2.0 => db/18.1.40-gcccore-12.2.0
+  2) expat/2.4.1-gcccore-11.2.0 => expat/2.4.9-gcccore-12.2.0
+  3) gettext/0.21-gcccore-11.2.0 => gettext/0.21.1-gcccore-12.2.0
+  4) libxml2/2.9.10-gcccore-11.2.0 => libxml2/2.10.3-gcccore-12.2.0
+  5) perl/5.34.0-gcccore-11.2.0 => perl/5.36.0-gcccore-12.2.0
+
+ scalapack/2.2.0-gompi-2022a-fb unloaded.
+ scalapack/2.2.0-gompi-2022a-fb loaded.
+ imkl/2022.2.1 unloaded.
+ imkl/2022.2.1 loaded.
+ gnuplot/5.4.4-gcccore-11.3.0 unloaded.
+ gcccore/12.2.0 unloaded.
+ gcccore/11.3.0 loaded.
+ ncurses/6.3-gcccore-12.2.0 unloaded.
+ ncurses/6.3-gcccore-11.3.0 loaded.
+ cairo/1.16.0-gcccore-11.2.0 unloaded.
+ bzip2/1.0.8-gcccore-12.2.0 unloaded.
+ bzip2/1.0.8-gcccore-11.3.0 loaded.
+ zlib/1.2.12-gcccore-12.2.0 unloaded.
+ zlib/1.2.12-gcccore-11.3.0 loaded.
+ libpng/1.6.37-gcccore-11.2.0 unloaded.
+ libpng/1.6.37-gcccore-11.3.0 loaded.
+ freetype/2.11.0-gcccore-11.2.0 unloaded.
+ brotli/1.0.9-gcccore-11.2.0 unloaded.
+ brotli/1.0.9-gcccore-11.3.0 loaded.
+ freetype/2.12.1-gcccore-11.3.0 loaded.
+ pixman/0.40.0-gcccore-11.2.0 unloaded.
+ pixman/0.40.0-gcccore-11.3.0 loaded.
+ expat/2.4.9-gcccore-12.2.0 unloaded.
+ expat/2.4.8-gcccore-11.3.0 loaded.
+ glib/2.69.1-gcccore-11.2.0 unloaded.
+ libffi/3.4.4-gcccore-12.2.0 unloaded.
+ libffi/3.4.2-gcccore-11.3.0 loaded.
+ gettext/0.21.1-gcccore-12.2.0 unloaded.
+ libxml2/2.10.3-gcccore-12.2.0 unloaded.
+ xz/5.2.7-gcccore-12.2.0 unloaded.
+ xz/5.2.5-gcccore-11.3.0 loaded.
+ libxml2/2.9.13-gcccore-11.3.0 loaded.
+ gettext/0.21-gcccore-11.3.0 loaded.
+ pcre/8.45-gcccore-11.2.0 unloaded.
+ pcre/8.45-gcccore-11.3.0 loaded.
+ util-linux/2.37-gcccore-11.2.0 unloaded.
+ util-linux/2.38-gcccore-11.3.0 loaded.
+ glib/2.72.1-gcccore-11.3.0 loaded.
+ x11/20210802-gcccore-11.2.0 unloaded.
+ fontconfig/2.13.94-gcccore-11.2.0 unloaded.
+ fontconfig/2.14.0-gcccore-11.3.0 loaded.
+ xorg-macros/1.19.3-gcccore-11.2.0 unloaded.
+ xorg-macros/1.19.3-gcccore-11.3.0 loaded.
+ libpciaccess/0.16-gcccore-11.2.0 unloaded.
+ libpciaccess/0.16-gcccore-11.3.0 loaded.
+ x11/20220504-gcccore-11.3.0 loaded.
+ cairo/1.17.4-gcccore-11.3.0 loaded.
+ gnuplot/5.4.4-gcccore-11.3.0 loaded.
+
+The following have been reloaded with a version change:
+  1) brotli/1.0.9-gcccore-11.2.0 => brotli/1.0.9-gcccore-11.3.0
+  2) bzip2/1.0.8-gcccore-12.2.0 => bzip2/1.0.8-gcccore-11.3.0
+  3) cairo/1.16.0-gcccore-11.2.0 => cairo/1.17.4-gcccore-11.3.0
+  4) expat/2.4.9-gcccore-12.2.0 => expat/2.4.8-gcccore-11.3.0
+  5) fontconfig/2.13.94-gcccore-11.2.0 => fontconfig/2.14.0-gcccore-11.3.0
+  6) freetype/2.11.0-gcccore-11.2.0 => freetype/2.12.1-gcccore-11.3.0
+  7) gcccore/12.2.0 => gcccore/11.3.0
+  8) gettext/0.21.1-gcccore-12.2.0 => gettext/0.21-gcccore-11.3.0
+  9) glib/2.69.1-gcccore-11.2.0 => glib/2.72.1-gcccore-11.3.0
+ 10) libffi/3.4.4-gcccore-12.2.0 => libffi/3.4.2-gcccore-11.3.0
+ 11) libpciaccess/0.16-gcccore-11.2.0 => libpciaccess/0.16-gcccore-11.3.0
+ 12) libpng/1.6.37-gcccore-11.2.0 => libpng/1.6.37-gcccore-11.3.0
+ 13) libxml2/2.10.3-gcccore-12.2.0 => libxml2/2.9.13-gcccore-11.3.0
+ 14) ncurses/6.3-gcccore-12.2.0 => ncurses/6.3-gcccore-11.3.0
+ 15) pcre/8.45-gcccore-11.2.0 => pcre/8.45-gcccore-11.3.0
+ 16) pixman/0.40.0-gcccore-11.2.0 => pixman/0.40.0-gcccore-11.3.0
+ 17) util-linux/2.37-gcccore-11.2.0 => util-linux/2.38-gcccore-11.3.0
+ 18) x11/20210802-gcccore-11.2.0 => x11/20220504-gcccore-11.3.0
+ 19) xorg-macros/1.19.3-gcccore-11.2.0 => xorg-macros/1.19.3-gcccore-11.3.0
+ 20) xz/5.2.7-gcccore-12.2.0 => xz/5.2.5-gcccore-11.3.0
+ 21) zlib/1.2.12-gcccore-12.2.0 => zlib/1.2.12-gcccore-11.3.0
+
+ scipy-bundle/2021.10-intel-2021b unloaded.
+ python/3.10.8-gcccore-12.2.0 unloaded.
+ gcccore/11.3.0 unloaded.
+ gcccore/11.2.0 loaded.
+ binutils/2.39-gcccore-12.2.0 unloaded.
+ zlib/1.2.12-gcccore-11.3.0 unloaded.
+ zlib/1.2.11-gcccore-11.2.0 loaded.
+ binutils/2.37-gcccore-11.2.0 loaded.
+ bzip2/1.0.8-gcccore-11.3.0 unloaded.
+ bzip2/1.0.8-gcccore-11.2.0 loaded.
+ libreadline/8.2-gcccore-12.2.0 unloaded.
+ ncurses/6.3-gcccore-11.3.0 unloaded.
+ ncurses/6.2-gcccore-11.2.0 loaded.
+ libreadline/8.1-gcccore-11.2.0 loaded.
+ sqlite/3.39.4-gcccore-12.2.0 unloaded.
+ tcl/8.6.12-gcccore-12.2.0 unloaded.
+ tcl/8.6.11-gcccore-11.2.0 loaded.
+ sqlite/3.36-gcccore-11.2.0 loaded.
+ xz/5.2.5-gcccore-11.3.0 unloaded.
+ xz/5.2.5-gcccore-11.2.0 loaded.
+ gmp/6.2.1-gcccore-12.2.0 unloaded.
+ gmp/6.2.1-gcccore-11.2.0 loaded.
+ libffi/3.4.2-gcccore-11.3.0 unloaded.
+ libffi/3.4.2-gcccore-11.2.0 loaded.
+ python/3.9.6-gcccore-11.2.0 loaded.
+ scipy-bundle/2021.10-intel-2021b loaded.
+
+The following have been reloaded with a version change:
+  1) binutils/2.39-gcccore-12.2.0 => binutils/2.37-gcccore-11.2.0
+  2) bzip2/1.0.8-gcccore-11.3.0 => bzip2/1.0.8-gcccore-11.2.0
+  3) gcccore/11.3.0 => gcccore/11.2.0
+  4) gmp/6.2.1-gcccore-12.2.0 => gmp/6.2.1-gcccore-11.2.0
+  5) libffi/3.4.2-gcccore-11.3.0 => libffi/3.4.2-gcccore-11.2.0
+  6) libreadline/8.2-gcccore-12.2.0 => libreadline/8.1-gcccore-11.2.0
+  7) ncurses/6.3-gcccore-11.3.0 => ncurses/6.2-gcccore-11.2.0
+  8) python/3.10.8-gcccore-12.2.0 => python/3.9.6-gcccore-11.2.0
+  9) sqlite/3.39.4-gcccore-12.2.0 => sqlite/3.36-gcccore-11.2.0
+ 10) tcl/8.6.12-gcccore-12.2.0 => tcl/8.6.11-gcccore-11.2.0
+ 11) xz/5.2.5-gcccore-11.3.0 => xz/5.2.5-gcccore-11.2.0
+ 12) zlib/1.2.12-gcccore-11.3.0 => zlib/1.2.11-gcccore-11.2.0
+
+ texlive/20230313-gcc-11.2.0 unloaded.
+ x11/20220504-gcccore-11.3.0 unloaded.
+ fontconfig/2.14.0-gcccore-11.3.0 unloaded.
+ expat/2.4.8-gcccore-11.3.0 unloaded.
+ expat/2.4.1-gcccore-11.2.0 loaded.
+ freetype/2.12.1-gcccore-11.3.0 unloaded.
+ libpng/1.6.37-gcccore-11.3.0 unloaded.
+ libpng/1.6.37-gcccore-11.2.0 loaded.
+ brotli/1.0.9-gcccore-11.3.0 unloaded.
+ brotli/1.0.9-gcccore-11.2.0 loaded.
+ freetype/2.11.0-gcccore-11.2.0 loaded.
+ util-linux/2.38-gcccore-11.3.0 unloaded.
+ util-linux/2.37-gcccore-11.2.0 loaded.
+ fontconfig/2.13.94-gcccore-11.2.0 loaded.
+ xorg-macros/1.19.3-gcccore-11.3.0 unloaded.
+ xorg-macros/1.19.3-gcccore-11.2.0 loaded.
+ libpciaccess/0.16-gcccore-11.3.0 unloaded.
+ libpciaccess/0.16-gcccore-11.2.0 loaded.
+ x11/20210802-gcccore-11.2.0 loaded.
+ perl/5.36.0-gcccore-12.2.0 unloaded.
+ db/18.1.40-gcccore-12.2.0 unloaded.
+ db/18.1.40-gcccore-11.2.0 loaded.
+ perl/5.34.0-gcccore-11.2.0 loaded.
+ cairo/1.17.4-gcccore-11.3.0 unloaded.
+ pixman/0.40.0-gcccore-11.3.0 unloaded.
+ pixman/0.40.0-gcccore-11.2.0 loaded.
+ glib/2.72.1-gcccore-11.3.0 unloaded.
+ gettext/0.21-gcccore-11.3.0 unloaded.
+ libxml2/2.9.13-gcccore-11.3.0 unloaded.
+ libxml2/2.9.10-gcccore-11.2.0 loaded.
+ gettext/0.21-gcccore-11.2.0 loaded.
+ pcre/8.45-gcccore-11.3.0 unloaded.
+ pcre/8.45-gcccore-11.2.0 loaded.
+ glib/2.69.1-gcccore-11.2.0 loaded.
+ cairo/1.16.0-gcccore-11.2.0 loaded.
+ texlive/20230313-gcc-11.2.0 loaded.
+
+The following have been reloaded with a version change:
+  1) brotli/1.0.9-gcccore-11.3.0 => brotli/1.0.9-gcccore-11.2.0
+  2) cairo/1.17.4-gcccore-11.3.0 => cairo/1.16.0-gcccore-11.2.0
+  3) db/18.1.40-gcccore-12.2.0 => db/18.1.40-gcccore-11.2.0
+  4) expat/2.4.8-gcccore-11.3.0 => expat/2.4.1-gcccore-11.2.0
+  5) fontconfig/2.14.0-gcccore-11.3.0 => fontconfig/2.13.94-gcccore-11.2.0
+  6) freetype/2.12.1-gcccore-11.3.0 => freetype/2.11.0-gcccore-11.2.0
+  7) gettext/0.21-gcccore-11.3.0 => gettext/0.21-gcccore-11.2.0
+  8) glib/2.72.1-gcccore-11.3.0 => glib/2.69.1-gcccore-11.2.0
+  9) libpciaccess/0.16-gcccore-11.3.0 => libpciaccess/0.16-gcccore-11.2.0
+ 10) libpng/1.6.37-gcccore-11.3.0 => libpng/1.6.37-gcccore-11.2.0
+ 11) libxml2/2.9.13-gcccore-11.3.0 => libxml2/2.9.10-gcccore-11.2.0
+ 12) pcre/8.45-gcccore-11.3.0 => pcre/8.45-gcccore-11.2.0
+ 13) perl/5.36.0-gcccore-12.2.0 => perl/5.34.0-gcccore-11.2.0
+ 14) pixman/0.40.0-gcccore-11.3.0 => pixman/0.40.0-gcccore-11.2.0
+ 15) util-linux/2.38-gcccore-11.3.0 => util-linux/2.37-gcccore-11.2.0
+ 16) x11/20220504-gcccore-11.3.0 => x11/20210802-gcccore-11.2.0
+ 17) xorg-macros/1.19.3-gcccore-11.3.0 => xorg-macros/1.19.3-gcccore-11.2.0
+
+ gcccore/11.2.0 unloaded.
+ gcccore/12.2.0 loaded.
+
+The following have been reloaded with a version change:
+  1) gcccore/11.2.0 => gcccore/12.2.0
+
+ ruby/3.0.1-gcccore-11.2.0 unloaded.
+ gcccore/12.2.0 unloaded.
+ gcccore/11.2.0 loaded.
+ ruby/3.0.1-gcccore-11.2.0 loaded.
+
+The following have been reloaded with a version change:
+  1) gcccore/12.2.0 => gcccore/11.2.0
+

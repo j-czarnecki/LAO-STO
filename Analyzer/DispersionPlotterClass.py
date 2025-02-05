@@ -3,7 +3,9 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 import numpy as np
 import seaborn as sns
-
+from scipy.signal import convolve
+from matplotlib.colors import PowerNorm, Normalize
+from matplotlib.cm import ScalarMappable
 
 # TODO: self.lowestEnergy should not be used - all energies should be shown with respect to E_Fermi
 # Data reader is in fact not used here, rethink this architecture
@@ -250,12 +252,62 @@ class DispersionPlotter(DataReader):
         plt.savefig(plotOutputPath)
         plt.close()
 
-    def plotDos(self, eMax: float, plotOutputPath: str):
-        plt.figure()
-        plt.plot(self.dosDataframe.E, self.dosDataframe.DOS, color="black", linewidth=1)
-        plt.xlim(left=-eMax, right=eMax)
-        plt.xlabel(r"DOS")
-        plt.ylabel(r"E (meV)")
+    def plotDos(self, eMax: float, plotOutputPath: str, addSmearing: bool,zeta: float, isSingle: bool = True, ax = None, color = "black"):
+        if ax is None and isSingle == False:
+            ValueError("If isSingle is False, ax must be provided")
+
+        if addSmearing:
+            # Define the Lorentzian broadening
+            lorentzian = lambda E: (zeta / np.pi) / (E**2 + zeta**2)
+
+            # Create Lorentzian kernel
+            energy_range = 2*eMax
+            step = self.dosDataframe.E[1] - self.dosDataframe.E[0]
+            kernel_size = len(self.dosDataframe.E)
+            kernel = lorentzian(np.linspace(-energy_range, energy_range, kernel_size))
+            kernel /= np.trapz(kernel, dx=step)  # Normalize the kernel
+
+            # Perform convolution
+            dosSmoothed = convolve(self.dosDataframe.DOS, kernel, mode='same', method='fft')
+
+        if isSingle:
+            fig, ax = plt.subplots(figsize=(7, 5), dpi=400)
+
+        if addSmearing:
+            ax.plot(self.dosDataframe.E, dosSmoothed, color=color, linewidth=1)
+        else:
+            ax.plot(self.dosDataframe.E, self.dosDataframe.DOS, color=color, linewidth=1)
+
+        if isSingle:
+            plt.xlim(left=-eMax, right=eMax)
+            plt.xlabel(r"E (meV)")
+            plt.ylabel(r"DOS")
+            plt.savefig(plotOutputPath)
+            plt.close()
+
+
+    def plotStackedDos(self, eMax: float, plotOutputPath: str, addSmearing: bool, zeta: float, dosDirsList: list, colorParamList: list):
+        """
+        Plots subsequent DOSes on top of each other. User should provide a new LoadDos call for each DOS.
+        Moreover list of parameters from which color should be deduced has to be provided.
+        """
+        fig, ax = plt.subplots(figsize=(7, 5), dpi=400)
+        cmap = plt.cm.viridis
+        norm = Normalize(vmin=min(colorParamList), vmax=max(colorParamList))
+
+        for dir in dosDirsList:
+            self.LoadDos(dir)
+            color = cmap(norm(colorParamList[dosDirsList.index(dir)]))
+            self.plotDos(eMax, plotOutputPath, addSmearing, zeta, isSingle=False, ax=ax, color=color)
+
+        sm = ScalarMappable(cmap=cmap, norm=norm)
+        sm.set_array([])  # Required for ScalarMappable
+        colorbar = fig.colorbar(sm, ax=ax)
+        colorbar.set_label(r"$E_\text{Fermi}$ (meV)")  # Update label as needed
+
+        ax.set_xlim(left=-eMax, right=eMax)
+        ax.set_xlabel(r"E (meV)")
+        ax.set_ylabel(r"DOS")
         plt.savefig(plotOutputPath)
         plt.close()
 

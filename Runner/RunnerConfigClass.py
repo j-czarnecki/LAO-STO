@@ -21,11 +21,11 @@ class RunnerConfig:
             """\
         #!/bin/bash -l
         ## Job name
-        #SBATCH -J KTO-SC-DOS
+        #SBATCH -J STO-GAP
         ## Number of allocated nodes
         #SBATCH -N 1
         ## Number of tasks per node (by default this corresponds to the number of cores allocated per node)
-        #SBATCH --ntasks-per-node=20
+        #SBATCH --ntasks-per-node=30
         ## Memory allocated per core (default is 5GB), comment if mem for whole job should be taken
         #SBATCH --mem-per-cpu=3800MB
         ## Memory allocated for whole job, comment if mem-per-cpu should be taken
@@ -128,10 +128,10 @@ class RunnerConfig:
                 gamma_start = 1., \
                 gamma_nnn_start = 1., \
                 charge_start = 0.1, \
-                max_sc_iter = 100, \
+                max_sc_iter = 30, \
                 sc_alpha = 0.2, \
                 sc_alpha_adapt = 1., \
-                gamma_eps_convergence = 1e-4, \
+                gamma_eps_convergence = 5e-3, \
                 charge_eps_convergence = 1e-4 / \
             &romberg_integration \
                 romb_eps_x = 1e-4, \
@@ -165,8 +165,8 @@ class RunnerConfig:
                 path_to_run_dir_dos = '',\
                 E_DOS_min = -1.,\
                 E_DOS_max = 1.,\
-                dE0 = 0.002,\
-                zeta_DOS = 1e-3,\
+                dE0 = 1e-3,\
+                zeta_DOS = 2e-3,\
                 include_sc_in_dos = .TRUE.,\
                 Nk_points_dos = 15000 /"
         )

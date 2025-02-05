@@ -85,13 +85,12 @@ class DataReader:
             filePathIter = os.path.join(
                 self.runsPath, dir, "OutputData", "Charge_dens_iter.dat"
             )
-
             if os.path.exists(filePathConverged):
                 currentFilling = pd.read_fwf(
                     filePathConverged,
                     skiprows=1,
                     names=self.colnamesCharge,
-                    infer_nrows=100,
+                    infer_nrows=10,
                     dtype=np.float64,
                 )
                 self.__FillDictFilling(currentFilling, isFirstIter)
@@ -102,7 +101,7 @@ class DataReader:
                         filePathIter,
                         skiprows=1,
                         names=self.colnamesCharge,
-                        infer_nrows=100,
+                        infer_nrows=10,
                         dtype=np.float64,
                     )
                     self.__FillDictFilling(currentFilling, isFirstIter)
@@ -136,7 +135,6 @@ class DataReader:
                 self.runsPath, dir, "OutputData", "Gamma_SC_iter.dat"
             )
             namelistPath = os.path.join(self.runsPath, dir, "input.nml")
-
             with open(namelistPath) as nmlFile:
                 nml = f90nml.read(nmlFile)
                 paramsValuesList = []
@@ -144,7 +142,6 @@ class DataReader:
                     paramsValuesList.append(nml["physical_params"][xKey])
                 self.params.append(tuple(paramsValuesList))
                 # print(nml['physical_params'][xKeyword])
-
             # Gamma is printed in [meV]
             # If simulation converged final file should exists
             if os.path.exists(filePathGammaConverged):
@@ -174,7 +171,7 @@ class DataReader:
             else:
                 print("No Gamma file in ", dir)
                 # shutil.rmtree(os.path.join(self.runsPath, dir))
-                # print('Direcotry removed')
+                # print('Directory removed')
                 continue
             firstIter = False
 
@@ -281,6 +278,7 @@ class DataReader:
         Based on the order of self.params list of tuples (first elements ???)
         """
         sortedIndexes = sorted(range(len(self.params)), key=lambda x: self.params[x])
+        print(len(sortedIndexes))
         for key, yList in self.gamma.items():
             self.gamma[key] = [yList[i] for i in sortedIndexes]
 
@@ -312,13 +310,6 @@ class DataReader:
             dictKey = tuple(
                 int(x) for x in pandasFile.loc[row, self.colnamesGamma[:-2]]
             )
-            # print(dictKey)
-            # dictKey = (
-            #     int(pandasFile.spin[row]),
-            #     int(pandasFile.neighbor[row]),
-            #     int(pandasFile.sublat[row]),
-            #     int(pandasFile.orbital[row]),
-            # )
             if firstIter:
                 # self.gamma[dictKey] = [np.sqrt(pandasFile.gammaR[row]**2 + pandasFile.gammaIm[row]**2)]
                 if not fillNones:
