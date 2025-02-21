@@ -75,7 +75,7 @@ def runTemperatureDependence():
 
 def configureAndRunPostprocessing():
     runner = Runner()
-    pathToRuns = os.path.join(SCRATCH_PATH, "STO-SC", "LAO-STO-E_Fermi_J_SC")
+    pathToRuns = os.path.join(SCRATCH_PATH, "STO-SC", "LAO-STO-E_Fermi_J_SC_J_SC_NNN")
     # Adding '' at the end to terminate path with /
     # directories = [
     #     os.path.join(pathToRuns, dir, "")
@@ -83,7 +83,7 @@ def configureAndRunPostprocessing():
     #     if re.match("RUN.*", dir)
     # ]
     directories = [
-        os.path.join(pathToRuns, f"RUN_E_Fermi_{ef}.0_J_SC_110.0", "")
+        os.path.join(pathToRuns, f"RUN_E_Fermi_{ef}.0_J_SC_100.0_J_SC_NNN_75.0", "")
         for ef in [-1026, -966]]
     enable_sc = ("sc_gap_calculation", "enable_sc_gap_calc", True)
     enable_chern = ("chern_number_calculation", "enable_chern_number_calc", False)
@@ -104,35 +104,34 @@ def configureAndRunPostprocessing():
 def configureAndRunSc():
     runner = Runner()
 
-    # Setting number of sublattices and potential of layers
-    n_sublattices = 3
-    Sublat_param = ("discretization", "SUBLATTICES", n_sublattices)
-    const_v_layer = 1.946e3
-    V_layer_param = (
-        "physical_params",
-        "V_layer",
-        [const_v_layer for _ in range(n_sublattices)],
-    )
-    n_subbands = 2
-    Subband_param = ("discretization", "SUBBANDS", n_subbands)
-    Subband_energies_param = ("physical_params", "Subband_energies", [0.0, 0.065e3])
     # Fermi energy
     nml_name = "physical_params"
     param_name = "E_Fermi"
-    Ef_min = 0.05e3
-    Ef_max = 0.15e3
-    Ef_steps = 10
+    Ef_min = -1.05e3
+    Ef_max = -0.9e3
+    Ef_steps = 75
     dE = abs(Ef_max - Ef_min) / Ef_steps
     Fermi_table = [(nml_name, param_name, Ef_min + i * dE) for i in range(Ef_steps + 1)]
 
     # J_SC
     nml_name = "physical_params"
     param_name = "J_SC"
-    J_min = 0.38e3
-    J_max = 0.4e3
-    J_steps = 2
+    J_min = 0.075e3
+    J_max = 0.075e3
+    J_steps = 1
     dJ = abs(J_max - J_min) / J_steps
-    J_table = [(nml_name, param_name, J_min + i * dJ) for i in range(J_steps + 1)]
+    J_table = [(nml_name, param_name, J_min + i * dJ) for i in range(J_steps)]
+
+    # J_SC_NNN
+    nml_name = "physical_params"
+    param_name = "J_SC_NNN"
+    J_NNN = (nml_name, param_name, 0.075e3)
+    # J_min = 0.05e3
+    # J_max = 0.15e3
+    # J_steps = 2
+    # dJ = abs(J_max - J_min) / J_steps
+    # J_table = [(nml_name, param_name, J_min + i * dJ) for i in range(J_steps + 1)]
+
 
     for Ef in Fermi_table:
         for J_sc in J_table:
@@ -140,21 +139,22 @@ def configureAndRunSc():
                 paramValuePairs=[
                     Ef,
                     J_sc,
-                    V_layer_param,
-                    Sublat_param,
-                    Subband_param,
-                    Subband_energies_param,
+                    J_NNN
+                    #V_layer_param,
+                    #Sublat_param,
+                    #Subband_param,
+                    #Subband_energies_param,
                 ],
-                runsDir="KTO-SC/KTO-fit-E_Fermi_100-150meV",
-                material="KTO",
+                runsDir="STO-SC/LAO-STO-E_Fermi_J_SC_J_SC_NNN",
+                material="STO",
                 isAres=True,
             )
 
 
 def main():
     #runTemperatureDependence()
-    #configureAndRunSc()
-    configureAndRunPostprocessing()
+    configureAndRunSc()
+    #configureAndRunPostprocessing()
 
 if __name__ == "__main__":
     main()

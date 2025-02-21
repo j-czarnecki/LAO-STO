@@ -321,6 +321,7 @@ class DispersionPlotter(DataReader):
             c=self.superconductingGapDataframe.gap,
             s=0.5,
             cmap="inferno",
+            norm=PowerNorm(gamma=1.3, vmin = 0, vmax=self.superconductingGapDataframe.gap.max()),
         )
         print("Minimal value of gap is ", self.superconductingGapDataframe.gap.min())
 

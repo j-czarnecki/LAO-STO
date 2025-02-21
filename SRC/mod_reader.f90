@@ -179,10 +179,16 @@ SUBROUTINE GET_INPUT(nmlfile)
     IMPLICIT NONE
     CHARACTER(LEN=*), INTENT(IN) :: nmlfile
     INTEGER*4 :: i
+    INTEGER*4 :: io_status
 
     OPEN(unit = 9, FILE=nmlfile, FORM = "FORMATTED", ACTION = "READ", STATUS="OLD")
 
-    READ(9,NML=discretization)
+    READ(9,NML=discretization, IOSTAT=io_status)
+    IF (io_status .NE. 0) THEN
+        WRITE(log_string, *) "Error reading discretization ", io_status
+        LOG_ERROR(log_string)
+        STOP "Error reading discretization"
+    END IF
     WRITE(log_string, '(2(A, I0))') "k1_steps: ", k1_steps, &
                                   & " k2_steps: ", k2_steps
     LOG_INFO(log_string)
@@ -205,8 +211,14 @@ SUBROUTINE GET_INPUT(nmlfile)
     Subband_energies = 0.0d0
 
     !TODO: WRITE BETTER CHECKS!!!!!!!!!!!!!!!!!!
-    REWIND(9) !Always read from the beginning
-    READ(9,NML=physical_params)
+    REWIND(9)
+    READ(9,NML=physical_params, IOSTAT=io_status)
+    IF (io_status .NE. 0) THEN
+        WRITE(log_string, *) "Error reading physical_params ", io_status
+        LOG_ERROR(log_string)
+        STOP "Error reading physical_params"
+    END IF
+
     WRITE(log_string, '(16(A, E15.5))') "T: ", T,&
                                      & " t_D: ", t_D,&
                                      & " t_I: ", t_I,&
@@ -251,8 +263,16 @@ SUBROUTINE GET_INPUT(nmlfile)
     V_layer = V_layer * meV2au
     Subband_energies = Subband_energies * meV2au
 
-    REWIND(9) !Always read from the beginning
-    READ(9,NML=self_consistency)
+    REWIND(9)
+    READ(9,NML=self_consistency, IOSTAT=io_status)
+    IF (io_status .NE. 0) THEN
+        WRITE(log_string, *) "Error reading self_consistency ", io_status
+        LOG_ERROR(log_string)
+        STOP "Error reading self_consistency"
+    END IF
+    IF (read_gamma_from_file == .FALSE.) WRITE(path_to_gamma_start, *) ""
+    IF (read_charge_from_file == .FALSE.) WRITE(path_to_charge_start, *) ""
+
     WRITE(log_string, '(2(A, I0, 2A), 10(A, E15.5))') "read_gamma_from_file: ", read_gamma_from_file,&
                                                     & " path_to_gamma_start: ", TRIM(path_to_gamma_start),&
                                                     & " read_charge_from_file: ", read_charge_from_file,&
@@ -285,8 +305,13 @@ SUBROUTINE GET_INPUT(nmlfile)
     domega = ABS(dk1*dk2*SIN(2*PI/3.))/(SIN(2*PI/3.)*K1_MAX*K2_MAX)
     eta_p = v * SQRT(3.) / 3.905 * nm2au
 
-    REWIND(9) !Always read from the beginning
-    READ(9, NML=romberg_integration)
+    REWIND(9)
+    READ(9, NML=romberg_integration, IOSTAT=io_status)
+    IF (io_status .NE. 0) THEN
+        WRITE(log_string, *) "Error reading romberg_integration ", io_status
+        LOG_ERROR(log_string)
+        STOP "Error reading romberg_integration"
+    END IF
     WRITE(log_string, '(2((A, E15.5), 2(A, I0)))') "romb_eps_x: ", romb_eps_x, &
                                                  & " interpolation_deg_x: ", interpolation_deg_x, &
                                                  & " max_grid_refinements_x: ", max_grid_refinements_x, &

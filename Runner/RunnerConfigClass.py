@@ -21,19 +21,19 @@ class RunnerConfig:
             """\
         #!/bin/bash -l
         ## Job name
-        #SBATCH -J STO-GAP
+        #SBATCH -J STO-SC-NNN
         ## Number of allocated nodes
         #SBATCH -N 1
         ## Number of tasks per node (by default this corresponds to the number of cores allocated per node)
-        #SBATCH --ntasks-per-node=30
+        #SBATCH --ntasks-per-node=20
         ## Memory allocated per core (default is 5GB), comment if mem for whole job should be taken
-        #SBATCH --mem-per-cpu=3800MB
+        ##SBATCH --mem-per-cpu=3800MB
         ## Memory allocated for whole job, comment if mem-per-cpu should be taken
-        ##SBATCH --mem=80GB
+        #SBATCH --mem=5GB
         ## Max task execution time (format is HH:MM:SS)
         #SBATCH --time=72:00:00
         ## Name of grant to which resource usage will be charged
-        #SBATCH -A plglaosto111-cpu
+        #SBATCH -A plglaosto-cpu
         ## Name of partition
         #SBATCH -p plgrid
         ## Name of file to which standard output will be redirected
@@ -78,7 +78,7 @@ class RunnerConfig:
                 gamma_start = 1., \
                 gamma_nnn_start = 1., \
                 charge_start = 0.1, \
-                max_sc_iter = 100, \
+                max_sc_iter = 50, \
                 sc_alpha = 0.2, \
                 sc_alpha_adapt = 1., \
                 gamma_eps_convergence = 1e-4, \

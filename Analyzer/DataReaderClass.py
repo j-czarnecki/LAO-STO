@@ -344,7 +344,7 @@ class DataReader:
         self.fillingTotal.append(sum(pandasFile.filling[:]))
         for row in range(len(pandasFile.spin)):
             dictKey = tuple(
-                int(x) for x in pandasFile.loc[row, self.colnamesCharge[:-2]]
+                int(x) for x in pandasFile.loc[row, self.colnamesCharge[:-1]]
             )
             # dictKey = (
             #     int(pandasFile.spin[row]),
