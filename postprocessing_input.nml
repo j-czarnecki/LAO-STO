@@ -7,20 +7,20 @@
 &chern_number_calculation
     enable_chern_number_calc = .FALSE.,
     path_to_run_dir_chern_number = "/home/jczarnecki/LAO-STO-results/LAO-STO/RUN_E_Fermi_-850.0/",
-    Nk_points_chern_number = 2000 /
+    Nk_points_chern_number = 1000 /
 
 &dispersion_relation_calculation
-    enable_dispersion_relation_calc = .FALSE.,
+    enable_dispersion_relation_calc = .TRUE.,
     path_to_run_dir_dispersion_relation = "/home/jczarnecki/LAO-STO/",
     include_sc_in_dispersion = .FALSE.,
-    Nk_points_dispersion_relation = 200 /
+    Nk_points_dispersion_relation = 100 /
 
 &dos_calculation
-    enable_dos_calc = .TRUE.,
-    path_to_run_dir_dos = "/net/afscra/people/plgjczarnecki/TEST-instant/",
-    E_DOS_min = -1,
-    E_DOS_max = 1,
-    dE0 = 1e-2,
-    zeta_DOS = 1e-2,
-    include_sc_in_dos = .TRUE.,
-    Nk_points_dos = 4000 /
+    enable_dos_calc = .FALSE.,
+    path_to_run_dir_dos = "/home/jczarnecki/LAO-STO/",
+    E_DOS_min = -100,
+    E_DOS_max = 300,
+    dE0 = 0.1,
+    zeta_DOS = 0.1,
+    include_sc_in_dos = .FALSE.,
+    Nk_points_dos = 2000 /

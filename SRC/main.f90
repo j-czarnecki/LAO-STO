@@ -185,7 +185,7 @@ PROGRAM MAIN
                                     Gamma_SC_new(orb,n,spin,lat, band) = Gamma_SC_new(orb,n,spin,lat, band) - 0.5 * J_SC_PRIME * Delta_new(orb_prime, n,spin,lat, band)
                                 END IF
                             END DO
-                            ! To get same critical temperature in all subbands
+                            !To get same critical temperature in all subbands
                             DO band_prime = 1, SUBBANDS
                                 IF(band .NE. band_prime) THEN
                                     DO orb_prime = 1, ORBITALS
@@ -214,7 +214,7 @@ PROGRAM MAIN
                                     Gamma_SC_new(orb,n,spin,lat, band) = Gamma_SC_new(orb,n,spin,lat, band) - 0.5 * J_SC_PRIME_NNN * Delta_new(orb_prime, n,spin,lat, band)
                                 END IF
                             END DO
-                            ! To get same critical temperature in all subbands
+                            !To get same critical temperature in all subbands
                             DO band_prime = 1, SUBBANDS
                                 IF(band .NE. band_prime) THEN
                                     DO orb_prime = 1, ORBITALS

@@ -8,19 +8,19 @@
     T = 0.0,
     t_D = 0.65e3,
     t_I = 0.05e3,
-    t_Rashba = 0.003e3,
+    t_Rashba = 0.004e3,
     lambda_SOC = 0.265e3,
-    DELTA_TRI = 0.0e3,
+    DELTA_TRI = 0.000e3,
     v = 0.0e3,
     V_pdp = 0.028e3,
     V_pds = -0.065e3,
-    J_SC = 0.35e3,
-    J_SC_PRIME = 0.035e3,
-    J_SC_NNN = 0.0e3,
-    J_SC_PRIME_NNN = 0.0e3,
+    J_SC = 0.3e3,
+    J_SC_PRIME = 0.03e3,
+    J_SC_NNN = 0.2e3,
+    J_SC_PRIME_NNN = 0.02e3,
     U_HUB = 0e3,
     V_HUB = 0e3,
-    E_Fermi = 0.10e3,
+    E_Fermi = -0.0e3,
     V_layer = 1.946e3, 1.946e3, 1.946e3,
     Subband_energies = 0.0e3, 0.065e3 /
 
@@ -33,18 +33,18 @@
     gamma_nnn_start = 0.,
     charge_start = 0.1,
     max_sc_iter = 10,
-    sc_alpha = 0.2,
+    sc_alpha = 0.3,
     sc_alpha_adapt = 1.,
-    gamma_eps_convergence = 1e-2,
-    charge_eps_convergence = 1e-4 /
+    gamma_eps_convergence = 5e-3,
+    charge_eps_convergence = 5e-3 /
 
 &romberg_integration
     romb_eps_x = 1e-2,
     interpolation_deg_x = 3,
-    max_grid_refinements_x = 10,
+    max_grid_refinements_x = 9,
     romb_eps_y = 1e-2,
     interpolation_deg_y = 3,
-    max_grid_refinements_y = 10 /
+    max_grid_refinements_y = 9 /
 
 
 

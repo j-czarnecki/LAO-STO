@@ -7,9 +7,13 @@ from scipy.signal import convolve
 from matplotlib.colors import PowerNorm, Normalize
 from matplotlib.cm import ScalarMappable
 
+
 # TODO: self.lowestEnergy should not be used - all energies should be shown with respect to E_Fermi
 # Data reader is in fact not used here, rethink this architecture
 class DispersionPlotter(DataReader):
+
+    def __init__(self, sublattices: int, subbands: int):
+        DataReader.__init__(self, "./", "xxx", sublattices, subbands)
 
     def __init__(self, sublattices: int, subbands: int):
         DataReader.__init__(self, "./", "xxx", sublattices, subbands)
@@ -22,10 +26,10 @@ class DispersionPlotter(DataReader):
         plt.rcParams["font.serif"] = "Computer Modern Roman"
         plt.rcParams["font.sans-serif"] = "Computer Modern Sans serif"
         plt.rcParams["font.monospace"] = "Computer Modern Typewriter"
-        plt.rcParams["axes.titlesize"] = 24
-        plt.rcParams["axes.labelsize"] = 24
-        plt.rcParams["xtick.labelsize"] = 20
-        plt.rcParams["ytick.labelsize"] = 20
+        plt.rcParams["axes.titlesize"] = 32
+        plt.rcParams["axes.labelsize"] = 32
+        plt.rcParams["xtick.labelsize"] = 26
+        plt.rcParams["ytick.labelsize"] = 26
         # Optionally, add custom LaTeX preamble
         plt.rcParams["text.latex.preamble"] = (
             r"\usepackage{amsmath} \usepackage{amsfonts} \usepackage{amssymb}"
@@ -51,7 +55,7 @@ class DispersionPlotter(DataReader):
         plt.rcParams["ytick.right"] = True
 
         plt.rcParams["legend.fontsize"] = 12
-        plt.rcParams["legend.title_fontsize"] = 14
+        plt.rcParams["legend.title_fontsize"] = 24
 
         plt.rcParams["axes.xmargin"] = 0.01
 
@@ -252,7 +256,16 @@ class DispersionPlotter(DataReader):
         plt.savefig(plotOutputPath)
         plt.close()
 
-    def plotDos(self, eMax: float, plotOutputPath: str, addSmearing: bool,zeta: float, isSingle: bool = True, ax = None, color = "black"):
+    def plotDos(
+        self,
+        eMax: float,
+        plotOutputPath: str,
+        addSmearing: bool,
+        zeta: float,
+        isSingle: bool = True,
+        ax=None,
+        color="black",
+    ):
         if ax is None and isSingle == False:
             ValueError("If isSingle is False, ax must be provided")
 
@@ -261,14 +274,16 @@ class DispersionPlotter(DataReader):
             lorentzian = lambda E: (zeta / np.pi) / (E**2 + zeta**2)
 
             # Create Lorentzian kernel
-            energy_range = 2*eMax
+            energy_range = 2 * eMax
             step = self.dosDataframe.E[1] - self.dosDataframe.E[0]
             kernel_size = len(self.dosDataframe.E)
             kernel = lorentzian(np.linspace(-energy_range, energy_range, kernel_size))
             kernel /= np.trapz(kernel, dx=step)  # Normalize the kernel
 
             # Perform convolution
-            dosSmoothed = convolve(self.dosDataframe.DOS, kernel, mode='same', method='fft')
+            dosSmoothed = convolve(
+                self.dosDataframe.DOS, kernel, mode="same", method="fft"
+            )
 
         if isSingle:
             fig, ax = plt.subplots(figsize=(7, 5), dpi=400)
@@ -276,7 +291,9 @@ class DispersionPlotter(DataReader):
         if addSmearing:
             ax.plot(self.dosDataframe.E, dosSmoothed, color=color, linewidth=1)
         else:
-            ax.plot(self.dosDataframe.E, self.dosDataframe.DOS, color=color, linewidth=1)
+            ax.plot(
+                self.dosDataframe.E, self.dosDataframe.DOS, color=color, linewidth=1
+            )
 
         if isSingle:
             plt.xlim(left=-eMax, right=eMax)
@@ -285,8 +302,15 @@ class DispersionPlotter(DataReader):
             plt.savefig(plotOutputPath)
             plt.close()
 
-
-    def plotStackedDos(self, eMax: float, plotOutputPath: str, addSmearing: bool, zeta: float, dosDirsList: list, colorParamList: list):
+    def plotStackedDos(
+        self,
+        eMax: float,
+        plotOutputPath: str,
+        addSmearing: bool,
+        zeta: float,
+        dosDirsList: list,
+        colorParamList: list,
+    ):
         """
         Plots subsequent DOSes on top of each other. User should provide a new LoadDos call for each DOS.
         Moreover list of parameters from which color should be deduced has to be provided.
@@ -298,7 +322,15 @@ class DispersionPlotter(DataReader):
         for dir in dosDirsList:
             self.LoadDos(dir)
             color = cmap(norm(colorParamList[dosDirsList.index(dir)]))
-            self.plotDos(eMax, plotOutputPath, addSmearing, zeta, isSingle=False, ax=ax, color=color)
+            self.plotDos(
+                eMax,
+                plotOutputPath,
+                addSmearing,
+                zeta,
+                isSingle=False,
+                ax=ax,
+                color=color,
+            )
 
         sm = ScalarMappable(cmap=cmap, norm=norm)
         sm.set_array([])  # Required for ScalarMappable
