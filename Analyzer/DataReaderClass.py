@@ -36,6 +36,7 @@ class DataReader:
         self.layerCouplings: int = 2 * (self.sublattices - 1)
         self.subbands: int = subbands
         self.gamma: dict = {}
+        self.gammaKDataFrame: pd.DataFrame = pd.DataFrame()
         self.filling: dict = {}
         self.fillingTotal: list = []
         self.params: list = []
@@ -271,6 +272,17 @@ class DataReader:
             else:
                 print("No such file ", filePath)
             isFirstIter = False
+
+    def LoadGammaMap(self, gammaKPath: str):
+        if os.path.exists(gammaKPath):
+            self.gammaKDataFrame = pd.read_csv(
+                gammaKPath,
+                delim_whitespace=True,
+                dtype=np.float64,
+                skiprows=1,
+            )
+        else:
+            print("No such file ", gammaKPath)
 
     def sortData(self):
         """

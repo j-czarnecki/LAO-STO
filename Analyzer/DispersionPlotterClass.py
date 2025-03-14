@@ -14,9 +14,6 @@ class DispersionPlotter(DataReader):
 
     def __init__(self, sublattices: int, subbands: int):
         DataReader.__init__(self, "./", "xxx", sublattices, subbands)
-
-    def __init__(self, sublattices: int, subbands: int):
-        DataReader.__init__(self, "./", "xxx", sublattices, subbands)
         self.dataLength: int = 0
         self.kPoints1D: int = 0
         self.maxBands: int = 0
@@ -108,8 +105,8 @@ class DispersionPlotter(DataReader):
             brillouinZoneVertices[:, 0],
             brillouinZoneVertices[:, 1],
             "--",
-            color="black",
-            linewidth=0.8,
+            color="white",
+            linewidth=1.5,
         )
 
     def plotCrossection(
@@ -353,7 +350,9 @@ class DispersionPlotter(DataReader):
             c=self.superconductingGapDataframe.gap,
             s=0.5,
             cmap="inferno",
-            norm=PowerNorm(gamma=1.3, vmin = 0, vmax=self.superconductingGapDataframe.gap.max()),
+            norm=PowerNorm(
+                gamma=1.3, vmin=0, vmax=self.superconductingGapDataframe.gap.max()
+            ),
         )
         print("Minimal value of gap is ", self.superconductingGapDataframe.gap.min())
 
@@ -400,3 +399,179 @@ class DispersionPlotter(DataReader):
             # plt.grid()
             plt.savefig(f"../Plots/SuperconductingGapMap_n{state}.png")
             plt.close()
+
+    def plotGammaKMap(self, inputPath: str):
+        multiplier = 3
+
+        for band in range(1, max(1, self.subbands) + 1):
+            for spin in range(1, 3):
+                for sublat in range(1, self.layerCouplings + 1):
+                    for orbital in range(1, 4):
+                        self.LoadGammaMap(
+                            os.path.join(
+                                inputPath,
+                                "OutputData",
+                                f"GammaK_orb{orbital}_spin{spin}_layer{sublat}_band{band}.dat",
+                            )
+                        )
+                        # Real part
+                        plt.figure()
+                        self.plotFirstBrillouinZoneBoundary()
+                        plt.scatter(
+                            self.gammaKDataFrame.iloc[:, 0],
+                            self.gammaKDataFrame.iloc[:, 1],
+                            c=np.float64(self.gammaKDataFrame.iloc[:, 2]),
+                            s=0.5,
+                            cmap="inferno",
+                        )
+                        plt.colorbar(label=r"$Re\left( \Gamma  \right)$ (meV)")
+                        ticks = plt.gca().get_xticks()
+                        plt.xticks(ticks)
+                        plt.yticks(ticks)
+                        plt.xlim(-2.5 * multiplier, 2.5 * multiplier)
+                        plt.ylim(-2.5 * multiplier, 2.5 * multiplier)
+
+                        plt.xlabel(r"$k_x~(\tilde{a}^{-1})$")
+                        plt.ylabel(r"$k_y~(\tilde{a}^{-1})$")
+                        plt.gca().set_aspect("equal", adjustable="box")
+                        # plt.grid()
+                        plt.savefig(
+                            f"../Plots/GammaKMapRe_orb{orbital}_spin{spin}_layer{sublat}_band{band}.png"
+                        )
+                        plt.close()
+
+                        # Imaginary part
+                        plt.figure()
+                        self.plotFirstBrillouinZoneBoundary()
+                        plt.scatter(
+                            self.gammaKDataFrame.iloc[:, 0],
+                            self.gammaKDataFrame.iloc[:, 1],
+                            c=np.float64(self.gammaKDataFrame.iloc[:, 3]),
+                            s=0.5,
+                            cmap="inferno",
+                        )
+                        plt.colorbar(label=r"$Im\left( \Gamma  \right)$ (meV)")
+                        ticks = plt.gca().get_xticks()
+                        plt.xticks(ticks)
+                        plt.yticks(ticks)
+                        plt.xlim(-2.5 * multiplier, 2.5 * multiplier)
+                        plt.ylim(-2.5 * multiplier, 2.5 * multiplier)
+
+                        plt.xlabel(r"$k_x~(\tilde{a}^{-1})$")
+                        plt.ylabel(r"$k_y~(\tilde{a}^{-1})$")
+                        plt.gca().set_aspect("equal", adjustable="box")
+                        # plt.grid()
+                        plt.savefig(
+                            f"../Plots/GammaKMapIm_orb{orbital}_spin{spin}_layer{sublat}_band{band}.png"
+                        )
+                        plt.close()
+
+                        # Module squared NN
+                        plt.figure()
+                        self.plotFirstBrillouinZoneBoundary()
+                        plt.scatter(
+                            self.gammaKDataFrame.iloc[:, 0],
+                            self.gammaKDataFrame.iloc[:, 1],
+                            c=np.float64(
+                                self.gammaKDataFrame.iloc[:, 2] ** 2
+                                + self.gammaKDataFrame.iloc[:, 3] ** 2
+                            ),
+                            s=0.5,
+                            cmap="inferno",
+                        )
+                        plt.colorbar(label=r"$\left| \Gamma  \right|^2$ (meV)")
+                        ticks = plt.gca().get_xticks()
+                        plt.xticks(ticks)
+                        plt.yticks(ticks)
+                        plt.xlim(-2.5 * multiplier, 2.5 * multiplier)
+                        plt.ylim(-2.5 * multiplier, 2.5 * multiplier)
+
+                        plt.xlabel(r"$k_x~(\tilde{a}^{-1})$")
+                        plt.ylabel(r"$k_y~(\tilde{a}^{-1})$")
+                        plt.gca().set_aspect("equal", adjustable="box")
+                        # plt.grid()
+                        plt.savefig(
+                            f"../Plots/GammaKMapModuleSquared_orb{orbital}_spin{spin}_layer{sublat}_band{band}.png"
+                        )
+                        plt.close()
+
+                        # Real part NNN
+                        plt.figure()
+                        self.plotFirstBrillouinZoneBoundary()
+                        plt.scatter(
+                            self.gammaKDataFrame.iloc[:, 0],
+                            self.gammaKDataFrame.iloc[:, 1],
+                            c=np.float64(self.gammaKDataFrame.iloc[:, 4]),
+                            s=0.5,
+                            cmap="inferno",
+                        )
+                        plt.colorbar(label=r"$Re\left( \Gamma  \right)$ (meV)")
+                        ticks = plt.gca().get_xticks()
+                        plt.xticks(ticks)
+                        plt.yticks(ticks)
+                        plt.xlim(-2.5 * multiplier, 2.5 * multiplier)
+                        plt.ylim(-2.5 * multiplier, 2.5 * multiplier)
+
+                        plt.xlabel(r"$k_x~(\tilde{a}^{-1})$")
+                        plt.ylabel(r"$k_y~(\tilde{a}^{-1})$")
+                        plt.gca().set_aspect("equal", adjustable="box")
+                        # plt.grid()
+                        plt.savefig(
+                            f"../Plots/GammaKMapNnnRe_orb{orbital}_spin{spin}_layer{sublat}_band{band}.png"
+                        )
+                        plt.close()
+
+                        # Imaginary part NNN
+                        plt.figure()
+                        self.plotFirstBrillouinZoneBoundary()
+                        plt.scatter(
+                            self.gammaKDataFrame.iloc[:, 0],
+                            self.gammaKDataFrame.iloc[:, 1],
+                            c=np.float64(self.gammaKDataFrame.iloc[:, 5]),
+                            s=0.5,
+                            cmap="inferno",
+                        )
+                        plt.colorbar(label=r"$Im\left( \Gamma  \right)$ (meV)")
+                        ticks = plt.gca().get_xticks()
+                        plt.xticks(ticks)
+                        plt.yticks(ticks)
+                        plt.xlim(-2.5 * multiplier, 2.5 * multiplier)
+                        plt.ylim(-2.5 * multiplier, 2.5 * multiplier)
+
+                        plt.xlabel(r"$k_x~(\tilde{a}^{-1})$")
+                        plt.ylabel(r"$k_y~(\tilde{a}^{-1})$")
+                        plt.gca().set_aspect("equal", adjustable="box")
+                        # plt.grid()
+                        plt.savefig(
+                            f"../Plots/GammaKMapNnnIm_orb{orbital}_spin{spin}_layer{sublat}_band{band}.png"
+                        )
+                        plt.close()
+
+                        # Module squared part NNN
+                        plt.figure()
+                        self.plotFirstBrillouinZoneBoundary()
+                        plt.scatter(
+                            self.gammaKDataFrame.iloc[:, 0],
+                            self.gammaKDataFrame.iloc[:, 1],
+                            c=np.float64(
+                                self.gammaKDataFrame.iloc[:, 4] ** 2
+                                + self.gammaKDataFrame.iloc[:, 5] ** 2
+                            ),
+                            s=0.5,
+                            cmap="inferno",
+                        )
+                        plt.colorbar(label=r"$\left| \Gamma  \right|^2$ (meV)")
+                        ticks = plt.gca().get_xticks()
+                        plt.xticks(ticks)
+                        plt.yticks(ticks)
+                        plt.xlim(-2.5 * multiplier, 2.5 * multiplier)
+                        plt.ylim(-2.5 * multiplier, 2.5 * multiplier)
+
+                        plt.xlabel(r"$k_x~(\tilde{a}^{-1})$")
+                        plt.ylabel(r"$k_y~(\tilde{a}^{-1})$")
+                        plt.gca().set_aspect("equal", adjustable="box")
+                        # plt.grid()
+                        plt.savefig(
+                            f"../Plots/GammaKMapNnnModuleSquared_orb{orbital}_spin{spin}_layer{sublat}_band{band}.png"
+                        )
+                        plt.close()
