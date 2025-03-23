@@ -116,11 +116,30 @@ def plotDispersions():
 
     # dispersionPlotter.plotFermiCrossection(75, 2.0, "../Plots/FermiSlice75.png")
     # dispersionPlotter.plotFermiCrossection(500, 1.0, "../Plots/FermiSlice500.png")
-    # dispersionPlotter.plotDos(0.7, "../Plots/DOS.png", False, 1e-2)
-    dispersionPlotter = DispersionPlotter(sublattices=2, subbands=1)
-    dispersionPlotter.plotGammaKMap(
-        inputPath="/home/jczarnecki/LAO-STO-results/LAO-STO-E_Fermi_J_SC_J_SC_NNN/RUN_E_Fermi_-1000.0_J_SC_100.0_J_SC_NNN_75.0"
-    )
+    dispersionPlotter = DispersionPlotter(sublattices=3, subbands=2)
+    dispersionPlotter.LoadSuperconductingGap(
+                os.path.join(
+                    "/home/pwojcik/LAO-STO",
+                    "OutputData",
+                    "SuperconductingGap.dat",
+                )
+            )
+    dispersionPlotter.plotSuperconductingGapAngular(postfix=f"", title=rf"")
+    dispersionPlotter.plotSuperconductingGap(postfix=f"", title=rf"")
+    dispersionPlotter.LoadDos(
+                    os.path.join(
+                        "/home",
+                        "pwojcik",
+                        "LAO-STO",
+                        "OutputData",
+                        "DOS.dat",
+                    )
+                )
+    dispersionPlotter.plotDos(50, "../Plots/DOS.png", False, 1e-2)
+
+    # dispersionPlotter.plotGammaKMap(
+    #     inputPath="/home/pwojcik/LAO-STO"
+    # )
 
 
 def main():

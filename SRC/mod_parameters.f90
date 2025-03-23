@@ -22,6 +22,8 @@ REAL*8, PARAMETER :: K1_MAX = 1. !Full Brillouin zone to integrate over
 REAL*8, PARAMETER :: K2_MAX = 1.
 REAL*8, PARAMETER :: KX_MAX = 4.0d0 * PI / (3.0d0 * SQRT(3.0d0)) !This defines maximum kx of hexagon corresponding to the first Brillouin Zone
 REAL*8, PARAMETER :: KY_MAX = 2.0d0 * PI / 3.0d0 !This defines maximum ky of hexagon corresponding to the first Brillouin Zone
+REAL*8, PARAMETER :: R_K_MAX = 4.0d0 * PI / (3.0d0 * SQRT(3.0d0)) !This defines the radius of circle that the first Brillouin Zone hexagon is inscribed in.
 REAL*8, PARAMETER :: JACOBIAN = 8 * PI**2 / (3.*SQRT(3.0d0))
 
+INTEGER*4, PARAMETER :: N_BZ_SECTIONS = 6
 END MODULE mod_parameters

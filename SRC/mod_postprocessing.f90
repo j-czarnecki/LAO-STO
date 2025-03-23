@@ -70,22 +70,32 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_poi
   Gamma_SC = DCMPLX(0., 0.)
   Charge_dens = 0.
 
-  INQUIRE (FILE=TRIM(inputPath)//"OutputData/Charge_dens_final.dat", EXIST=fileExists)
-  IF (fileExists) THEN
-    CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
-  ELSE
-    CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
-  END IF
+  ! INQUIRE (FILE=TRIM(inputPath)//"OutputData/Charge_dens_final.dat", EXIST=fileExists)
+  ! IF (fileExists) THEN
+  !   CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
+  ! ELSE
+  !   CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
+  ! END IF
 
-  IF (include_sc) THEN
-    !Then we should also read Gamma_SC
-    INQUIRE (FILE=TRIM(inputPath)//"OutputData/Gamma_SC_final.dat", EXIST=fileExists)
-    IF (fileExists) THEN
-      CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_final.dat")
-    ELSE
-      CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
-    END IF
-  END IF
+  ! IF (include_sc) THEN
+  !   !Then we should also read Gamma_SC
+  !   INQUIRE (FILE=TRIM(inputPath)//"OutputData/Gamma_SC_final.dat", EXIST=fileExists)
+  !   IF (fileExists) THEN
+  !     CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_final.dat")
+  !   ELSE
+  !     CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
+  !   END IF
+  ! END IF
+
+  Gamma_SC = DCMPLX(0.0d0, 0.0d0)
+  Gamma_SC(:, :3, 1, :, :) = 20.*meV2au
+  Gamma_SC(:, :3, 2, :, :) = -20.*meV2au
+  ! Gamma_SC(1, 2, 1, :, :) = 10.*meV2au
+  ! Gamma_SC(1, 2, 2, :, :) = -10.*meV2au
+  ! Gamma_SC(2, 3, 1, :, :) = 10.*meV2au
+  ! Gamma_SC(2, 3, 2, :, :) = -10.*meV2au
+  ! Gamma_SC(3, 1, 1, :, :) = 10.*meV2au
+  ! Gamma_SC(3, 1, 2, :, :) = -10.*meV2au
 
   !Computing k-independent terms
   CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:, :))
@@ -277,11 +287,6 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
       CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
     END IF
   END IF
-
-  Gamma_SC(:, :, 1, :, 1) = 30.*meV2au
-  Gamma_SC(:, :, 2, :, 1) = -30.*meV2au
-  Gamma_SC(:, :, 1, :, 2) = 10.*meV2au
-  Gamma_SC(:, :, 2, :, 2) = -10.*meV2au
 
   !Computing k-independent terms
   CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:, :))
@@ -602,24 +607,28 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
   output_format = '(3E15.5, I10)'
 
   !Calculation of superconducting gap
-  INQUIRE (FILE=TRIM(inputPath)//"OutputData/Gamma_SC_final.dat", EXIST=fileExists)
-  IF (fileExists) THEN
-    CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_final.dat")
-  ELSE
-    CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
-  END IF
+  ! INQUIRE (FILE=TRIM(inputPath)//"OutputData/Gamma_SC_final.dat", EXIST=fileExists)
+  ! IF (fileExists) THEN
+  !   CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_final.dat")
+  ! ELSE
+  !   CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
+  ! END IF
 
-  ! Gamma_SC(:,:,1,:,1) = 30. * meV2au
-  ! Gamma_SC(:,:,2,:,1) = -30. * meV2au
-  ! Gamma_SC(:,:,1,:,2) = 10. * meV2au
-  ! Gamma_SC(:,:,2,:,2) = -10. * meV2au
-
-  INQUIRE (FILE=TRIM(inputPath)//"OutputData/Charge_dens_final.dat", EXIST=fileExists)
-  IF (fileExists) THEN
-    CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
-  ELSE
-    CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
-  END IF
+  Gamma_SC = DCMPLX(0.0d0, 0.0d0)
+  Gamma_SC(:, :3, 1, :, :) = 20.*meV2au
+  Gamma_SC(:, :3, 2, :, :) = -20.*meV2au
+  ! Gamma_SC(1, 2, 1, :, :) = 10.*meV2au
+  ! Gamma_SC(1, 2, 2, :, :) = -10.*meV2au
+  ! Gamma_SC(2, 3, 1, :, :) = 10.*meV2au
+  ! Gamma_SC(2, 3, 2, :, :) = -10.*meV2au
+  ! Gamma_SC(3, 1, 1, :, :) = 10.*meV2au
+  ! Gamma_SC(3, 1, 2, :, :) = -10.*meV2au
+  ! INQUIRE (FILE=TRIM(inputPath)//"OutputData/Charge_dens_final.dat", EXIST=fileExists)
+  ! IF (fileExists) THEN
+  !   CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
+  ! ELSE
+  !   CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
+  ! END IF
   !Computing k-independent terms
   CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:, :))
   CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:, :))
@@ -670,7 +679,7 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
           !Check whether current wavevector is in the Fermi surface
           IF (MINVAL(ABS(Energies(:DIM_POSITIVE_K))) < dE) THEN
             IsFermiSurface(i, j) = 1
-            OrbitalAtFermiSurface(i, j) = band * DIM_POSITIVE_K + MINLOC(ABS(Energies(:DIM_POSITIVE_K)), 1)
+            OrbitalAtFermiSurface(i, j) = (band - 1) * DIM_POSITIVE_K + MINLOC(ABS(Energies(:DIM_POSITIVE_K)), 1)
           END IF
         END IF
       END DO
@@ -678,7 +687,7 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
     !$omp end do
     !$omp end parallel
 
-    WRITE (log_string, *) "Fermi surface done, reading Gamma_SC"
+    WRITE (log_string, *) "Fermi surface done"
     LOG_INFO(log_string)
 
     !$omp parallel private(kx, ky, Hamiltonian, Energies)

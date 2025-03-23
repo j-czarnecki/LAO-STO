@@ -6,7 +6,7 @@ import seaborn as sns
 from scipy.signal import convolve
 from matplotlib.colors import PowerNorm, Normalize
 from matplotlib.cm import ScalarMappable
-
+from brokenaxes import brokenaxes
 
 # TODO: self.lowestEnergy should not be used - all energies should be shown with respect to E_Fermi
 # Data reader is in fact not used here, rethink this architecture
@@ -18,43 +18,7 @@ class DispersionPlotter(DataReader):
         self.kPoints1D: int = 0
         self.maxBands: int = 0
 
-        plt.rcParams["text.usetex"] = True
-        plt.rcParams["font.family"] = "serif"
-        plt.rcParams["font.serif"] = "Computer Modern Roman"
-        plt.rcParams["font.sans-serif"] = "Computer Modern Sans serif"
-        plt.rcParams["font.monospace"] = "Computer Modern Typewriter"
-        plt.rcParams["axes.titlesize"] = 32
-        plt.rcParams["axes.labelsize"] = 32
-        plt.rcParams["xtick.labelsize"] = 26
-        plt.rcParams["ytick.labelsize"] = 26
-        # Optionally, add custom LaTeX preamble
-        plt.rcParams["text.latex.preamble"] = (
-            r"\usepackage{amsmath} \usepackage{amsfonts} \usepackage{amssymb}"
-        )
-
-        # Choose a seaborn palette
-        palette = sns.color_palette("hsv", 7)  # has to specify number of lines
-
-        # Set the color cycle
-        plt.rcParams["axes.prop_cycle"] = plt.cycler(color=palette)
-
-        # Set rcParams for tighter layout
-        plt.rcParams["figure.autolayout"] = True
-        plt.rcParams["figure.constrained_layout.use"] = False
-        plt.rcParams["axes.linewidth"] = 1.2
-
-        # Set rcParams to show ticks on both left and right sides
-        plt.rcParams["xtick.direction"] = "in"
-        plt.rcParams["ytick.direction"] = "in"
-        plt.rcParams["xtick.bottom"] = True
-        plt.rcParams["ytick.left"] = True
-        plt.rcParams["xtick.top"] = True
-        plt.rcParams["ytick.right"] = True
-
-        plt.rcParams["legend.fontsize"] = 12
-        plt.rcParams["legend.title_fontsize"] = 24
-
-        plt.rcParams["axes.xmargin"] = 0.01
+        self.__initializePlotParams()
 
         print("Initialized DispersionPlotter object")
         print(self.kPoints1D)
@@ -105,8 +69,8 @@ class DispersionPlotter(DataReader):
             brillouinZoneVertices[:, 0],
             brillouinZoneVertices[:, 1],
             "--",
-            color="white",
-            linewidth=1.5,
+            color="black",
+            linewidth=1,
         )
 
     def plotCrossection(
@@ -371,6 +335,43 @@ class DispersionPlotter(DataReader):
         plt.savefig("../Plots/SuperconductingGap" + postfix + ".png")
         plt.close()
 
+    def plotSuperconductingGapAngular(self, postfix: str = "", title: str = None):
+        self.__setPalette(nColors=self.superconductingGapDataframe['state'].nunique())
+
+        figAngular, axAngular = plt.subplots(figsize=(7, 5), dpi=400)
+        #baxAngular = brokenaxes(ylims=((0,1), (15,50)), hspace=0.1)
+        figFourier, axFourier = plt.subplots(figsize=(7, 5), dpi=400)
+
+        for state, group in self.superconductingGapDataframe.groupby("state"):
+            angles = np.arctan2(group.ky, group.kx) / (np.pi)
+            sortedIndices = np.argsort(angles)
+            sortedAngles = angles.iloc[sortedIndices]
+            sortedGaps = group.gap.iloc[sortedIndices]
+            axAngular.plot(
+                sortedAngles,
+                sortedGaps,
+                label=f"{int(state)}",
+            )
+
+            gapFft = np.fft.fft(sortedGaps) / len(sortedGaps)
+            freqs = np.fft.fftfreq(len(sortedGaps), d=np.mean(np.diff(sortedAngles))) / np.pi
+            axFourier.scatter(freqs, np.abs(gapFft), label=f"{int(state)}")
+
+        axAngular.set_title(title)
+        axAngular.legend(title="n", loc="upper right")
+        axAngular.set_xlabel(r"$\varphi$~($\pi$)")
+        axAngular.set_ylabel(r"$\tilde{\Delta}$~(meV)")
+        figAngular.savefig(f"../Plots/SuperconductingGapAngular{postfix}.png")
+        plt.close(figAngular)
+
+        axFourier.set_title(title)
+        axFourier.legend(title="n", loc="upper right")
+        axFourier.set_xlabel(r"f ($\pi^{-1}$)")
+        axFourier.set_ylabel(r"$\tilde{\Delta}$~(meV)")
+        axFourier.set_xlim(-2, 2)
+        figFourier.savefig(f"../Plots/SuperconductingGapFourier{postfix}.png")
+        plt.close(figFourier)
+
     def plotSuperconductingGapMap(self):
 
         # print(self.superconductingGapMap[1][1][1])
@@ -422,7 +423,7 @@ class DispersionPlotter(DataReader):
                             self.gammaKDataFrame.iloc[:, 1],
                             c=np.float64(self.gammaKDataFrame.iloc[:, 2]),
                             s=0.5,
-                            cmap="inferno",
+                            cmap="bwr",
                         )
                         plt.colorbar(label=r"$Re\left( \Gamma  \right)$ (meV)")
                         ticks = plt.gca().get_xticks()
@@ -448,7 +449,7 @@ class DispersionPlotter(DataReader):
                             self.gammaKDataFrame.iloc[:, 1],
                             c=np.float64(self.gammaKDataFrame.iloc[:, 3]),
                             s=0.5,
-                            cmap="inferno",
+                            cmap="bwr",
                         )
                         plt.colorbar(label=r"$Im\left( \Gamma  \right)$ (meV)")
                         ticks = plt.gca().get_xticks()
@@ -477,7 +478,7 @@ class DispersionPlotter(DataReader):
                                 + self.gammaKDataFrame.iloc[:, 3] ** 2
                             ),
                             s=0.5,
-                            cmap="inferno",
+                            cmap="bwr",
                         )
                         plt.colorbar(label=r"$\left| \Gamma  \right|^2$ (meV)")
                         ticks = plt.gca().get_xticks()
@@ -503,7 +504,7 @@ class DispersionPlotter(DataReader):
                             self.gammaKDataFrame.iloc[:, 1],
                             c=np.float64(self.gammaKDataFrame.iloc[:, 4]),
                             s=0.5,
-                            cmap="inferno",
+                            cmap="bwr",
                         )
                         plt.colorbar(label=r"$Re\left( \Gamma  \right)$ (meV)")
                         ticks = plt.gca().get_xticks()
@@ -529,7 +530,7 @@ class DispersionPlotter(DataReader):
                             self.gammaKDataFrame.iloc[:, 1],
                             c=np.float64(self.gammaKDataFrame.iloc[:, 5]),
                             s=0.5,
-                            cmap="inferno",
+                            cmap="bwr",
                         )
                         plt.colorbar(label=r"$Im\left( \Gamma  \right)$ (meV)")
                         ticks = plt.gca().get_xticks()
@@ -558,7 +559,7 @@ class DispersionPlotter(DataReader):
                                 + self.gammaKDataFrame.iloc[:, 5] ** 2
                             ),
                             s=0.5,
-                            cmap="inferno",
+                            cmap="bwr",
                         )
                         plt.colorbar(label=r"$\left| \Gamma  \right|^2$ (meV)")
                         ticks = plt.gca().get_xticks()
@@ -575,3 +576,49 @@ class DispersionPlotter(DataReader):
                             f"../Plots/GammaKMapNnnModuleSquared_orb{orbital}_spin{spin}_layer{sublat}_band{band}.png"
                         )
                         plt.close()
+
+    """ ---------------------------------------------------------------------------------- """
+    """ ---------------------------- Private methods ------------------------------------- """
+    """ ---------------------------------------------------------------------------------- """
+
+    def __initializePlotParams(self):
+        plt.rcParams["text.usetex"] = True
+        plt.rcParams["font.family"] = "serif"
+        plt.rcParams["font.serif"] = "Computer Modern Roman"
+        plt.rcParams["font.sans-serif"] = "Computer Modern Sans serif"
+        plt.rcParams["font.monospace"] = "Computer Modern Typewriter"
+        plt.rcParams["axes.titlesize"] = 30
+        plt.rcParams["axes.labelsize"] = 30
+        plt.rcParams["xtick.labelsize"] = 26
+        plt.rcParams["ytick.labelsize"] = 26
+        plt.rcParams["legend.fontsize"] = 20
+        plt.rcParams["legend.title_fontsize"] = 24
+        # Optionally, add custom LaTeX preamble
+        plt.rcParams["text.latex.preamble"] = (
+            r"\usepackage{amsmath} \usepackage{amsfonts} \usepackage{amssymb}"
+        )
+
+        self.__setPalette()
+
+        # Set rcParams for tighter layout
+        plt.rcParams["figure.autolayout"] = True
+        plt.rcParams["figure.constrained_layout.use"] = False
+        plt.rcParams["axes.linewidth"] = 1.2
+
+        # Set rcParams to show ticks on both left and right sides
+        plt.rcParams["xtick.direction"] = "in"
+        plt.rcParams["ytick.direction"] = "in"
+        plt.rcParams["xtick.bottom"] = True
+        plt.rcParams["ytick.left"] = True
+        plt.rcParams["xtick.top"] = True
+        plt.rcParams["ytick.right"] = True
+
+        plt.rcParams["axes.xmargin"] = 0.01
+
+    def __setPalette(self, nColors: int = 3, palette: str = "hsv"):
+        # Choose a seaborn palette
+        # has to specify number of lines
+        self.palette = sns.color_palette(palette, nColors)
+        # Set the color cycle
+        plt.rcParams["axes.prop_cycle"] = plt.cycler(color=self.palette)
+

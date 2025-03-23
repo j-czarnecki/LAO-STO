@@ -65,7 +65,7 @@ INTEGER*4 :: max_grid_refinements_y = 0
 
 !Derived
 REAL * 8 eta_p
-REAL*8 :: dk1, dk2, domega
+REAL*8 :: dr_k, dphi_k, domega
 
 !Used for postprocessing
 !Superconducting gap calculation
@@ -306,9 +306,9 @@ SUBROUTINE GET_INPUT(nmlfile)
   gamma_nnn_start = gamma_nnn_start * meV2au
   gamma_eps_convergence = gamma_eps_convergence * meV2au
   !Calculating derived values
-  dk1 = K1_MAX / k1_steps
-  dk2 = K2_MAX / k2_steps
-  domega = ABS(dk1 * dk2 * SIN(2 * PI / 3.)) / (SIN(2 * PI / 3.) * K1_MAX * K2_MAX)
+  dr_k = R_K_MAX / k1_steps
+  dphi_k = (PI / 3.0d0) / k2_steps  !Slicing every hexagon's triangle into the same number of phi steps
+  !domega = ABS(dk1 * dk2 * SIN(2 * PI / 3.)) / (SIN(2 * PI / 3.) * K1_MAX * K2_MAX)
   eta_p = v * SQRT(3.) / 3.905 * nm2au
 
   REWIND (9)

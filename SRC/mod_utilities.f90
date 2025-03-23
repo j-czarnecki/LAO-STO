@@ -225,4 +225,12 @@ RECURSIVE PURE REAL * 8 FUNCTION dirac_delta(E, omega, zeta)
   RETURN
 END FUNCTION dirac_delta
 
+!dir$ attributes forceinline :: r_max_phi
+RECURSIVE PURE REAL * 8 FUNCTION r_max_phi(phi)
+  IMPLICIT NONE
+  REAL*8, INTENT(IN) :: phi
+  r_max_phi = R_K_MAX * SQRT(3.0d0) / (2.0d0 * COS(phi - PI / 6.0d0))
+  RETURN
+END FUNCTION r_max_phi
+
 END MODULE mod_utilities

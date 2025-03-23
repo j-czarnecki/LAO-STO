@@ -25,8 +25,10 @@ REAL*8, ALLOCATABLE :: Charge_dens(:, :), Charge_dens_new(:, :), Charge_dens_loc
 
 REAL*8 :: gamma_error, gamma_max_error, charge_error, charge_max_error
 REAL*8 :: gamma_max_error_prev, charge_max_error_prev
+REAL*8 :: phi_k_min
 
 INTEGER*4 :: i, j, n, lat, orb, orb_prime, spin, band, band_prime
+INTEGER*4 :: n_triangle, i_r, j_phi
 INTEGER*4 :: sc_iter
 LOGICAL :: sc_flag
 
@@ -147,24 +149,30 @@ DO sc_iter = 1, max_sc_iter
     CALL COMPUTE_SUBBAND_POTENTIAL(Hamiltonian_const_band, band)
 
     !Integration over chunks is computed via Romberg algorithm.
-    !$omp parallel do collapse(2) schedule(dynamic, 1) private(Delta_local, Charge_dens_local)
-    DO i = -k1_steps / 2, k1_steps / 2 - 1
-      DO j = -k2_steps / 2, k2_steps / 2 - 1
-        ! WRITE(log_string, *) 'Integrating over chunk: ', i, j
-        ! LOG_INFO(log_string)
+    !$omp parallel do collapse(3) schedule(dynamic, 1) private(Delta_local, Charge_dens_local, phi_k_min)
+    DO n_triangle = -N_BZ_SECTIONS / 2, N_BZ_SECTIONS / 2 - 1
+      DO i_r = 0, k1_steps - 1
+        DO j_phi = 0, k2_steps - 1
+          ! WRITE(log_string, *) 'Integrating over chunk: ', i, j
+          ! LOG_INFO(log_string)
+          phi_k_min = n_triangle * (PI / 3.0d0) + j_phi * dphi_k
+          CALL ROMBERG_Y(Hamiltonian_const_band(:, :), Gamma_SC(:, :, :, :, band), Charge_dens(:, band), i_r, k1_steps, phi_k_min, phi_k_min + dphi_k, &
+          & Delta_local(:, :, :, :, band), Charge_dens_local(:, band), romb_eps_x, interpolation_deg_x, max_grid_refinements_x, &
+          & romb_eps_y, interpolation_deg_y, max_grid_refinements_y)
 
-        CALL ROMBERG_Y(Hamiltonian_const_band(:, :), Gamma_SC(:, :, :, :, band), Charge_dens(:, band), i * dk1, (i + 1) * dk1, j * dk2, (j + 1) * dk2, &
-        & Delta_local(:, :, :, :, band), Charge_dens_local(:, band), romb_eps_x, interpolation_deg_x, max_grid_refinements_x, &
-        & romb_eps_y, interpolation_deg_y, max_grid_refinements_y)
-        !This has to be atomic operations, since Delta_new and Charge_dens would be global variables for all threads
-        !$omp critical (update_delta_and_charge)
-        Delta_new(:, :, :, :, band) = Delta_new(:, :, :, :, band) + Delta_local(:, :, :, :, band)
-        Charge_dens_new(:, band) = Charge_dens_new(:, band) + Charge_dens_local(:, band)
-        !$omp end critical (update_delta_and_charge)
+          !This has to be atomic operations, since Delta_new and Charge_dens would be global variables for all threads
+          !$omp critical (update_delta_and_charge)
+          Delta_new(:, :, :, :, band) = Delta_new(:, :, :, :, band) + Delta_local(:, :, :, :, band)
+          Charge_dens_new(:, band) = Charge_dens_new(:, band) + Charge_dens_local(:, band)
+          !$omp end critical (update_delta_and_charge)
+        END DO
       END DO
-    END DO !End of k-loop
+    END DO
     !$omp end parallel do
   END DO
+  !Multiplying the result by Brillouin zone area
+  Delta_new = Delta_new / JACOBIAN
+  Charge_dens_new = Charge_dens_new / JACOBIAN
   !#########################################################################################################################
   !This is a critical section - only one thread can execute that and all thread should have ended their job up to that point
   !#########################################################################################################################

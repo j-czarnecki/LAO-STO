@@ -11,12 +11,13 @@ CONTAINS
 !Adapted from "Numerical Recipes in Fortran Second Edition"
 !William H. Press, Saul A. Teukolsky, W. T. Vetterling, B. P. Flannery
 
-RECURSIVE SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chunk_min, k1_chunk_max, k2_chunk_min, k2_chunk_max, &
+RECURSIVE SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, i_r, k1_steps, k2_chunk_min, k2_chunk_max, &
                     & Delta_local, Charge_dens_local, romb_eps_x, interpolation_deg_x, max_grid_refinements_x, &
                     & romb_eps_y, interpolation_deg_y, max_grid_refinements_y)
 
   COMPLEX*16, INTENT(IN) :: Hamiltonian_const(DIM, DIM)
-  REAL*8, INTENT(IN) :: k1_chunk_min, k1_chunk_max, k2_chunk_min, k2_chunk_max
+  INTEGER*4, INTENT(IN) :: i_r, k1_steps
+  REAL*8, INTENT(IN) :: k2_chunk_min, k2_chunk_max
   COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, 2, LAYER_COUPLINGS)
   REAL*8, INTENT(IN) :: Charge_dens(DIM_POSITIVE_K)
   REAL*8, INTENT(IN) :: romb_eps_x, romb_eps_y
@@ -34,6 +35,7 @@ RECURSIVE SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chun
   INTEGER*4 :: n, i, j, spin, orb, lat
   REAL*8 :: dk2_trap, k2_trap
   LOGICAL :: convergence
+  REAL*8 :: r_max_local, k1_chunk_min, k1_chunk_max
 
   stepsize = DCMPLX(0., 0.)
   Delta_iterations = DCMPLX(0., 0.)
@@ -47,12 +49,18 @@ RECURSIVE SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chun
     !First approximation of the integral is taking only boundary values
     IF (j == 1) THEN
       !Calculation for lower bound of chunk
+      r_max_local = r_max_phi(MOD(ABS(k2_chunk_max), PI / 3))
+      k1_chunk_min = r_max_local / k1_steps * i_r
+      k1_chunk_max = r_max_local / k1_steps * (i_r + 1)
       CALL ROMBERG_X(Hamiltonian_const(:, :), Gamma_SC(:, :, :, :), Charge_dens(:), k1_chunk_min, k1_chunk_max, k2_chunk_max,&
           &  Delta_local(:, :, :, :), Charge_dens_local(:), romb_eps_x, interpolation_deg_x, max_grid_refinements_x)
       Delta_iterations(:, :, :, :, j) = Delta_local(:, :, :, :)
       Charge_dens_iterations(:, j) = Charge_dens_local(:)
 
       !Calculation for upper bound of chunk
+      r_max_local = r_max_phi(MOD(ABS(k2_chunk_min), PI / 3))
+      k1_chunk_min = r_max_local / k1_steps * i_r
+      k1_chunk_max = r_max_local / k1_steps * (i_r + 1)
       CALL ROMBERG_X(Hamiltonian_const(:, :), Gamma_SC(:, :, :, :), Charge_dens(:), k1_chunk_min, k1_chunk_max, k2_chunk_min,&
           &  Delta_local(:, :, :, :), Charge_dens_local(:), romb_eps_x, interpolation_deg_x, max_grid_refinements_x)
       Delta_iterations(:, :, :, :, j) = Delta_iterations(:, :, :, :, j) + Delta_local(:, :, :, :)
@@ -73,6 +81,9 @@ RECURSIVE SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chun
       ! Charge_dens_iterations(:,j) = DCMPLX(0. , 0.)
       DO n = 1, i
         !Here we pass k1_trap as actual k1 point
+        r_max_local = r_max_phi(MOD(ABS(k2_trap), PI / 3))
+        k1_chunk_min = r_max_local / k1_steps * i_r
+        k1_chunk_max = r_max_local / k1_steps * (i_r + 1)
         CALL ROMBERG_X(Hamiltonian_const(:, :), Gamma_SC(:, :, :, :), Charge_dens(:), k1_chunk_min, k1_chunk_max, k2_trap,&
             &  Delta_local(:, :, :, :), Charge_dens_local(:), romb_eps_x, interpolation_deg_x, max_grid_refinements_x)
         Delta_sum(:, :, :, :) = Delta_sum(:, :, :, :) + Delta_local(:, :, :, :)

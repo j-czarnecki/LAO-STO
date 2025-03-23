@@ -24,8 +24,9 @@ SUBROUTINE GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge_dens, 
   REAL*8 :: occupation
 
   !Transform from graphene reciprocal lattice to kx and ky
-  kx = 2.*PI / (SQRT(3.0d0)) * k1
-  ky = -2.*PI / 3.*k1 + 4.*PI / 3.*k2
+  kx = k1 * COS(k2)
+  ky = k1 * SIN(k2)
+
   Energies(:) = 0.
   Hamiltonian(:, :) = DCMPLX(0., 0.)
   U_transformation(:, :) = DCMPLX(0., 0.)
@@ -150,6 +151,9 @@ SUBROUTINE GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge_dens, 
     END DO
   END DO
 
+  !Multiplication by the Jacobian
+  Delta_local = Delta_local * k1
+  Charge_dens_local = Charge_dens_local * k1
 END SUBROUTINE GET_LOCAL_CHARGE_AND_DELTA
 
 END MODULE mod_compute_hamiltonians
