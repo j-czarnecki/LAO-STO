@@ -128,12 +128,15 @@ Delta_new_broyden = 0.
 gamma_max_error = 0.
 charge_max_error = 0.
 
+B_field = (/0.1 * T2au, 0.0d0, 0.0d0/)
+
 !Computing k-independent terms
 CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:, :))
 CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:, :))
 CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian_const(:, :))
 CALL COMPUTE_LAYER_POTENTIAL(Hamiltonian_const(:, :))
 CALL COMPUTE_FERMI_ENERGY(Hamiltonian_const(:, :))
+CALL COMPUTE_ZEEMAN(B_field, Hamiltonian_const(:, :))
 CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
 
 OPEN (unit=99, FILE="./OutputData/Convergence.dat", FORM="FORMATTED", ACTION="WRITE")

@@ -26,7 +26,7 @@ END IF
 IF (enable_dos_calc) THEN
   WRITE (log_string, *) "Calculating DOS"
   LOG_INFO(log_string)
-  CALL CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc_in_dos, Nk_points_dos, path_to_run_dir_dos)
+  CALL CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc_in_dos, Nk_points_dos, Nk_points_dos_refined, path_to_run_dir_dos)
 END IF
 
 IF (enable_chern_number_calc) THEN

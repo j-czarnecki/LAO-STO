@@ -203,7 +203,7 @@ END FUNCTION pairing_nnn_6
 RECURSIVE PURE REAL * 8 FUNCTION fd_distribution(E, E_Fermi, T)
   IMPLICIT NONE
   REAL*8, INTENT(IN) :: E, E_Fermi, T
-  IF (T .ne. 0) THEN
+  IF (T .ne. 0.0d0) THEN
     fd_distribution = 1./(EXP((E - E_Fermi) / (k_B * T)) + 1.)
   ELSE
     IF (E > E_Fermi) THEN
@@ -216,6 +216,16 @@ RECURSIVE PURE REAL * 8 FUNCTION fd_distribution(E, E_Fermi, T)
   END IF
   RETURN
 END FUNCTION fd_distribution
+
+!dir$ attributes forceinline :: fd_distribution_derivative_E
+RECURSIVE PURE REAL*8 FUNCTION fd_distribution_derivative_E(E, E_Fermi, T)
+  IMPLICIT NONE
+  REAL*8, INTENT(IN) :: E, E_Fermi, T
+  REAL*8 :: x
+  x = EXP((E - E_Fermi) / (k_B * T))
+  fd_distribution_derivative_E = -x / ((k_B * T) * (x + 1.0d0)**2)
+  RETURN
+END FUNCTION fd_distribution_derivative_E
 
 !dir$ attributes forceinline :: dirac_delta
 RECURSIVE PURE REAL * 8 FUNCTION dirac_delta(E, omega, zeta)

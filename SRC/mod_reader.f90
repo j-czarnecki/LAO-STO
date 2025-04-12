@@ -40,6 +40,7 @@ REAL*8 :: V_HUB = 0.
 REAL*8 :: E_Fermi = 0.
 REAL*8, ALLOCATABLE :: V_layer(:)
 REAL*8, ALLOCATABLE :: Subband_energies(:)
+REAL*8 :: B_field(3)
 
 !Self-consistency
 LOGICAL :: read_gamma_from_file = .FALSE.
@@ -73,6 +74,7 @@ LOGICAL :: enable_sc_gap_calc = .FALSE.
 CHARACTER(1000) :: path_to_run_dir_sc_gap = ""
 REAL*8 :: dE_sc_gap = 0.
 INTEGER*4 :: Nk_points_sc_gap = 0
+INTEGER*4 :: Nk_points_sc_gap_refined = 0
 
 !For chern number calculation
 LOGICAL :: enable_chern_number_calc = .FALSE.
@@ -94,6 +96,7 @@ REAL*8 :: dE0 = 0
 REAL*8 :: zeta_DOS = 0
 LOGICAL :: include_sc_in_dos = .FALSE.
 INTEGER*4 :: Nk_points_dos = 0
+INTEGER*4 :: Nk_points_dos_refined = 0
 
 !Gamma as a map of k-vector calculation
 LOGICAL :: enable_gamma_k_calc = .FALSE.
@@ -118,7 +121,8 @@ NAMELIST /physical_params/  &
 & V_HUB,                    &
 & E_Fermi,                  &
 & V_layer,                  &
-& Subband_energies
+& Subband_energies,         &
+& B_field
 
 NAMELIST /discretization/ &
 & k1_steps,               &
@@ -152,7 +156,8 @@ NAMELIST /sc_gap_calculation/ &
 & enable_sc_gap_calc,         &
 & path_to_run_dir_sc_gap,     &
 & dE_sc_gap,                  &
-& Nk_points_sc_gap
+& Nk_points_sc_gap,           &
+& Nk_points_sc_gap_refined
 
 NAMELIST /chern_number_calculation/ &
 & enable_chern_number_calc, &
@@ -173,7 +178,8 @@ NAMELIST /dos_calculation/ &
 & dE0, &
 & zeta_DOS, &
 & include_sc_in_dos, &
-& Nk_points_dos
+& Nk_points_dos, &
+& Nk_points_dos_refined
 
 NAMELIST /gamma_k_calculation/ &
 & enable_gamma_k_calc, &
@@ -246,6 +252,8 @@ SUBROUTINE GET_INPUT(nmlfile)
   LOG_INFO(log_string)
   WRITE (log_string, *) "Subband_energies: ", (Subband_energies(i), i=1, SUBBANDS)
   LOG_INFO(log_string)
+  WRITE (log_string, '(A, 3E15.5)') "B_field: ", (B_field(i), i=1, 3)
+  LOG_INFO(log_string)
 
   !Check input data
   IF (T < 0) STOP "Temperature in kelvins must be >= 0!"
@@ -268,6 +276,7 @@ SUBROUTINE GET_INPUT(nmlfile)
   E_Fermi = E_Fermi * meV2au
   V_layer = V_layer * meV2au
   Subband_energies = Subband_energies * meV2au
+  B_field = B_field * T2au
 
   REWIND (9)
   READ (9, NML=self_consistency, IOSTAT=io_status)
@@ -371,6 +380,7 @@ SUBROUTINE GET_POSTPROCESSING_INPUT(nmlfile)
     IF (dE0 .LE. 0) STOP "dE0 must be > 0"
     IF (zeta_DOS .LE. 0) STOP "zeta_DOS must be > 0"
     IF (Nk_points_dos .LE. 0) STOP "Nk_points_dos must be > 0"
+    IF (Nk_points_dos_refined .LT. 0) STOP "Nk_points_dos_refined must be >= 0"
     E_DOS_min = E_DOS_min * meV2au
     E_DOS_max = E_DOS_max * meV2au
     zeta_DOS = zeta_DOS * meV2au

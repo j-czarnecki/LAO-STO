@@ -1,8 +1,9 @@
 &sc_gap_calculation
-    enable_sc_gap_calc = .TRUE.,
+    enable_sc_gap_calc = .FALSE.,
     path_to_run_dir_sc_gap = "/home/pwojcik/LAO-STO/",
-    dE_sc_gap = 1e-2,
-    Nk_points_sc_gap = 3000 /
+    dE_sc_gap = 1e-3,
+    Nk_points_sc_gap = 4000,
+    Nk_points_sc_gap_refined = 2 /
 
 &chern_number_calculation
     enable_chern_number_calc = .FALSE.,
@@ -18,12 +19,13 @@
 &dos_calculation
     enable_dos_calc = .TRUE.,
     path_to_run_dir_dos = "/home/pwojcik/LAO-STO/",
-    E_DOS_min = -50,
-    E_DOS_max = 50,
-    dE0 = 0.1,
-    zeta_DOS = 0.1,
+    E_DOS_min = -.75,
+    E_DOS_max = .75,
+    dE0 = 0.001,
+    zeta_DOS = 0.005,
     include_sc_in_dos = .TRUE.,
-    Nk_points_dos = 2000 /
+    Nk_points_dos = 1000,
+    Nk_points_dos_refined = 10 /
 
 &gamma_k_calculation
     enable_gamma_k_calc = .FALSE.,

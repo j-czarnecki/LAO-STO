@@ -21,9 +21,10 @@
     j_sc_prime_nnn = 30.0
     u_hub = 0.0
     v_hub = 0.0
-    e_fermi = 80.0
+    e_fermi = 247.29117272127294
     v_layer = 1946.0, 1946.0, 1946.0
     subband_energies = 0.0
+    b_field = 0.0, 0.0, 0.0
 /
 
 &self_consistency
@@ -37,19 +38,15 @@
     max_sc_iter = 50
     sc_alpha = 0.2
     sc_alpha_adapt = 1.0
-    gamma_eps_convergence = 0.0001
-    charge_eps_convergence = 0.0001
+    gamma_eps_convergence = 0.01
+    charge_eps_convergence = 0.01
 /
 
 &romberg_integration
-    romb_eps_x = 0.0001
+    romb_eps_x = 0.05
     interpolation_deg_x = 3
-    max_grid_refinements_x = 14
-    romb_eps_y = 0.0001
+    max_grid_refinements_x = 8
+    romb_eps_y = 0.05
     interpolation_deg_y = 3
-    max_grid_refinements_y = 14
+    max_grid_refinements_y = 8
 /
-
-
-
-

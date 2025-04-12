@@ -46,9 +46,14 @@ TYPE subband_params_t
   REAL*8 :: eta_p = 0.0d0
 END TYPE subband_params_t
 
+TYPE external_params_t
+  REAL*8 :: B_field(3) = (/0.0d0, 0.0d0, 0.0d0/)
+END TYPE external_params_t
+
 TYPE physical_params_t
   REAL*8 :: T = 0.0d0                         !! Temparature
   TYPE(subband_params_t) :: subband_params
+  TYPE(external_params_t) :: external
 END TYPE physical_params_t
 
 TYPE self_consistency_t
@@ -85,13 +90,14 @@ END TYPE sc_input_params_t
 ! ----------------------------------------------------------------------
 ! ---------------------- Used for postprocessing -----------------------
 ! ----------------------------------------------------------------------
-TYPE post_sc_t
+TYPE post_sc_gap_t
     !! Superconducting gap calculation
   LOGICAL :: enable_sc_gap_calc = .FALSE.
   CHARACTER(1000) :: path_to_run_dir_sc_gap = ""
   REAL*8 :: dE_sc_gap = 0.0d0
   INTEGER*4 :: Nk_points_sc_gap = 0
-END TYPE post_sc_t
+  INTEGER*4 :: Nk_points_sc_gap_refined = 0
+END TYPE post_sc_gap_t
 
 TYPE post_chern_number_t
     !! Chern number calculation
@@ -118,10 +124,11 @@ TYPE post_dos_t
   REAL*8 :: zeta_DOS = 0
   LOGICAL :: include_sc_in_dos = .FALSE.
   INTEGER*4 :: Nk_points_dos = 0
+  INTEGER*4 :: Nk_points_dos_refined = 0
 END TYPE post_dos_t
 
 TYPE post_input_params_t
-  TYPE(post_sc_t) :: post_sc
+  TYPE(post_sc_gap_t) :: post_sc
   TYPE(post_chern_number_t) :: post_chern
   TYPE(post_dispersion_relation_t) :: post_dispersion
   TYPE(post_dos_t) :: post_dos

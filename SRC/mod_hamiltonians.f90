@@ -493,20 +493,26 @@ RECURSIVE SUBROUTINE COMPUTE_HUBBARD(Hamiltonian, Charge_dens)
 
 END SUBROUTINE COMPUTE_HUBBARD
 
-RECURSIVE SUBROUTINE COMPUTE_ZEEMAN(Bfield, Hamiltonian)
-  REAL*8, INTENT(IN) :: Bfield(3)
+RECURSIVE SUBROUTINE COMPUTE_ZEEMAN(B, Hamiltonian)
+  REAL*8, INTENT(IN) :: B(3)
   COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM, DIM)
   REAL*8, PARAMETER :: gFactor = 3.0d0
   REAL*8, PARAMETER :: muB = 0.5
-  INTEGER*4 :: i
+  INTEGER*4 :: i, spin, nambu, row, col
+  REAL*8 :: sign_nambu, sign_spin
 
-  DO i = 1, TBA_DIM
-    !Electrons
-    Hamiltonian(i, i) = Hamiltonian(i, i) + 0.5d0 * muB * gFactor * Bfield(3)
-    Hamiltonian(TBA_DIM + i, TBA_DIM + i) = Hamiltonian(TBA_DIM + i, TBA_DIM + i) - 0.5d0 * muB * gFactor * Bfield(3)
-    !Holes
-    Hamiltonian(2 * TBA_DIM + i, 2 * TBA_DIM + i) = Hamiltonian(2 * TBA_DIM + i, 2 * TBA_DIM + i) - 0.5d0 * muB * gFactor * Bfield(3)
-    Hamiltonian(3 * TBA_DIM + i, 3 * TBA_DIM + i) = Hamiltonian(3 * TBA_DIM + i, 3 * TBA_DIM + i) + 0.5d0 * muB * gFactor * Bfield(3)
+  DO nambu = 0, 1
+    sign_nambu = (-1)**nambu
+    DO spin = 0, 1
+      sign_spin = (-1)**spin
+      DO i = 1, TBA_DIM
+        row = nambu * DIM_POSITIVE_K + spin * TBA_DIM + i
+        col = MIN(row + TBA_DIM, DIM)
+        !Electrons
+        Hamiltonian(row, col) = Hamiltonian(row, col) + sign_nambu * 0.5d0 * muB * gFactor * (B(1) - imag * B(2))
+        Hamiltonian(row, row) = Hamiltonian(row, row) + sign_nambu * sign_spin * 0.5d0 * muB * gFactor * B(3)
+      END DO
+    END DO
   END DO
 
 END SUBROUTINE COMPUTE_ZEEMAN

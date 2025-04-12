@@ -115,6 +115,9 @@ analyze:
 run_slurm:
 	cd Runner && python3 mainRunner.py && cd ..
 
+fit:
+	cd Analyzer && python3 DosFitter.py && cd ..
+
 clean_plots:
 	cd Plots && rm -rf *.png && cd ..
 
