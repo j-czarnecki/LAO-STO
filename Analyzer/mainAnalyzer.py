@@ -13,10 +13,10 @@ def plotGammas():
     # eMin = -1480
     # eMin = 0
     gammaAndFillingPlotter = GammaAndFillingPlotter(
-        # runsPath=os.path.join(SCRATCH_PATH, "STO-SC", "LAO-STO-E_Fermi_J_SC_J_SC_NNN"),
-        runsPath=os.path.join(
-            "/home", "jczarnecki", "LAO-STO-results", "LAO-STO-E_Fermi_J_SC_J_SC_NNN"
-        ),
+        runsPath=os.path.join(SCRATCH_PATH, "STO-SC", "LAO-STO-E_Fermi_J_SC_J_SC_NNN"),
+        # runsPath=os.path.join(
+        #     "/home", "jczarnecki", "LAO-STO-results", "LAO-STO-E_Fermi_J_SC_J_SC_NNN"
+        # ),
         matchPattern="RUN_.*",
         nNeighbors=3,
         nNextNeighbors=6,
@@ -32,16 +32,18 @@ def plotGammas():
     gammaAndFillingPlotter.CalculateSymmetryGamma()
     gammaAndFillingPlotter.getMaxvalSymmetrizedGamma()
     gammaAndFillingPlotter.plotGammasFermi()
-    # gammaAndFillingPlotter.plotGammasSingleTripletFermi()
-    gammaAndFillingPlotter.plotSymmetryRatios(eMax=100)
-    # gammaAndFillingPlotter.plotNnnGammasFermi()
-    # gammaAndFillingPlotter.plotNnnSymmetryRatios(eMax = 100)
+    #gammaAndFillingPlotter.plotGammasSingleTripletFermi(eMax = 150)
+    #gammaAndFillingPlotter.plotSymmetryRatios(eMax=100)
+    gammaAndFillingPlotter.plotNnnGammasFermi()
+    #gammaAndFillingPlotter.plotNnnSymmetryRatios(eMax = 100)
+    # gammaAndFillingPlotter.plotNnnGammasSingleTripletFermi(eMax=150)
     # gammaAndFillingPlotter.plotGammaFermiUnsymmetrized()
     # gammaAndFillingPlotter.plotFillingFermi()
     # gammaAndFillingPlotter.plotGammasJ()
     # gammaAndFillingPlotter.plotFillingFermi()
-    # gammaAndFillingPlotter.plotGammasTemperature()
-    # gammaAndFillingPlotter.plotGammasTemperatureMap(eMax = 120)
+    #gammaAndFillingPlotter.plotGammasTemperature()
+    #gammaAndFillingPlotter.plotGammasTemperatureMap(eMax = 120)
+    #gammaAndFillingPlotter.plotNnnGammasTemperatureMap(eMax = 120)
 
 
 def plotDispersions():
@@ -143,8 +145,8 @@ def plotDispersions():
 
 
 def main():
-    # plotGammas()
-    plotDispersions()
+    plotGammas()
+    #plotDispersions()
 
 
 if __name__ == "__main__":

@@ -135,14 +135,8 @@ class DataReader:
             filePathGammaIter = os.path.join(
                 self.runsPath, dir, "OutputData", "Gamma_SC_iter.dat"
             )
-            namelistPath = os.path.join(self.runsPath, dir, "input.nml")
-            with open(namelistPath) as nmlFile:
-                nml = f90nml.read(nmlFile)
-                paramsValuesList = []
-                for xKey in xKeywords:
-                    paramsValuesList.append(nml["physical_params"][xKey])
-                self.params.append(tuple(paramsValuesList))
-                # print(nml['physical_params'][xKeyword])
+
+            # print(nml['physical_params'][xKeyword])
             # Gamma is printed in [meV]
             # If simulation converged final file should exists
             if os.path.exists(filePathGammaConverged):
@@ -174,6 +168,15 @@ class DataReader:
                 # shutil.rmtree(os.path.join(self.runsPath, dir))
                 # print('Directory removed')
                 continue
+            
+            namelistPath = os.path.join(self.runsPath, dir, "input.nml")
+            with open(namelistPath) as nmlFile:
+                nml = f90nml.read(nmlFile)
+                paramsValuesList = []
+                for xKey in xKeywords:
+                    paramsValuesList.append(nml["physical_params"][xKey])
+                self.params.append(tuple(paramsValuesList))
+
             firstIter = False
 
     def LoadDispersion(self, energiesPath: str):

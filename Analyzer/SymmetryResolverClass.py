@@ -1,6 +1,6 @@
 import numpy as np
 from DataReaderClass import *
-
+from collections import defaultdict
 
 class SymmetryResolver(DataReader):
 
@@ -25,10 +25,10 @@ class SymmetryResolver(DataReader):
         DataReader.__init__(self, runsPath, matchPattern, sublattices, subbands)
         self.nNeighbors = nNeighbors
         self.nNextNeighbors = nNextNeighbors
-        self.symmetryGammaDict: dict = {}
-        self.symmetryGammaSingletTripletDict: dict = {}
-        self.nnnSymmetryGammaDict: dict = {}
-        self.nnnSymmetryGammaSingletTripletDict: dict = {}
+        self.symmetryGammaDict: dict = defaultdict(list)
+        self.symmetryGammaSingletTripletDict: dict = defaultdict(list)
+        self.nnnSymmetryGammaDict: dict = defaultdict(list)
+        self.nnnSymmetryGammaSingletTripletDict: dict = defaultdict(list)
 
     """ ---------------------------------------------------------------------------------- """
     """ ---------------------------- Interface methods ----------------------------------- """
@@ -39,19 +39,42 @@ class SymmetryResolver(DataReader):
         Fills dict of superconducting gap symmetries, based on data from DataReader.gamma
         """
 
+        symmetries = ["s", "f", "p_1", "p_2", "p_3", "p_4", "p_5", "p_6", "d_1", "d_2", "d_3", "d_4", "d_5", "d_6"]
+        symmetryCallbacks = [
+            #s-wave
+            self.__A1Projection,
+            #f-wave
+            self.__B1Projection,
+            #p-wave
+            self.__E1Projection1,
+            self.__E1Projection2,
+            self.__E1Projection3,
+            self.__E1Projection4,
+            self.__E1Projection5,
+            self.__E1Projection6,
+            #d-wave
+            self.__E2Projection1,
+            self.__E2Projection2,
+            self.__E2Projection3,
+            self.__E2Projection4,
+            self.__E2Projection5,
+            self.__E2Projection6,
+        ]
+
+        # Returns length of lists stored in dictionary
+        listLen = len(next(iter(self.gamma.values())))
+
         # Loop over all dict keys except for neighbours
         # Nearest neighbors
         for band in range(1, max(1, self.subbands) + 1):
             for spin in range(1, 3):
                 for sublat in range(1, self.layerCouplings + 1):
-                    for orbital in range(1, 4):
-                        symmetryKey = (band, spin, sublat, orbital)
-                        # Returns length of lists stored in dictionary
-                        listLen = len(next(iter(self.gamma.values())))
-                        # Loop over all gammas for given spin, sublat and orbital
-                        for i in range(listLen):
+                    symmetryKey = (band, spin, sublat)
+
+                    for i in range(listLen):
+                        gammaToSymmetrize = []
+                        for orbital in range(1, 4):
                             # This code could be simplified, maybe list comprehension?
-                            gammaToSymmetrize = []
                             # Nearest neighbours pairing
                             for neighbor in range(1, self.nNeighbors + 1):
                                 gammaKey = (
@@ -60,75 +83,29 @@ class SymmetryResolver(DataReader):
                                     else (band, spin, neighbor, sublat, orbital)
                                 )
                                 gammaToSymmetrize.append(self.gamma[gammaKey][i])
-                            # Pairing from second sublattice
-                            for neighbor in range(1, self.nNeighbors + 1):
-                                gammaKey = (
-                                    (
-                                        spin,
-                                        neighbor,
-                                        sublat + (-1) ** (sublat + 1),
-                                        orbital,
-                                    )
+                                # Generating next atom from second sublattice
+                                # such that it obeys the order of neighbors defined on a regular hexagon
+                                gammaKeySecondSublat = (
+                                    (spin, self.__getFollowingNeighbor(neighbor), self.__getOppositeSublat(sublat), orbital)
                                     if self.subbands == 0
-                                    else (band, spin, neighbor, sublat, orbital)
+                                    else (band, spin, self.__getFollowingNeighbor(neighbor), self.__getOppositeSublat(sublat), orbital)
                                 )
-                                gammaToSymmetrize.append(self.gamma[gammaKey][i])
+                                gammaToSymmetrize.append(self.gamma[gammaKeySecondSublat][i])
+                        for i, sym in enumerate(symmetries):
+                            self.symmetryGammaDict[(*symmetryKey, sym)].append(
+                                symmetryCallbacks[i](gammaToSymmetrize)
+                            )
+        if self.nNextNeighbors == 0:
+            return
 
-                            if i == 0:
-                                self.symmetryGammaDict[(*symmetryKey, "s")] = [
-                                    self._ExtSWavePairing(gammaToSymmetrize)
-                                ]
-                                self.symmetryGammaDict[(*symmetryKey, "p+")] = [
-                                    self._PPlusWavePairing(gammaToSymmetrize)
-                                ]
-                                self.symmetryGammaDict[(*symmetryKey, "d+")] = [
-                                    self._DPlusWavePairing(gammaToSymmetrize)
-                                ]
-                                self.symmetryGammaDict[(*symmetryKey, "f")] = [
-                                    self._FWavePairing(gammaToSymmetrize)
-                                ]
-                                self.symmetryGammaDict[(*symmetryKey, "p-")] = [
-                                    self._PMinusWavePairing(gammaToSymmetrize)
-                                ]
-                                self.symmetryGammaDict[(*symmetryKey, "d-")] = [
-                                    self._DMinusWavePairing(gammaToSymmetrize)
-                                ]
-                            else:
-                                self.symmetryGammaDict[(*symmetryKey, "s")].append(
-                                    self._ExtSWavePairing(gammaToSymmetrize)
-                                )
-                                self.symmetryGammaDict[(*symmetryKey, "p+")].append(
-                                    self._PPlusWavePairing(gammaToSymmetrize)
-                                )
-                                self.symmetryGammaDict[(*symmetryKey, "d+")].append(
-                                    self._DPlusWavePairing(gammaToSymmetrize)
-                                )
-                                self.symmetryGammaDict[(*symmetryKey, "f")].append(
-                                    self._FWavePairing(gammaToSymmetrize)
-                                )
-                                self.symmetryGammaDict[(*symmetryKey, "p-")].append(
-                                    self._PMinusWavePairing(gammaToSymmetrize)
-                                )
-                                self.symmetryGammaDict[(*symmetryKey, "d-")].append(
-                                    self._DMinusWavePairing(gammaToSymmetrize)
-                                )
-        print("Symmetries calculated")
-        print("s maxval is ", max(self.symmetryGammaDict[(*symmetryKey, "s")]))
-        print("p+ maxval is ", max(self.symmetryGammaDict[(*symmetryKey, "p+")]))
-        print("d+ maxval is ", max(self.symmetryGammaDict[(*symmetryKey, "d+")]))
-        print("f maxval is ", max(self.symmetryGammaDict[(*symmetryKey, "f")]))
-        print("p- maxval is ", max(self.symmetryGammaDict[(*symmetryKey, "p-")]))
-        print("d- maxval is ", max(self.symmetryGammaDict[(*symmetryKey, "d-")]))
         # Next-to-nearest neighbors
         for band in range(1, max(1, self.subbands) + 1):
             for spin in range(1, 3):
                 for sublat in range(1, self.sublattices + 1):
-                    for orbital in range(1, 4):
-                        symmetryKey = (band, spin, sublat, orbital)
-                        # THis code could be simplified, maybe list comprehension?
-                        listLen = len(next(iter(self.gamma.values())))
-                        for i in range(listLen):
-                            nnnGammaToSymmetrize = []
+                    symmetryKey = (band, spin, sublat)
+                    for i in range(listLen):
+                        nnnGammaToSymmetrize = []
+                        for orbital in range(1, 4):
                             # Next nearest neighbours pairing
                             if self.nNextNeighbors != 0:
                                 for neighbor in range(
@@ -141,54 +118,10 @@ class SymmetryResolver(DataReader):
                                         else (band, spin, neighbor, sublat, orbital)
                                     )
                                     nnnGammaToSymmetrize.append(self.gamma[gammaKey][i])
-                                if i == 0:
-                                    self.nnnSymmetryGammaDict[(*symmetryKey, "s")] = [
-                                        self._ExtSWavePairing(nnnGammaToSymmetrize)
-                                    ]
-                                    self.nnnSymmetryGammaDict[(*symmetryKey, "p+")] = [
-                                        self._PPlusWavePairing(nnnGammaToSymmetrize)
-                                    ]
-                                    self.nnnSymmetryGammaDict[(*symmetryKey, "d+")] = [
-                                        self._DPlusWavePairing(nnnGammaToSymmetrize)
-                                    ]
-                                    self.nnnSymmetryGammaDict[(*symmetryKey, "f")] = [
-                                        self._FWavePairing(nnnGammaToSymmetrize)
-                                    ]
-                                    self.nnnSymmetryGammaDict[(*symmetryKey, "d-")] = [
-                                        self._DMinusWavePairing(nnnGammaToSymmetrize)
-                                    ]
-                                    self.nnnSymmetryGammaDict[(*symmetryKey, "p-")] = [
-                                        self._PMinusWavePairing(nnnGammaToSymmetrize)
-                                    ]
-                                else:
-                                    self.nnnSymmetryGammaDict[
-                                        (*symmetryKey, "s")
-                                    ].append(
-                                        self._ExtSWavePairing(nnnGammaToSymmetrize)
-                                    )
-                                    self.nnnSymmetryGammaDict[
-                                        (*symmetryKey, "p+")
-                                    ].append(
-                                        self._PPlusWavePairing(nnnGammaToSymmetrize)
-                                    )
-                                    self.nnnSymmetryGammaDict[
-                                        (*symmetryKey, "d+")
-                                    ].append(
-                                        self._DPlusWavePairing(nnnGammaToSymmetrize)
-                                    )
-                                    self.nnnSymmetryGammaDict[
-                                        (*symmetryKey, "f")
-                                    ].append(self._FWavePairing(nnnGammaToSymmetrize))
-                                    self.nnnSymmetryGammaDict[
-                                        (*symmetryKey, "d-")
-                                    ].append(
-                                        self._DMinusWavePairing(nnnGammaToSymmetrize)
-                                    )
-                                    self.nnnSymmetryGammaDict[
-                                        (*symmetryKey, "p-")
-                                    ].append(
-                                        self._PMinusWavePairing(nnnGammaToSymmetrize)
-                                    )
+                        for i, sym in enumerate(symmetries):
+                            self.nnnSymmetryGammaDict[(*symmetryKey, sym)].append(
+                                symmetryCallbacks[i](nnnGammaToSymmetrize)
+                            )
 
     def calculateSingletTripletGammas(self) -> None:
         if not self.symmetryGammaDict:
@@ -203,14 +136,8 @@ class SymmetryResolver(DataReader):
         for key in self.symmetryGammaDict:
             band, spin, sublat, orbital, symmetry = key
             spinOpposite = spin + (-1) ** (spin + 1)  # generates opposite spin
-            sublatOpposite = sublat + (-1) ** (
-                sublat + 1
-            )  # generates opposite sublattice
             spinStateSign = (-1) ** spin  # -1 for singlet state, +1 for triplet state
-            sublatStateSign = (
-                -1
-            ) ** sublat  # -1 for sublattice "singlet", +1 for sublattice "triplet"
-            keyOpposite = (band, spinOpposite, sublatOpposite, orbital, symmetry)
+            keyOpposite = (band, spinOpposite, sublat, orbital, symmetry)
 
             self.symmetryGammaSingletTripletDict[key] = []
             for i in range(len(self.symmetryGammaDict[key])):
@@ -218,9 +145,11 @@ class SymmetryResolver(DataReader):
                     self.symmetryGammaDict[key][i]
                     + np.conj(self.symmetryGammaDict[keyOpposite][i])
                     * spinStateSign
-                    * sublatStateSign
                 )
                 self.symmetryGammaSingletTripletDict[key].append(value)
+
+        if self.nNextNeighbors == 0:
+            return
 
         for key in self.nnnSymmetryGammaDict:
             band, spin, sublat, orbital, symmetry = key
@@ -240,108 +169,68 @@ class SymmetryResolver(DataReader):
     """ ---------------------------- Private methods ------------------------------------- """
     """ ---------------------------------------------------------------------------------- """
 
-    def _ExtSWavePairing(self, listOfGammas: list):
-        """
-        Sets parameters for s-wave gap symmetry calculation and invokes function _CalculateSingleGamma()
-        which implements general equation for gap symmetry.
-        """
-        p = 0
-        M = 0
-        return self._CalculateSingleGamma(listOfGammas, p, M)
+    # s-wave
+    def __A1Projection(self, listOfGammas: list) -> np.complex128:
+        return sum(listOfGammas)/len(listOfGammas)
 
-    def _PPlusWavePairing(self, listOfGammas: list):
-        """
-        Sets parameters for p+ip-wave gap symmetry calculation and invokes function _CalculateSingleGamma()
-        which implements general equation for gap symmetry.
-        """
-        p = 1
-        M = 1
-        return self._CalculateSingleGamma(listOfGammas, p, M)
+    # f-wave
+    def __B1Projection(self, listOfGammas: list) -> np.complex128:
+        sum = 0
+        for i in range(len(listOfGammas)):
+            sum += listOfGammas[i] * (-1) ** (i + 1)
+        return sum/len(listOfGammas)
 
-    def _DPlusWavePairing(self, listOfGammas: list):
-        """
-        Sets parameters for d+id-wave gap symmetry calculation and invokes function _CalculateSingleGamma()
-        which implements general equation for gap symmetry.
-        """
-        p = 0
-        M = 2
-        return self._CalculateSingleGamma(listOfGammas, p, M)
+    # p-wave
+    def __E1Projection1(self, listOfGammas: list) -> np.complex128:
+        return (-listOfGammas[1] + listOfGammas[4] - listOfGammas[6] + listOfGammas[9])/len(listOfGammas)
 
-    def _FWavePairing(self, listOfGammas: list):
-        """
-        Sets parameters for f-wave gap symmetry calculation and invokes function _CalculateSingleGamma()
-        which implements general equation for gap symmetry.
-        """
-        p = 1
-        M = 3
-        return self._CalculateSingleGamma(listOfGammas, p, M)
+    def __E1Projection2(self, listOfGammas: list) -> np.complex128:
+        return (-listOfGammas[2] + listOfGammas[5] - listOfGammas[7] + listOfGammas[10])/len(listOfGammas)
 
-    def _DMinusWavePairing(self, listOfGammas: list):
-        """
-        Sets parameters for d-id-wave gap symmetry calculation and invokes function _CalculateSingleGamma()
-        which implements general equation for gap symmetry.
-        """
-        p = 0
-        M = 4
-        return self._CalculateSingleGamma(listOfGammas, p, M)
+    def __E1Projection3(self, listOfGammas: list) -> np.complex128:
+        return (listOfGammas[0] - listOfGammas[3] - listOfGammas[8] + listOfGammas[11])/len(listOfGammas)
 
-    def _PMinusWavePairing(self, listOfGammas: list):
-        """
-        Sets parameters for d-id-wave gap symmetry calculation and invokes function _CalculateSingleGamma()
-        which implements general equation for gap symmetry.
-        """
-        p = 1
-        M = 5
-        return self._CalculateSingleGamma(listOfGammas, p, M)
+    def __E1Projection4(self, listOfGammas: list) -> np.complex128:
+        return(listOfGammas[2] - listOfGammas[5] - listOfGammas[12] + listOfGammas[15])/len(listOfGammas)
 
-    def _CalculateSingleGamma(self, listOfGammas: list, p: int, M: int):
-        """
-        Sums all gammas with proper phase factors, implementing general equation for given symmetry, determined by M and p.
-        !!! Assumes that all neigbors in list have the same phase offset to the previous one !!!
-        """
-        nBonds = len(listOfGammas)
-        # s-wave
-        if M == 0 and p == 0:
-            return sum(listOfGammas) / nBonds
-        # p+
-        if M == 1 and p == 1:
-            sin1 = listOfGammas[0] - listOfGammas[3]
-            sin2 = listOfGammas[1] - listOfGammas[4]
-            sin3 = listOfGammas[2] - listOfGammas[5]
-            return sin1 - sin2 + 1j * (sin1 - sin3)
-        # d+
-        if M == 2 and p == 0:
-            cos1 = listOfGammas[0] + listOfGammas[3]
-            cos2 = listOfGammas[1] + listOfGammas[4]
-            cos3 = listOfGammas[2] + listOfGammas[5]
-            return cos1 - cos2 + 1j * (cos1 - cos3)
-        # f
-        if M == 3 and p == 1:
-            sin1 = listOfGammas[0] - listOfGammas[3]
-            sin2 = listOfGammas[1] - listOfGammas[4]
-            sin3 = listOfGammas[2] - listOfGammas[5]
-            return sin1 + sin2 + sin3
-        # d-
-        if M == 4 and p == 0:
-            cos1 = listOfGammas[0] + listOfGammas[3]
-            cos2 = listOfGammas[1] + listOfGammas[4]
-            cos3 = listOfGammas[2] + listOfGammas[5]
-            return cos1 - cos2 - 1j * (cos1 - cos3)
-        # p-
-        if M == 5 and p == 1:
-            sin1 = listOfGammas[0] - listOfGammas[3]
-            sin2 = listOfGammas[1] - listOfGammas[4]
-            sin3 = listOfGammas[2] - listOfGammas[5]
-            return sin1 - sin2 - 1j * (sin1 - sin3)
-        # symmetryGamma = 0
-        # nBonds = len(listOfGammas)
-        # for i in range(nBonds):
-        #     currentPhase = 2 * np.pi / nBonds * i
-        #     phaseFactor = np.exp(-1j * M * currentPhase)
-        #     symmetryGamma += listOfGammas[i] * phaseFactor
+    def __E1Projection5(self, listOfGammas: list) -> np.complex128:
+        return(-listOfGammas[0] + listOfGammas[3] - listOfGammas[13] + listOfGammas[16])/len(listOfGammas)
 
-        # return symmetryGamma * (1j) ** p / nBonds
+    def __E1Projection6(self, listOfGammas: list) -> np.complex128:
+        return(-listOfGammas[1] + listOfGammas[4] - listOfGammas[14] + listOfGammas[17])/len(listOfGammas)
 
+    # d-wave
+    def __E2Projection1(self, listOfGammas: list) -> np.complex128:
+        return (-listOfGammas[1] - listOfGammas[4] + listOfGammas[6] + listOfGammas[9])/len(listOfGammas)
+
+    def __E2Projection2(self, listOfGammas: list) -> np.complex128:
+        return (-listOfGammas[2] - listOfGammas[5] + listOfGammas[7] + listOfGammas[10])/len(listOfGammas)
+
+    def __E2Projection3(self, listOfGammas: list) -> np.complex128:
+        return (-listOfGammas[0] - listOfGammas[3] + listOfGammas[8] + listOfGammas[11])/len(listOfGammas)
+
+    def __E2Projection4(self, listOfGammas: list) -> np.complex128:
+        return(-listOfGammas[2] - listOfGammas[5] + listOfGammas[12] + listOfGammas[15])/len(listOfGammas)
+
+    def __E2Projection5(self, listOfGammas: list) -> np.complex128:
+        return(-listOfGammas[0] - listOfGammas[3] + listOfGammas[13] + listOfGammas[16])/len(listOfGammas)
+
+    def __E2Projection6(self, listOfGammas: list) -> np.complex128:
+        return(-listOfGammas[1] - listOfGammas[4] + listOfGammas[14] + listOfGammas[17])/len(listOfGammas)
+
+
+    def __getOppositeSublat(self, sublat: int) -> int:
+        """
+        Returns opposite sublattice with which the coupling should be calculated
+        """
+        return sublat + (-1)**(sublat + 1)
+
+    def __getFollowingNeighbor(self, neighbor: int) -> int:
+        """
+        Returns neighbors belonging to opposite lattice that should be takes as next
+        in order determined by placing all the atoms on a regular hexagon for symetry analysis.
+        """
+        return (neighbor + 1) % self.nNeighbors + 1
     """ ---------------------------------------------------------------------------------- """
     """ ---------------------------- Special methods ------------------------------------- """
     """ ---------------------------------------------------------------------------------- """

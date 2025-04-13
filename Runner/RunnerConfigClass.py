@@ -21,7 +21,7 @@ class RunnerConfig:
             """\
         #!/bin/bash -l
         ## Job name
-        #SBATCH -J STO-SC-NNN
+        #SBATCH -J STO-SC-T
         ## Number of allocated nodes
         #SBATCH -N 1
         ## Number of tasks per node (by default this corresponds to the number of cores allocated per node)
@@ -33,7 +33,7 @@ class RunnerConfig:
         ## Max task execution time (format is HH:MM:SS)
         #SBATCH --time=72:00:00
         ## Name of grant to which resource usage will be charged
-        #SBATCH -A plglaosto-cpu
+        #SBATCH -A plglaosto111-cpu
         ## Name of partition
         #SBATCH -p plgrid
         ## Name of file to which standard output will be redirected

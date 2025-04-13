@@ -94,18 +94,17 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 )
                 colorIndex += 1
 
-            band, spin, sublat, orbital, symmetry = key
-            # plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}')
-            plt.legend(title=r"$E_{Fermi}$ (meV)")
+            band, spin, sublat, symmetry = key
+            plt.legend(title=r"$E_{F}$ (meV)")
             plt.xlabel(r"$J$ (meV)")
             plt.ylabel(
-                rf"{self.__getNearestNeighborGammaLabel(sublat, orbital, symmetry, spin)} (meV)",
+                rf"{self.__getNearestNeighborGammaLabel(sublat, symmetry, spin)} (meV)",
                 labelpad=20,
             )
             # plt.grid()
             plt.ylim(0, 0.2)
             plt.savefig(
-                f"../Plots/GammaJ_band{band}_spin{spin}_lat{sublat}_{self.orbitalNameMapping[orbital - 1]}_{symmetry}.png"
+                f"../Plots/GammaJ_band{band}_spin{spin}_lat{sublat}_{symmetry}.png"
             )
             plt.close()
 
@@ -133,26 +132,27 @@ class GammaAndFillingPlotter(SymmetryResolver):
                         ef_plot.append(self.params[i][0] - self.eMinimal)
                         gamma_plot.append(np.abs(self.symmetryGammaDict[key][i]))
                         n_total_plot.append(
-                            self.__calculateFillingPerCm2(
-                                self.fillingTotal[i], self.a_tilde
-                            )
+                            # self.__calculateFillingPerCm2(
+                            #     self.fillingTotal[i], self.a_tilde
+                            # )
+                            self.fillingTotal[i]/12.
                         )
 
                 # color = cmap(norm(secondParam))
                 # ax1.plot(ef_plot, gamma_plot, label=secondParam, color=color)
                 ax1.plot(ef_plot, gamma_plot, label=secondParam)
 
-            band, spin, sublat, orbital, symmetry = key
+            band, spin, sublat, symmetry = key
 
             ax1.set_ylim(top=1.02 * self.maxval)
             ax1.set_xlim(right=eMax if eMax != None else max(ef_plot))
-            ax1.set_xlabel(r"$E_{Fermi}$ (meV)")
+            ax1.set_xlabel(r"$\mu$ (meV)")
             ax1.set_ylabel(
-                rf"{self.__getNearestNeighborGammaLabel(sublat, orbital, symmetry, spin)} (meV)",
+                rf"{self.__getNearestNeighborGammaLabel(sublat, symmetry, spin)} (meV)",
                 labelpad=20,
             )
 
-            ax1.legend(title=r"$J$ (meV)", loc="best")
+            ax1.legend(title=r"$U$ (meV)", loc="best")
 
             # sm = ScalarMappable(cmap=cmap, norm=norm)
             # sm.set_array([])  # Required for ScalarMappable
@@ -172,10 +172,11 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 [f"{val:.2f}" for val in tick_labels]
             )  # Map `n_total_plot` as tick labels
             ax2.set_xlabel(
-                r"$n $ (10\textsuperscript{14} cm\textsuperscript{-2})", labelpad=10
+                #r"$n $ (10\textsuperscript{14} cm\textsuperscript{-2})", labelpad=10
+                r"$n$"
             )  # Customize units as needed
             plt.savefig(
-                f"../Plots/GammaFermi_band{band}_spin{spin}_lat{sublat}_{self.orbitalNameMapping[orbital - 1]}_{symmetry}.png"
+                f"../Plots/GammaFermi_band{band}_spin{spin}_lat{sublat}_{symmetry}.png"
             )
             plt.close()
 
@@ -203,21 +204,22 @@ class GammaAndFillingPlotter(SymmetryResolver):
                             np.abs(self.symmetryGammaSingletTripletDict[key][i])
                         )
                         n_total_plot.append(
-                            self.__calculateFillingPerCm2(
-                                self.fillingTotal[i], self.a_tilde
-                            )
+                            # self.__calculateFillingPerCm2(
+                            #     self.fillingTotal[i], self.a_tilde
+                            # )
+                            self.fillingTotal[i]/12
                         )
 
                 ax1.plot(ef_plot, gamma_plot, label=secondParam)
 
-            band, spin, sublat, orbital, symmetry = key
+            band, spin, sublat, symmetry = key
 
             ax1.set_ylim(top=1.02 * self.maxval)
             ax1.set_xlim(right=eMax if eMax != None else max(ef_plot))
-            ax1.set_xlabel(r"$E_{Fermi}$ (meV)")
+            ax1.set_xlabel(r"$E_{F}$ (meV)")
             ax1.set_ylabel(
-                rf"{self.__getNearestNeighborSingletTripletGammaLabel(sublat, orbital, symmetry, spin)} (meV)",
-                labelpad=20,
+                rf"{self.__getNearestNeighborSingletTripletGammaLabel(sublat, symmetry, spin)} (meV)",
+                labelpad=10,
             )
 
             ax1.legend(title=r"$J$ (meV)", loc="best")
@@ -239,13 +241,87 @@ class GammaAndFillingPlotter(SymmetryResolver):
             ax2.set_xticklabels(
                 [f"{val:.2f}" for val in tick_labels]
             )  # Map `n_total_plot` as tick labels
-            ax2.set_xlabel(
-                r"$n $ (10\textsuperscript{14} cm\textsuperscript{-2})", labelpad=10
-            )  # Customize units as needed
+            # ax2.set_xlabel(
+            #     r"$n $ (10\textsuperscript{14} cm\textsuperscript{-2})", labelpad=10
+            # )  # Customize units as needed
+            ax2.set_xlabel(r"$n$", labelpad = 16)
             plt.savefig(
-                f"../Plots/GammaFermiSingletTriplet_band{band}_spin{spin}_lat{sublat}_{self.orbitalNameMapping[orbital - 1]}_{symmetry}.png"
+                f"../Plots/GammaFermiSingletTriplet_band{band}_spin{spin}_lat{sublat}_{symmetry}.png",
+                bbox_inches="tight"
             )
             plt.close()
+
+    def plotNnnGammasSingleTripletFermi(self, eMax: float = None):
+        secondParamValues = [element[1] for element in self.params]
+        secondParamValues = sorted(list(set(secondParamValues)))
+        self.__setPalette(nColors=len(set(secondParamValues)))
+        self.calculateSingletTripletGammas()
+        gamma_plot = []
+        ef_plot = []
+        n_total_plot = []
+
+        for key in self.nnnSymmetryKeys:
+            fig, ax1 = plt.subplots(figsize=(7, 5), dpi=400)
+
+            for secondParam in secondParamValues:
+                gamma_plot = []
+                ef_plot = []
+                n_total_plot = []
+
+                for i in range(len(self.params)):
+                    if int(self.params[i][1]) == secondParam:
+                        ef_plot.append(self.params[i][0] - self.eMinimal)
+                        gamma_plot.append(
+                            np.abs(self.nnnSymmetryGammaSingletTripletDict[key][i])
+                        )
+                        n_total_plot.append(
+                            # self.__calculateFillingPerCm2(
+                            #     self.fillingTotal[i], self.a_tilde
+                            # )
+                            self.fillingTotal[i]/12
+                        )
+
+                ax1.plot(ef_plot, gamma_plot, label=secondParam)
+
+            band, spin, sublat, symmetry = key
+
+            ax1.set_ylim(top=1.02 * self.maxval)
+            ax1.set_xlim(right=eMax if eMax != None else max(ef_plot))
+            ax1.set_xlabel(r"$E_{F}$ (meV)")
+            ax1.set_ylabel(
+                rf"{self.__getNextNearestNeighborSingletTripletGammaLabel(sublat, symmetry, spin)} (meV)",
+                labelpad=10,
+            )
+
+            ax1.legend(title=r"$J$ (meV)", loc="best")
+
+            # sm = ScalarMappable(cmap=cmap, norm=norm)
+            # sm.set_array([])  # Required for ScalarMappable
+            # colorbar = fig.colorbar(sm, ax=ax1)
+            # colorbar.set_label(r"$J$ (meV)")  # Update label as needed
+
+            # Do this as a last step and trigger plt.draw() so that the ticks are already set in their final form
+            plt.draw()
+            ax1_ticks = ax1.get_xticks()
+            # Plot secondary axis for occupation
+            tick_labels = np.interp(
+                ax1_ticks, ef_plot, n_total_plot
+            )  # Interpolate the mapping
+            ax2 = ax1.secondary_xaxis("top")
+            ax2.set_xticks(ax1_ticks)  # Use the same positions as `ef_plot`
+            ax2.set_xticklabels(
+                [f"{val:.2f}" for val in tick_labels]
+            )  # Map `n_total_plot` as tick labels
+            # ax2.set_xlabel(
+            #     r"$n $ (10\textsuperscript{14} cm\textsuperscript{-2})", labelpad=10
+            # )  # Customize units as needed
+            ax2.set_xlabel(r"$n$", labelpad = 16)
+            plt.savefig(
+                f"../Plots/nnnGammaFermiSingletTriplet_band{band}_spin{spin}_lat{sublat}_{symmetry}.png",
+                bbox_inches="tight"
+            )
+            plt.close()
+
 
     def plotSymmetryRatios(self, eMax: float = None):
         secondParamValues = [element[1] for element in self.params]
@@ -256,7 +332,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
         )
         symmetries = set(((key[-1]) for key in self.symmetryKeys))
 
-        self.__setPalette(nColors=len(symmetries))
+        self.__setPalette(nColors=len(symmetries) // 2)
 
         colors = ["black", "red"]
         i_color = 0
@@ -266,131 +342,89 @@ class GammaAndFillingPlotter(SymmetryResolver):
         fig, ax1 = plt.subplots(figsize=(7, 5), dpi=400)
         for key in paramsWithoutSym:
             for secondParam in secondParamValues:
-                if key == (1, 1, 1, 1) and secondParam in [50, 100]:
-                    # fig, ax1 = plt.subplots(figsize=(7, 5), dpi=400)
-                    gammaSRatio = []
-                    gammaPRatio = []
-                    gammaDRatio = []
-                    ef_plot = []
-                    n_total_plot = []
-                    for i in range(len(self.params)):
-                        if int(self.params[i][1]) == secondParam:
-                            total = 0
-                            for sym in symmetries:
-                                gammaKey = (*key, sym)
-                                total += np.abs(self.symmetryGammaDict[gammaKey][i])
-                            gammaKey = (*key, "s")
-                            gammaSRatio.append(
-                                np.abs(self.symmetryGammaDict[gammaKey][i])
-                                / total
-                                * 100
-                            )
-                            gammaKey = (*key, "p+")
-                            gammaPRatio.append(
-                                np.abs(self.symmetryGammaDict[gammaKey][i])
-                                / total
-                                * 100
-                            )
-                            gammaKey = (*key, "d+")
-                            gammaDRatio.append(
-                                np.abs(self.symmetryGammaDict[gammaKey][i])
-                                / total
-                                * 100
-                            )
-                            ef_plot.append(self.params[i][0] - self.eMinimal)
-                            n_total_plot.append(
-                                self.__calculateFillingPerCm2(
-                                    self.fillingTotal[i], self.a_tilde
-                                )
-                            )
-                    if i_color == 0:
-                        ax1.plot(
-                            ef_plot,
-                            gammaSRatio,
-                            label="s",
-                            marker=".",
-                            markersize=6,
-                            color=colors[i_color],
+                # if key == (1, 1, 1, 3) and secondParam in [50, 100]:
+                fig, ax1 = plt.subplots(figsize=(7, 5), dpi=400)
+                gammaSRatio = []
+                gammaD1Ratio = []
+                gammaD2Ratio = []
+                ef_plot = []
+                n_total_plot = []
+                for i in range(len(self.params)):
+                    if int(self.params[i][1]) == secondParam:
+                        total = 0
+                        for sym in symmetries:
+                            gammaKey = (*key, sym)
+                            total += np.abs(self.symmetryGammaDict[gammaKey][i])
+                        gammaKey = (*key, "s")
+                        gammaSRatio.append(
+                            np.abs(self.symmetryGammaDict[gammaKey][i])
+                            / total
+                            * 100
                         )
-                        ax1.plot(
-                            ef_plot,
-                            gammaPRatio,
-                            label="p+",
-                            marker=4,
-                            markersize=6,
-                            color=colors[i_color],
+                        gammaKey = (*key, "d_1")
+                        gammaD1Ratio.append(
+                            np.abs(self.symmetryGammaDict[gammaKey][i])
+                            / total
+                            * 100
                         )
-                        ax1.plot(
-                            ef_plot,
-                            gammaDRatio,
-                            label="d+",
-                            marker=5,
-                            markersize=6,
-                            color=colors[i_color],
+                        gammaKey = (*key, "d_2")
+                        gammaD2Ratio.append(
+                            np.abs(self.symmetryGammaDict[gammaKey][i])
+                            / total
+                            * 100
                         )
-                    else:
-                        ax1.plot(
-                            ef_plot,
-                            gammaSRatio,
-                            marker=".",
-                            markersize=6,
-                            color=colors[i_color],
-                        )
-                        ax1.plot(
-                            ef_plot,
-                            gammaPRatio,
-                            marker=4,
-                            markersize=6,
-                            color=colors[i_color],
-                        )
-                        ax1.plot(
-                            ef_plot,
-                            gammaDRatio,
-                            marker=5,
-                            markersize=6,
-                            color=colors[i_color],
+                        ef_plot.append(self.params[i][0] - self.eMinimal)
+                        n_total_plot.append(
+                            # self.__calculateFillingPerCm2(
+                            #     self.fillingTotal[i], self.a_tilde
+                            # )
+                            self.fillingTotal[i]/12
                         )
 
-                    band, spin, sublat, orbital = key
-                    # plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}')
+                    band, spin, sublat = key
                     i_color += 1
-                    print(i_color)
-        ax1.legend(title=r"$\xi$", loc="center left")
-        ax1.set_xlabel(r"$E_{Fermi}$ (meV)")
-        ax1.set_ylabel(r"$\Gamma_\xi$ (\%)", labelpad=20)
-        ax1.set_ylim(bottom=0, top=100)
-        ax1.set_xlim(left=6, right=eMax if eMax != None else max(ef_plot))
 
-        # Do this as a last step and trigger plt.draw() so that the ticks are already set in their final form
-        plt.draw()
-        ax1_ticks = ax1.get_xticks()
-        # Plot secondary axis for occupation
-        tick_labels = np.interp(
-            ax1_ticks, ef_plot, n_total_plot
-        )  # Interpolate the mapping
-        ax2 = ax1.secondary_xaxis("top")
-        ax2.set_xticks(ax1_ticks)  # Use the same positions as `ef_plot`
-        ax2.set_xticklabels(
-            [f"{val:.2f}" for val in tick_labels]
-        )  # Map `n_total_plot` as tick labels
-        ax2.set_xlabel(
-            r"$n $ (10\textsuperscript{14} cm\textsuperscript{-2})", labelpad=10
-        )  # Customize units as needed
-        plt.savefig(
-            f"../Plots/AAAGammaSymmetryRatios_band{band}_spin{spin}_lat{sublat}_{self.orbitalNameMapping[orbital - 1]}_J_SC_{secondParam}.png"
-        )
-        plt.close()
+                ax1.plot(ef_plot, gammaSRatio, label=r"$s$", marker=".", markersize=6)
+                ax1.plot(ef_plot, gammaD1Ratio, label=r"$d_1$", marker=6, markersize=6)
+                ax1.plot(ef_plot, gammaD2Ratio, label=r"$d_2$", marker=7, markersize=6)
+
+                ax1.legend(title=r"$\xi$", loc="center left")
+                ax1.set_xlabel(r"$E_F$ (meV)")
+                ax1.set_ylabel(r"$\Gamma^\xi$ (\%)", labelpad=16)
+                ax1.set_ylim(bottom=0, top=100)
+                ax1.set_xlim(left=6, right=eMax if eMax != None else max(ef_plot))
+
+                # Do this as a last step and trigger plt.draw() so that the ticks are already set in their final form
+                plt.draw()
+                ax1_ticks = ax1.get_xticks()
+                # Plot secondary axis for occupation
+                tick_labels = np.interp(
+                    ax1_ticks, ef_plot, n_total_plot
+                )  # Interpolate the mapping
+                ax2 = ax1.secondary_xaxis("top")
+                ax2.set_xticks(ax1_ticks)  # Use the same positions as `ef_plot`
+                ax2.set_xticklabels(
+                    [f"{val:.2f}" for val in tick_labels]
+                )  # Map `n_total_plot` as tick labels
+                ax2.set_xlabel(r"$n$", labelpad = 16)
+                # ax2.set_xlabel(
+                #     r"$n $ (10\textsuperscript{14} cm\textsuperscript{-2})", labelpad=10
+                # )  # Customize units as needed
+                plt.savefig(
+                    f"../Plots/GammaSymmetryRatios_band{band}_spin{spin}_lat{sublat}_J_SC_{secondParam}.png"
+                )
+                plt.close()
 
     def plotNnnSymmetryRatios(self, eMax: float = None):
         secondParamValues = [element[1] for element in self.params]
         secondParamValues = sorted(list(set(secondParamValues)))
 
         paramsWithoutSym = set(
-            ((key[0], key[1], key[2], key[3]) for key in self.nnnSymmetryKeys)
+            ((key[0], key[1], key[3]) for key in self.nnnSymmetryKeys)
         )
         symmetries = set(((key[-1]) for key in self.nnnSymmetryKeys))
 
-        self.__setPalette(nColors=len(symmetries))
+        self.__setPalette(nColors=len(symmetries) // 2)
 
         ef_plot = []
         n_total_plot = []
@@ -416,45 +450,45 @@ class GammaAndFillingPlotter(SymmetryResolver):
                         gammaSRatio.append(
                             np.abs(self.nnnSymmetryGammaDict[gammaKey][i]) / total * 100
                         )
-                        gammaKey = (*key, "p+")
-                        gammaPPlusRatio.append(
-                            np.abs(self.nnnSymmetryGammaDict[gammaKey][i]) / total * 100
-                        )
-                        gammaKey = (*key, "p-")
-                        gammaPMinusRatio.append(
-                            np.abs(self.nnnSymmetryGammaDict[gammaKey][i]) / total * 100
-                        )
-                        gammaKey = (*key, "d+")
+                        # gammaKey = (*key, "p_1")
+                        # gammaPPlusRatio.append(
+                        #     np.abs(self.nnnSymmetryGammaDict[gammaKey][i]) / total * 100
+                        # )
+                        # gammaKey = (*key, "p_2")
+                        # gammaPMinusRatio.append(
+                        #     np.abs(self.nnnSymmetryGammaDict[gammaKey][i]) / total * 100
+                        # )
+                        gammaKey = (*key, "d_1")
                         gammaDPlusRatio.append(
                             np.abs(self.nnnSymmetryGammaDict[gammaKey][i]) / total * 100
                         )
-                        gammaKey = (*key, "d-")
+                        gammaKey = (*key, "d_2")
                         gammaDMinusRatio.append(
                             np.abs(self.nnnSymmetryGammaDict[gammaKey][i]) / total * 100
                         )
-                        gammaKey = (*key, "f")
-                        gammaFRatio.append(
-                            np.abs(self.nnnSymmetryGammaDict[gammaKey][i]) / total * 100
-                        )
+                        # gammaKey = (*key, "f")
+                        # gammaFRatio.append(
+                        #     np.abs(self.nnnSymmetryGammaDict[gammaKey][i]) / total * 100
+                        # )
                         ef_plot.append(self.params[i][0] - self.eMinimal)
                         n_total_plot.append(
-                            self.__calculateFillingPerCm2(
-                                self.fillingTotal[i], self.a_tilde
-                            )
+                            # self.__calculateFillingPerCm2(
+                            #     self.fillingTotal[i], self.a_tilde
+                            # )
+                            self.fillingTotal[i]/12
                         )
 
-                ax1.plot(ef_plot, gammaSRatio, label="s", marker=".", markersize=6)
-                ax1.plot(ef_plot, gammaPPlusRatio, label="p+", marker=4, markersize=6)
-                ax1.plot(ef_plot, gammaPMinusRatio, label="p-", marker=5, markersize=6)
-                ax1.plot(ef_plot, gammaDPlusRatio, label="d+", marker=6, markersize=6)
-                ax1.plot(ef_plot, gammaDMinusRatio, label="d-", marker=7, markersize=6)
-                ax1.plot(ef_plot, gammaFRatio, label="f", marker="*", markersize=6)
+                ax1.plot(ef_plot, gammaSRatio, label=r"$s$", marker=".", markersize=6)
+                # ax1.plot(ef_plot, gammaPPlusRatio, label="p_1", marker=4, markersize=6)
+                # ax1.plot(ef_plot, gammaPMinusRatio, label="p_2", marker=5, markersize=6)
+                ax1.plot(ef_plot, gammaDPlusRatio, label=r"$d_1$", marker=6, markersize=6)
+                ax1.plot(ef_plot, gammaDMinusRatio, label=r"$d_2$", marker=7, markersize=6)
+                # ax1.plot(ef_plot, gammaFRatio, label="f", marker="*", markersize=6)
 
-                band, spin, sublat, orbital = key
-                # plt.title(fr'$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}')
+                band, spin, sublat = key
                 ax1.legend(title=r"$\xi$", loc="center left")
-                ax1.set_xlabel(r"$E_{Fermi}$ (meV)")
-                ax1.set_ylabel(r"$\Gamma_\xi$ (\%)", labelpad=20)
+                ax1.set_xlabel(r"$E_{F}$ (meV)")
+                ax1.set_ylabel(r"$\Gamma^\xi$ (\%)", labelpad=20)
                 ax1.set_ylim(bottom=0, top=100)
                 ax1.set_xlim(left=6, right=eMax if eMax != None else max(ef_plot))
 
@@ -470,12 +504,12 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 ax2.set_xticklabels(
                     [f"{val:.2f}" for val in tick_labels]
                 )  # Map `n_total_plot` as tick labels
-                ax2.set_xlabel(
-                    r"$n $ (10\textsuperscript{14} cm\textsuperscript{-2})", labelpad=10
-                )  # Customize units as needed
-
+                # ax2.set_xlabel(
+                #     r"$n $ (10\textsuperscript{14} cm\textsuperscript{-2})", labelpad=10
+                # )  # Customize units as needed
+                ax2.set_xlabel(r"$n$", labelpad = 16)
                 plt.savefig(
-                    f"../Plots/nnnGammaSymmetryRatios_band{band}_spin{spin}_lat{sublat}_{self.orbitalNameMapping[orbital - 1]}_J_SC_{secondParam}.png"
+                    f"../Plots/nnnGammaSymmetryRatios_band{band}_spin{spin}_lat{sublat}_J_SC_{secondParam}.png"
                 )
                 plt.close()
 
@@ -528,11 +562,11 @@ class GammaAndFillingPlotter(SymmetryResolver):
                     color = cmap(norm(thirdParam - self.eMinimal))
                     ax1.plot(T_plot, gamma_plot, color=color)
 
-            band, spin, sublat, orbital, symmetry = key
+            band, spin, sublat, symmetry = key
 
             ax1.set_xlabel(r"$T$ (K)")
             ax1.set_ylabel(
-                rf"{self.__getNearestNeighborGammaLabel(sublat, orbital, symmetry, spin)} (meV)",
+                rf"{self.__getNearestNeighborGammaLabel(sublat, symmetry, spin)} (meV)",
                 labelpad=20,
             )
 
@@ -540,10 +574,10 @@ class GammaAndFillingPlotter(SymmetryResolver):
             sm = ScalarMappable(cmap=cmap, norm=norm)
             sm.set_array([])  # Required for ScalarMappable
             colorbar = fig.colorbar(sm, ax=ax1)
-            colorbar.set_label(r"$E_{Fermi}$ (meV)")  # Update label as needed
+            colorbar.set_label(r"$E_{F}$ (meV)")  # Update label as needed
 
             plt.savefig(
-                f"../Plots/GammaTemperature_band{band}_spin{spin}_lat{sublat}_{self.orbitalNameMapping[orbital - 1]}_{symmetry}.png"
+                f"../Plots/GammaTemperature_band{band}_spin{spin}_lat{sublat}_{symmetry}.png"
             )
             plt.close()
 
@@ -572,9 +606,10 @@ class GammaAndFillingPlotter(SymmetryResolver):
                             Ef.append(self.params[i][2] - self.eMinimal)
                             Gap.append(np.abs(self.symmetryGammaDict[key][i]))
                             N_total.append(
-                                self.__calculateFillingPerCm2(
-                                    self.fillingTotal[i], self.a_tilde
-                                )
+                                # self.__calculateFillingPerCm2(
+                                #     self.fillingTotal[i], self.a_tilde
+                                # )
+                                self.fillingTotal[i] / 12
                             )
 
                 T_unique = np.unique(T)  # Find unique T values
@@ -592,14 +627,14 @@ class GammaAndFillingPlotter(SymmetryResolver):
                     Ef_grid, T_grid, Gap_grid, cmap="inferno", norm=PowerNorm(gamma=0.8)
                 )
 
-                band, spin, sublat, orbital, symmetry = key
-                ax1.set_xlabel(rf"$E_{{Fermi}}$ (meV)")
+                band, spin, sublat, symmetry = key
+                ax1.set_xlabel(rf"$E_{{F}}$ (meV)")
                 ax1.set_ylabel(rf"T (K)")
-                ax1.set_xlim(left=50, right=eMax if eMax != None else max(Ef))
+                ax1.set_xlim(left=0, right=eMax if eMax != None else max(Ef))
 
                 colorbar = fig.colorbar(colormesh, ax=ax1)
                 colorbar.set_label(
-                    rf"{self.__getNearestNeighborGammaLabel(sublat, orbital, symmetry, spin)} (meV)"
+                    rf"{self.__getNearestNeighborGammaLabel(sublat, symmetry, spin)} (meV)"
                 )
 
                 plt.draw()
@@ -613,16 +648,99 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 ax2.set_xticklabels(
                     [f"{val:.2f}" for val in tick_labels]
                 )  # Map `n_total_plot` as tick labels
-                ax2.set_xlabel(
-                    r"$n $ (10\textsuperscript{14} cm\textsuperscript{-2})", labelpad=10
-                )  # Customize units as needed
+                # ax2.set_xlabel(
+                #     r"$n $ (10\textsuperscript{14} cm\textsuperscript{-2})", labelpad=10
+                # )  # Customize units as needed
+                ax2.set_xlabel(r"$n$", labelpad = 16)
 
                 ax1.tick_params(axis="x", direction="out")
                 ax1.tick_params(axis="y", direction="out")
                 ax2.tick_params(axis="x", direction="out")
 
                 plt.savefig(
-                    f"../Plots/GammaTemperatureMap{secondParam}_band{band}_spin{spin}_lat{sublat}_orb{self.orbitalNameMapping[orbital - 1]}_{symmetry}.png"
+                    f"../Plots/GammaTemperatureMap{secondParam}_band{band}_spin{spin}_lat{sublat}_{symmetry}.png"
+                )
+                plt.close()
+
+
+    def plotNnnGammasTemperatureMap(self, eMax: float = None):
+        """Temperature has to be passed a 0-th argument to this method"""
+        # J_SC
+        secondParamValues = [element[1] for element in self.params]
+        secondParamValues = sorted(list(set(secondParamValues)))
+
+        # E_Fermi
+        thirdParamValues = [element[2] for element in self.params]
+        thirdParamValues = sorted(list(set(thirdParamValues)))
+
+        for key in self.nnnSymmetryKeys:
+            fig, ax1 = plt.subplots(figsize=(7, 5), dpi=400)
+
+            for secondParam in secondParamValues:
+                T = []
+                Ef = []
+                Gap = []
+                N_total = []
+                for thirdParam in thirdParamValues:
+                    for i in range(len(self.params)):
+                        if int(self.params[i][1]) == secondParam:
+                            T.append(self.params[i][0])
+                            Ef.append(self.params[i][2] - self.eMinimal)
+                            Gap.append(np.abs(self.nnnSymmetryGammaDict[key][i]))
+                            N_total.append(
+                                # self.__calculateFillingPerCm2(
+                                #     self.fillingTotal[i], self.a_tilde
+                                # )
+                                self.fillingTotal[i] / 12
+                            )
+
+                T_unique = np.unique(T)  # Find unique T values
+                Ef_unique = np.unique(Ef)  # Find unique Ef values
+                N_total_unique = np.unique(N_total)
+                Ef_grid, T_grid = np.meshgrid(Ef_unique, T_unique)
+
+                points = np.array([Ef, T]).T
+                values = Gap
+                Gap_grid = griddata(
+                    points, values, (Ef_grid, T_grid), method="linear", fill_value=0
+                )
+
+                colormesh = ax1.pcolormesh(
+                    Ef_grid, T_grid, Gap_grid, cmap="inferno", norm=PowerNorm(gamma=0.8)
+                )
+
+                band, spin, sublat, symmetry = key
+                ax1.set_xlabel(rf"$E_{{F}}$ (meV)")
+                ax1.set_ylabel(rf"T (K)")
+                ax1.set_xlim(left=0, right=eMax if eMax != None else max(Ef))
+
+                colorbar = fig.colorbar(colormesh, ax=ax1)
+                colorbar.set_label(
+                    rf"{self.__getNextNearestNeighborGammaLabel(sublat, symmetry, spin)} (meV)"
+                )
+
+                plt.draw()
+                ax1_ticks = ax1.get_xticks()
+                # Plot secondary axis for occupation
+                tick_labels = np.interp(
+                    ax1_ticks, Ef, N_total
+                )  # Interpolate the mapping
+                ax2 = ax1.secondary_xaxis("top")
+                ax2.set_xticks(ax1_ticks)  # Use the same positions as `ef_plot`
+                ax2.set_xticklabels(
+                    [f"{val:.2f}" for val in tick_labels]
+                )  # Map `n_total_plot` as tick labels
+                # ax2.set_xlabel(
+                #     r"$n $ (10\textsuperscript{14} cm\textsuperscript{-2})", labelpad=10
+                # )  # Customize units as needed
+                ax2.set_xlabel(r"$n$", labelpad = 16)
+
+                ax1.tick_params(axis="x", direction="out")
+                ax1.tick_params(axis="y", direction="out")
+                ax2.tick_params(axis="x", direction="out")
+
+                plt.savefig(
+                    f"../Plots/nnnGammaTemperatureMap{secondParam}_band{band}_spin{spin}_lat{sublat}_{symmetry}.png"
                 )
                 plt.close()
 
@@ -646,20 +764,21 @@ class GammaAndFillingPlotter(SymmetryResolver):
                         ef_plot.append(self.params[i][0] - self.eMinimal)
                         gamma_plot.append(np.abs(self.nnnSymmetryGammaDict[key][i]))
                         n_total_plot.append(
-                            self.__calculateFillingPerCm2(
-                                self.fillingTotal[i], self.a_tilde
-                            )
+                            # self.__calculateFillingPerCm2(
+                            #     self.fillingTotal[i], self.a_tilde
+                            # )
+                            self.fillingTotal[i] / 12
                         )
 
                 ax1.plot(ef_plot, gamma_plot, label=secondParam)
 
-            band, spin, sublat, orbital, symmetry = key
+            band, spin, sublat, symmetry = key
             ax1.legend(title=r"$J$ (meV)", loc="best")
             ax1.set_ylim(top=1.02 * self.maxval)
             ax1.set_xlim(left=0, right=eMax if eMax != None else max(ef_plot))
-            ax1.set_xlabel(r"$E_{Fermi}$ (meV)")
+            ax1.set_xlabel(r"$E_{F}$ (meV)")
             ax1.set_ylabel(
-                rf"{self.__getNextNearestNeighborGammaLabel(sublat, orbital, symmetry, spin)} (meV)",
+                rf"{self.__getNextNearestNeighborGammaLabel(sublat, symmetry, spin)} (meV)",
                 labelpad=20,
             )
             # Do this as a last step and trigger plt.draw() so that the ticks are already set in their final form
@@ -675,11 +794,11 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 [f"{val:.2f}" for val in tick_labels]
             )  # Map `n_total_plot` as tick labels
             ax2.set_xlabel(
-                r"$n $ (10\textsuperscript{14} cm\textsuperscript{-2})", labelpad=10
+                r"$n$", labelpad=10
             )  # Customize units as needed
 
             plt.savefig(
-                f"../Plots/nnnGammaFermi_band{band}_spin{spin}_lat{sublat}_{self.orbitalNameMapping[orbital - 1]}_{symmetry}.png"
+                f"../Plots/nnnGammaFermi_band{band}_spin{spin}_lat{sublat}_{symmetry}.png"
             )
             plt.close()
 
@@ -717,7 +836,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
             colorIndex += 1
 
         plt.legend(title=r"$U$ (meV)")
-        plt.xlabel(r"$E_{Fermi}$ (meV)")
+        plt.xlabel(r"$E_{F}$ (meV)")
         plt.ylabel(r"$n_{orb}$")
         # plt.grid()
         plt.savefig(f"../Plots/FillingFermiOrbital.png")
@@ -726,7 +845,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
         plt.figure(1)
         plt.plot(ef_plot, n_total_plot, "-", label=secondParam)
         plt.legend(title=r"$U$ (meV)")
-        plt.xlabel(r"$E_{Fermi}$ (meV)")
+        plt.xlabel(r"$E_{F}$ (meV)")
         plt.ylabel(r"$n_{tot}$")
         plt.grid()
         plt.savefig(f"../Plots/FillingFermiTotal.png")
@@ -762,7 +881,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 rf"$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}"
             )
             plt.legend(title=r"$J_{SC}$ (meV)")
-            plt.xlabel(r"$E_{Fermi}$ (meV)")
+            plt.xlabel(r"$E_{F}$ (meV)")
             plt.ylabel(rf"$\Gamma_{neighbor}$ (meV)")
             # plt.grid()
             plt.xlim(right=-900)
@@ -781,34 +900,29 @@ class GammaAndFillingPlotter(SymmetryResolver):
         for band in range(1, max(1, self.subbands) + 1):
             for spin in range(1, 3):
                 for sublat in range(1, self.layerCouplings + 1):
-                    for orbital in range(1, 4):
-                        for symmetry in ("s", "p+", "d+", "f", "d-", "p-"):
-                            self.symmetryKeys.append(
-                                (band, spin, sublat, orbital, symmetry)
-                            )
+                    for symmetry in ("s", "f", "p_1", "p_2", "p_3", "p_4", "p_5", "p_6", "d_1", "d_2", "d_3", "d_4", "d_5", "d_6"):
+                        self.symmetryKeys.append(
+                            (band, spin, sublat, symmetry)
+                        )
+
         # Next-to-nearest neighbors
         for band in range(1, max(1, self.subbands) + 1):
             for spin in range(1, 3):
                 for sublat in range(1, self.sublattices + 1):
-                    for orbital in range(1, 4):
-                        for symmetry in ("s", "p+", "d+", "f", "d-", "p-"):
-                            self.nnnSymmetryKeys.append(
-                                (band, spin, sublat, orbital, symmetry)
-                            )
+                    for symmetry in ("s", "f", "p_1", "p_2", "p_3", "p_4", "p_5", "p_6", "d_1", "d_2", "d_3", "d_4", "d_5", "d_6"):
+                        self.nnnSymmetryKeys.append(
+                            (band, spin, sublat, symmetry)
+                        )
 
     def __initializeMapping(self):
         self.orbitalNameMapping = ["yz", "zx", "xy"]
         self.spinSymbolsMapping = [r"\uparrow", r"\downarrow"]
         self.spinSymbolSingletTripletNameMapping = [
-            r"S_\sigma",
-            r"T_\sigma",
+            r"S",
+            r"T",
         ]
         self.latticeNameMapping = [rf"Ti_{i}" for i in range(1, self.sublattices + 1)]
         singletTripletDict = {0: "T", 1: "S"}
-        self.latticeSingletTripletNameMapping = [
-            rf"{singletTripletDict[i % 2]}_{{Ti_{i // 2 + i % 2}}}"
-            for i in range(1, self.sublattices + 1)
-        ]
         self.subbandNameMapping = [rf"n_{i}" for i in range(1, self.subbands + 1)]
 
     def __initializePlotParams(self):
@@ -845,7 +959,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
 
         plt.rcParams["axes.xmargin"] = 0.01
 
-    def __setPalette(self, nColors: int = 3, palette: str = "hsv"):
+    def __setPalette(self, nColors: int = 3, palette: str = "colorblind"):
         # Choose a seaborn palette
         # has to specify number of lines
         self.palette = sns.color_palette(palette, nColors)
@@ -853,29 +967,32 @@ class GammaAndFillingPlotter(SymmetryResolver):
         plt.rcParams["axes.prop_cycle"] = plt.cycler(color=self.palette)
 
     def __getNearestNeighborGammaLabel(
-        self, sublat: int, orbital: int, symmetry: str, spin: int
+        self, sublat: int, symmetry: str, spin: int
     ) -> str:
         latSubstring = f"{self.latticeNameMapping[sublat // 2]} {self.latticeNameMapping[(sublat // 2) + sublat % 2 - (sublat + 1) % 2]}"
         spinSubstring = (
             f"{self.spinSymbolsMapping[spin - 1]} {self.spinSymbolsMapping[spin % 2]}"
         )
-        return rf"$\Gamma_{{{latSubstring},{self.orbitalNameMapping[orbital - 1]},{symmetry}}}^{{{spinSubstring}}}$"
+        return rf"$\Gamma_{{\alpha \overline{{\alpha}}}}^{{{symmetry}}}$"
 
     def __getNearestNeighborSingletTripletGammaLabel(
-        self, sublat: int, orbital: int, symmetry: str, spin: int
+        self, sublat: int, symmetry: str, spin: int
     ) -> str:
-        latSubstring = f"{self.latticeSingletTripletNameMapping[sublat - 1]}"
-        spinSubstring = f"{self.spinSymbolSingletTripletNameMapping[spin - 1]}"
-        return rf"$\Gamma_{{{latSubstring},{self.orbitalNameMapping[orbital - 1]},{symmetry}}}^{{{spinSubstring}}}$"
+        return rf"$\Gamma_{{\alpha \overline{{\alpha}}}}^{{{symmetry}}}$"
+
+    def __getNextNearestNeighborSingletTripletGammaLabel(
+        self, sublat: int, symmetry: str, spin: int
+    ) -> str:
+        return rf"$\Gamma_{{\alpha \alpha}}^{{{symmetry}}}$"
 
     def __getNextNearestNeighborGammaLabel(
-        self, sublat: int, orbital: int, symmetry: str, spin: int
+        self, sublat: int, symmetry: str, spin: int
     ) -> str:
         latSubstring = f"{self.latticeNameMapping[sublat - 1]} {self.latticeNameMapping[sublat - 1]}"
         spinSubstring = (
             f"{self.spinSymbolsMapping[spin - 1]} {self.spinSymbolsMapping[spin % 2]}"
         )
-        return rf"$\Gamma_{{{latSubstring},{self.orbitalNameMapping[orbital - 1]},{symmetry}}}^{{{spinSubstring}}}$"
+        return rf"$\Gamma_{{{latSubstring},{symmetry}}}^{{{spinSubstring}}}$"
 
     def __getMaterialsLatticeConstant(self, material: str) -> float:
         """Calculates lattice constant of hexagonal lattice for a given material."""

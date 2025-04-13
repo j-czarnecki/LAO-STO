@@ -6,7 +6,6 @@ import seaborn as sns
 from scipy.signal import convolve
 from matplotlib.colors import PowerNorm, Normalize
 from matplotlib.cm import ScalarMappable
-from brokenaxes import brokenaxes
 
 # TODO: self.lowestEnergy should not be used - all energies should be shown with respect to E_Fermi
 # Data reader is in fact not used here, rethink this architecture
@@ -403,6 +402,11 @@ class DispersionPlotter(DataReader):
 
     def plotGammaKMap(self, inputPath: str):
         multiplier = 3
+        colorbarTitles = [
+            r"$Re\left( \Gamma  \right)$ (meV)"
+            r"$Im\left( \Gamma  \right)$ (meV)"
+            r"$\left| \Gamma  \right|^2$ (meV)"
+        ]
 
         for band in range(1, max(1, self.subbands) + 1):
             for spin in range(1, 3):
