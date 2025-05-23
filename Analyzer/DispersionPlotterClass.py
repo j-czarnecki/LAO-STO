@@ -6,6 +6,9 @@ import seaborn as sns
 from scipy.signal import convolve
 from matplotlib.colors import PowerNorm, Normalize
 from matplotlib.cm import ScalarMappable
+from matplotlib.colors import LinearSegmentedColormap
+from scipy.interpolate import griddata
+import matplotlib.gridspec as gridspec
 
 # TODO: self.lowestEnergy should not be used - all energies should be shown with respect to E_Fermi
 # Data reader is in fact not used here, rethink this architecture
@@ -188,6 +191,10 @@ class DispersionPlotter(DataReader):
                 linewidth=1,
                 color="black",
             )
+        plt.axhline(-50, color="red", linewidth=0.5, linestyle='--')
+        plt.axhline(50, color="red", linewidth=0.5, linestyle='--')
+        plt.axhline(0, color="blue", linewidth=0.5, linestyle='--')
+        plt.axhline(200, color="blue", linewidth=0.5, linestyle='--')
         plt.xlim(-kMax, kMax)
         plt.ylim(bottom=minEnergy, top=maxEnergy)
         plt.xlabel(xLabelOnPlot)
@@ -207,7 +214,6 @@ class DispersionPlotter(DataReader):
             colors = group[["P_yz", "P_zx", "P_xy"]].values
             plt.scatter(group["kx"], group["ky"], marker="o", s=0.6, c=colors)
 
-        plt.title(r"$E_{Fermi} = $ " + str(eFermi) + " (meV)")
         plt.xlabel(r"$k_x~(\tilde{a}^{-1})$")
         plt.ylabel(r"$k_y~(\tilde{a}^{-1})$")
         plt.xlim(-2.5, 2.5)
@@ -215,6 +221,29 @@ class DispersionPlotter(DataReader):
         plt.gca().set_aspect("equal", adjustable="box")
         plt.savefig(plotOutputPath)
         plt.close()
+
+        #Spin projection
+        plt.figure()
+        self.plotFirstBrillouinZoneBoundary()
+        filteredDispersion = self.dispersionDataframe[
+            np.abs(self.dispersionDataframe["E"] - eFermi) < dE
+        ]
+        groups = filteredDispersion.groupby("N")
+        for _, group in groups:
+            red = group["P_up"].values
+            blue = group["P_down"].values
+            green = np.zeros_like(red)
+            colors = np.stack([red, green, blue], axis=1)
+            plt.scatter(group["kx"], group["ky"], marker="o", s=0.6, c=colors)
+
+        plt.xlabel(r"$k_x~(\tilde{a}^{-1})$")
+        plt.ylabel(r"$k_y~(\tilde{a}^{-1})$")
+        plt.xlim(-2.5, 2.5)
+        plt.ylim(-2.5, 2.5)
+        plt.gca().set_aspect("equal", adjustable="box")
+        plt.savefig(plotOutputPath)
+        plt.close()
+
 
     def plotDos(
         self,
@@ -400,13 +429,14 @@ class DispersionPlotter(DataReader):
             plt.savefig(f"../Plots/SuperconductingGapMap_n{state}.png")
             plt.close()
 
-    def plotGammaKMap(self, inputPath: str):
-        multiplier = 3
+    def plotGammaKMap(self, inputPath: str, plotNnn: bool = False):
+        multiplier = 2.5
         colorbarTitles = [
             r"$Re\left( \Gamma  \right)$ (meV)"
             r"$Im\left( \Gamma  \right)$ (meV)"
             r"$\left| \Gamma  \right|^2$ (meV)"
         ]
+        positiveCmap = LinearSegmentedColormap.from_list("white_to_red", ["white", "red"])
 
         for band in range(1, max(1, self.subbands) + 1):
             for spin in range(1, 3):
@@ -419,165 +449,204 @@ class DispersionPlotter(DataReader):
                                 f"GammaK_orb{orbital}_spin{spin}_layer{sublat}_band{band}.dat",
                             )
                         )
-                        # Real part
-                        plt.figure()
-                        self.plotFirstBrillouinZoneBoundary()
-                        plt.scatter(
-                            self.gammaKDataFrame.iloc[:, 0],
-                            self.gammaKDataFrame.iloc[:, 1],
-                            c=np.float64(self.gammaKDataFrame.iloc[:, 2]),
-                            s=0.5,
-                            cmap="bwr",
-                        )
-                        plt.colorbar(label=r"$Re\left( \Gamma  \right)$ (meV)")
-                        ticks = plt.gca().get_xticks()
-                        plt.xticks(ticks)
-                        plt.yticks(ticks)
-                        plt.xlim(-2.5 * multiplier, 2.5 * multiplier)
-                        plt.ylim(-2.5 * multiplier, 2.5 * multiplier)
+                        kxGrid, kyGrid = np.meshgrid(np.unique(self.gammaKDataFrame.iloc[:, 0]),
+                                                     np.unique(self.gammaKDataFrame.iloc[:, 1]))
+                        kPoints = np.array([self.gammaKDataFrame.iloc[:, 0], self.gammaKDataFrame.iloc[:, 1]]).T
 
-                        plt.xlabel(r"$k_x~(\tilde{a}^{-1})$")
-                        plt.ylabel(r"$k_y~(\tilde{a}^{-1})$")
-                        plt.gca().set_aspect("equal", adjustable="box")
-                        # plt.grid()
+
+                        #Real part NN
+                        fig = plt.figure(figsize=(7, 5), dpi=400)
+                        # Set up GridSpec (1 row, 1 column, with some spacing)
+                        gs = gridspec.GridSpec(1, 1, figure=fig, left=0.2, right=0.8, top=0.8, bottom=0.25)
+                        ax = fig.add_subplot(gs[0,0])
+
+                        nnRealGrid = griddata(kPoints, self.gammaKDataFrame.iloc[:, 2], (kxGrid, kyGrid), method="linear", fill_value=0)
+                        colormesh = ax.pcolormesh(kxGrid, kyGrid, nnRealGrid, cmap='bwr', norm=PowerNorm(gamma=1.))
+
+                        ax.set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
+                        ax.set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
+
+                        ax.set_xlim(-2.5 * multiplier, 2.5 * multiplier)
+                        ax.set_ylim(-2.5 * multiplier, 2.5 * multiplier)
+
+                        ax.tick_params(axis="x", direction="out")
+                        ax.tick_params(axis="y", direction="out")
+
+                        #ax.set_aspect("equal", adjustable="box")
+
+                        colorbar = fig.colorbar(colormesh, ax=ax)
+                        colorbar.set_label(r"$\mathfrak{Re}\left( \Gamma  \right)$ (meV)")
+
+                        self.plotFirstBrillouinZoneBoundary()
+
                         plt.savefig(
-                            f"../Plots/GammaKMapRe_orb{orbital}_spin{spin}_layer{sublat}_band{band}.png"
+                            f"../Plots/GammaKMapRe_orb{orbital}_spin{spin}_layer{sublat}_band{band}.png",
+                            bbox_inches="tight",
                         )
                         plt.close()
 
-                        # Imaginary part
-                        plt.figure()
-                        self.plotFirstBrillouinZoneBoundary()
-                        plt.scatter(
-                            self.gammaKDataFrame.iloc[:, 0],
-                            self.gammaKDataFrame.iloc[:, 1],
-                            c=np.float64(self.gammaKDataFrame.iloc[:, 3]),
-                            s=0.5,
-                            cmap="bwr",
-                        )
-                        plt.colorbar(label=r"$Im\left( \Gamma  \right)$ (meV)")
-                        ticks = plt.gca().get_xticks()
-                        plt.xticks(ticks)
-                        plt.yticks(ticks)
-                        plt.xlim(-2.5 * multiplier, 2.5 * multiplier)
-                        plt.ylim(-2.5 * multiplier, 2.5 * multiplier)
 
-                        plt.xlabel(r"$k_x~(\tilde{a}^{-1})$")
-                        plt.ylabel(r"$k_y~(\tilde{a}^{-1})$")
-                        plt.gca().set_aspect("equal", adjustable="box")
-                        # plt.grid()
+                        # Imaginary part NN
+                        fig = plt.figure(figsize=(7, 5), dpi=400)
+                        # Set up GridSpec (1 row, 1 column, with some spacing)
+                        gs = gridspec.GridSpec(1, 1, figure=fig, left=0.2, right=0.8, top=0.8, bottom=0.25)
+                        ax = fig.add_subplot(gs[0,0])
+
+                        nnRealGrid = griddata(kPoints, self.gammaKDataFrame.iloc[:, 3], (kxGrid, kyGrid), method="linear", fill_value=0)
+                        colormesh = ax.pcolormesh(kxGrid, kyGrid, nnRealGrid, cmap='bwr', norm=PowerNorm(gamma=1.))
+
+                        ax.set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
+                        ax.set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
+
+                        ax.set_xlim(-2.5 * multiplier, 2.5 * multiplier)
+                        ax.set_ylim(-2.5 * multiplier, 2.5 * multiplier)
+
+                        ax.tick_params(axis="x", direction="out")
+                        ax.tick_params(axis="y", direction="out")
+
+                        #ax.set_aspect("equal", adjustable="box")
+
+                        colorbar = fig.colorbar(colormesh, ax=ax)
+                        colorbar.set_label(r"$\mathfrak{Im}\left( \Gamma  \right)$ (meV)")
+
+                        self.plotFirstBrillouinZoneBoundary()
+
                         plt.savefig(
-                            f"../Plots/GammaKMapIm_orb{orbital}_spin{spin}_layer{sublat}_band{band}.png"
+                            f"../Plots/GammaKMapIm_orb{orbital}_spin{spin}_layer{sublat}_band{band}.png",
+                            bbox_inches="tight",
                         )
                         plt.close()
+
 
                         # Module squared NN
-                        plt.figure()
-                        self.plotFirstBrillouinZoneBoundary()
-                        plt.scatter(
-                            self.gammaKDataFrame.iloc[:, 0],
-                            self.gammaKDataFrame.iloc[:, 1],
-                            c=np.float64(
-                                self.gammaKDataFrame.iloc[:, 2] ** 2
-                                + self.gammaKDataFrame.iloc[:, 3] ** 2
-                            ),
-                            s=0.5,
-                            cmap="bwr",
-                        )
-                        plt.colorbar(label=r"$\left| \Gamma  \right|^2$ (meV)")
-                        ticks = plt.gca().get_xticks()
-                        plt.xticks(ticks)
-                        plt.yticks(ticks)
-                        plt.xlim(-2.5 * multiplier, 2.5 * multiplier)
-                        plt.ylim(-2.5 * multiplier, 2.5 * multiplier)
+                        fig = plt.figure(figsize=(7, 5), dpi=400)
+                        # Set up GridSpec (1 row, 1 column, with some spacing)
+                        gs = gridspec.GridSpec(1, 1, figure=fig, left=0.2, right=0.8, top=0.8, bottom=0.25)
+                        ax = fig.add_subplot(gs[0,0])
 
-                        plt.xlabel(r"$k_x~(\tilde{a}^{-1})$")
-                        plt.ylabel(r"$k_y~(\tilde{a}^{-1})$")
-                        plt.gca().set_aspect("equal", adjustable="box")
-                        # plt.grid()
+                        nnRealGrid = griddata(kPoints, np.float64(
+                                np.sqrt(self.gammaKDataFrame.iloc[:, 2] ** 2
+                                + self.gammaKDataFrame.iloc[:, 3] ** 2)
+                            ), (kxGrid, kyGrid), method="linear", fill_value=0)
+                        colormesh = ax.pcolormesh(kxGrid, kyGrid, nnRealGrid, cmap=positiveCmap, norm=PowerNorm(gamma=2))
+
+                        ax.set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
+                        ax.set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
+
+                        ax.set_xlim(-2.5 * multiplier, 2.5 * multiplier)
+                        ax.set_ylim(-2.5 * multiplier, 2.5 * multiplier)
+
+                        ax.tick_params(axis="x", direction="out")
+                        ax.tick_params(axis="y", direction="out")
+
+                        #ax.set_aspect("equal", adjustable="box")
+
+                        colorbar = fig.colorbar(colormesh, ax=ax)
+                        colorbar.set_label(r"$\left| \Gamma  \right|$ (meV)")
+
+                        self.plotFirstBrillouinZoneBoundary()
+
                         plt.savefig(
-                            f"../Plots/GammaKMapModuleSquared_orb{orbital}_spin{spin}_layer{sublat}_band{band}.png"
+                            f"../Plots/GammaKMapModuleSquared_orb{orbital}_spin{spin}_layer{sublat}_band{band}.png",
+                            bbox_inches="tight",
                         )
                         plt.close()
 
-                        # Real part NNN
-                        plt.figure()
-                        self.plotFirstBrillouinZoneBoundary()
-                        plt.scatter(
-                            self.gammaKDataFrame.iloc[:, 0],
-                            self.gammaKDataFrame.iloc[:, 1],
-                            c=np.float64(self.gammaKDataFrame.iloc[:, 4]),
-                            s=0.5,
-                            cmap="bwr",
-                        )
-                        plt.colorbar(label=r"$Re\left( \Gamma  \right)$ (meV)")
-                        ticks = plt.gca().get_xticks()
-                        plt.xticks(ticks)
-                        plt.yticks(ticks)
-                        plt.xlim(-2.5 * multiplier, 2.5 * multiplier)
-                        plt.ylim(-2.5 * multiplier, 2.5 * multiplier)
+                        #Only plot NNN if needed
+                        if not plotNnn:
+                            continue
 
-                        plt.xlabel(r"$k_x~(\tilde{a}^{-1})$")
-                        plt.ylabel(r"$k_y~(\tilde{a}^{-1})$")
-                        plt.gca().set_aspect("equal", adjustable="box")
-                        # plt.grid()
+                        # Real part NNN
+                        fig = plt.figure(figsize=(7, 5), dpi=400)
+                        # Set up GridSpec (1 row, 1 column, with some spacing)
+                        gs = gridspec.GridSpec(1, 1, figure=fig, left=0.2, right=0.8, top=0.8, bottom=0.25)
+                        ax = fig.add_subplot(gs[0,0])
+
+                        nnRealGrid = griddata(kPoints, self.gammaKDataFrame.iloc[:, 4], (kxGrid, kyGrid), method="linear", fill_value=0)
+                        colormesh = ax.pcolormesh(kxGrid, kyGrid, nnRealGrid, cmap='bwr', norm=PowerNorm(gamma=1.))
+
+                        ax.set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
+                        ax.set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
+
+                        ax.set_xlim(-2.5 * multiplier, 2.5 * multiplier)
+                        ax.set_ylim(-2.5 * multiplier, 2.5 * multiplier)
+
+                        ax.tick_params(axis="x", direction="out")
+                        ax.tick_params(axis="y", direction="out")
+
+                        #ax.set_aspect("equal", adjustable="box")
+
+                        colorbar = fig.colorbar(colormesh, ax=ax)
+                        colorbar.set_label(r"$\mathfrak{Re}\left( \Gamma  \right)$ (meV)")
+
+                        self.plotFirstBrillouinZoneBoundary()
                         plt.savefig(
-                            f"../Plots/GammaKMapNnnRe_orb{orbital}_spin{spin}_layer{sublat}_band{band}.png"
+                            f"../Plots/GammaKMapNnnRe_orb{orbital}_spin{spin}_layer{sublat}_band{band}.png",
+                            bbox_inches="tight",
                         )
                         plt.close()
 
                         # Imaginary part NNN
-                        plt.figure()
-                        self.plotFirstBrillouinZoneBoundary()
-                        plt.scatter(
-                            self.gammaKDataFrame.iloc[:, 0],
-                            self.gammaKDataFrame.iloc[:, 1],
-                            c=np.float64(self.gammaKDataFrame.iloc[:, 5]),
-                            s=0.5,
-                            cmap="bwr",
-                        )
-                        plt.colorbar(label=r"$Im\left( \Gamma  \right)$ (meV)")
-                        ticks = plt.gca().get_xticks()
-                        plt.xticks(ticks)
-                        plt.yticks(ticks)
-                        plt.xlim(-2.5 * multiplier, 2.5 * multiplier)
-                        plt.ylim(-2.5 * multiplier, 2.5 * multiplier)
+                        fig = plt.figure(figsize=(7, 5), dpi=400)
+                        # Set up GridSpec (1 row, 1 column, with some spacing)
+                        gs = gridspec.GridSpec(1, 1, figure=fig, left=0.2, right=0.8, top=0.8, bottom=0.25)
+                        ax = fig.add_subplot(gs[0,0])
 
-                        plt.xlabel(r"$k_x~(\tilde{a}^{-1})$")
-                        plt.ylabel(r"$k_y~(\tilde{a}^{-1})$")
-                        plt.gca().set_aspect("equal", adjustable="box")
-                        # plt.grid()
+                        nnRealGrid = griddata(kPoints, self.gammaKDataFrame.iloc[:, 5], (kxGrid, kyGrid), method="linear", fill_value=0)
+                        colormesh = ax.pcolormesh(kxGrid, kyGrid, nnRealGrid, cmap='bwr', norm=PowerNorm(gamma=1.))
+
+                        ax.set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
+                        ax.set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
+
+                        ax.set_xlim(-2.5 * multiplier, 2.5 * multiplier)
+                        ax.set_ylim(-2.5 * multiplier, 2.5 * multiplier)
+
+                        ax.tick_params(axis="x", direction="out")
+                        ax.tick_params(axis="y", direction="out")
+
+                        #ax.set_aspect("equal", adjustable="box")
+
+                        colorbar = fig.colorbar(colormesh, ax=ax)
+                        colorbar.set_label(r"$\mathfrak{Im}\left( \Gamma  \right)$ (meV)")
+
+                        self.plotFirstBrillouinZoneBoundary()
+
                         plt.savefig(
-                            f"../Plots/GammaKMapNnnIm_orb{orbital}_spin{spin}_layer{sublat}_band{band}.png"
+                            f"../Plots/GammaKMapNnnIm_orb{orbital}_spin{spin}_layer{sublat}_band{band}.png",
+                            bbox_inches="tight",
                         )
                         plt.close()
 
                         # Module squared part NNN
-                        plt.figure()
-                        self.plotFirstBrillouinZoneBoundary()
-                        plt.scatter(
-                            self.gammaKDataFrame.iloc[:, 0],
-                            self.gammaKDataFrame.iloc[:, 1],
-                            c=np.float64(
-                                self.gammaKDataFrame.iloc[:, 4] ** 2
-                                + self.gammaKDataFrame.iloc[:, 5] ** 2
-                            ),
-                            s=0.5,
-                            cmap="bwr",
-                        )
-                        plt.colorbar(label=r"$\left| \Gamma  \right|^2$ (meV)")
-                        ticks = plt.gca().get_xticks()
-                        plt.xticks(ticks)
-                        plt.yticks(ticks)
-                        plt.xlim(-2.5 * multiplier, 2.5 * multiplier)
-                        plt.ylim(-2.5 * multiplier, 2.5 * multiplier)
+                        fig = plt.figure(figsize=(7, 5), dpi=400)
+                        # Set up GridSpec (1 row, 1 column, with some spacing)
+                        gs = gridspec.GridSpec(1, 1, figure=fig, left=0.2, right=0.8, top=0.8, bottom=0.25)
+                        ax = fig.add_subplot(gs[0,0])
 
-                        plt.xlabel(r"$k_x~(\tilde{a}^{-1})$")
-                        plt.ylabel(r"$k_y~(\tilde{a}^{-1})$")
-                        plt.gca().set_aspect("equal", adjustable="box")
-                        # plt.grid()
+                        nnRealGrid = griddata(kPoints, np.float64(
+                                np.sqrt(self.gammaKDataFrame.iloc[:, 4] ** 2
+                                + self.gammaKDataFrame.iloc[:, 5] ** 2)
+                            ), (kxGrid, kyGrid), method="linear", fill_value=0)
+                        colormesh = ax.pcolormesh(kxGrid, kyGrid, nnRealGrid, cmap=positiveCmap, norm=PowerNorm(gamma=2))
+
+                        ax.set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
+                        ax.set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
+
+                        ax.set_xlim(-2.5 * multiplier, 2.5 * multiplier)
+                        ax.set_ylim(-2.5 * multiplier, 2.5 * multiplier)
+
+                        ax.tick_params(axis="x", direction="out")
+                        ax.tick_params(axis="y", direction="out")
+
+                        #ax.set_aspect("equal", adjustable="box")
+
+                        colorbar = fig.colorbar(colormesh, ax=ax)
+                        colorbar.set_label(r"$\left| \Gamma  \right|$ (meV)")
+
+                        self.plotFirstBrillouinZoneBoundary()
                         plt.savefig(
-                            f"../Plots/GammaKMapNnnModuleSquared_orb{orbital}_spin{spin}_layer{sublat}_band{band}.png"
+                            f"../Plots/GammaKMapNnnModuleSquared_orb{orbital}_spin{spin}_layer{sublat}_band{band}.png",
+                            bbox_inches="tight",
                         )
                         plt.close()
 

@@ -128,8 +128,6 @@ Delta_new_broyden = 0.
 gamma_max_error = 0.
 charge_max_error = 0.
 
-B_field = (/0.1 * T2au, 0.0d0, 0.0d0/)
-
 !Computing k-independent terms
 CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:, :))
 CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:, :))

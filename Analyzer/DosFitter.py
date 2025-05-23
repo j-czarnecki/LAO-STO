@@ -11,6 +11,7 @@ from scipy.interpolate import interp1d
 from sklearn.metrics import mean_squared_error
 import f90nml
 import time
+import seaborn as sns
 
 class DosFitter():
   def __init__(self):
@@ -23,16 +24,18 @@ class DosFitter():
     self.orbitals = 3
     self.dataReader = DataReader("./", "xxx", self.sublattices, self.subbands)
     self.timeStart = 0
+    self.__initializePlotParams()
 
 
   """ ---------------------------------------------------------------------------------- """
   """ ---------------------------- Interface methods ----------------------------------- """
   """ ---------------------------------------------------------------------------------- """
   def fit(self):
-    result = differential_evolution(self.__costMse,
-                                    bounds = [(0, 0.5), (-0.3, 0.3), (-0.3, 0.3)],
-                                    disp = True)
-    print(result, flush=True)
+    # result = differential_evolution(self.__costMse,
+    #                                 bounds = [(0.29, 0.3), (0.2, 0.3), (0.2, 0.3), (-0.25, -0.15)],
+    #                                 disp = True)
+    self.__costMse([4.441e-01,  1.626e-01, -3.050e-01])
+    #print(result, flush=True)
 
   """ ---------------------------------------------------------------------------------- """
   """ ---------------------------- Private methods ------------------------------------- """
@@ -40,16 +43,20 @@ class DosFitter():
 
   def __costMse(self, x: list, *args) -> float:
     """
-    x = [eFermi, gamma1, gamma2, gamma3]
+    x = [gamma1, gamma2, gamma3]
     """
 
     self.timeStart = time.time()
 
     dosFit = self.__getDos(x)
-    dosExp = pd.read_csv("/home/pwojcik/NicolasFit/J1_exp_0mT.dat", delim_whitespace=True, names=["E", "DOS"], dtype=np.float64)
-    dosExp["DOS"] = dosExp["DOS"] / dosExp["DOS"].max() #Normalization to maximum
+    dosExp = pd.read_csv("/home/jczarnecki/NicolasFit/J1_exp_0mT.dat", delim_whitespace=True, names=["E", "DOS"], dtype=np.float64)
     dosExp["E"] = dosExp["E"] * 1000 #Conversion to meV
-    dosExp.drop(dosExp[np.abs(dosExp["E"]) > 0.35].index, inplace=True)
+    dosExp.drop(dosExp[np.abs(dosExp["E"]) > 0.3].index, inplace=True)
+    dosExp["DOS"] = dosExp["DOS"] - dosExp["DOS"].min() # Shift so that minimum is at zero
+    dosExp["DOS"] = dosExp["DOS"] / dosExp["DOS"].max() #Normalization to maximum
+
+    dosFit.drop(dosFit[np.abs(dosFit["E"]) > 0.3].index, inplace=True)
+    dosFit["DOS"] = dosFit["DOS"] / dosFit["DOS"].max() #Normalization to maximum
 
     interpolate = interp1d(dosFit["E"], dosFit["DOS"], kind="linear", fill_value="extrapolate")
     DosInterpolated = interpolate(dosExp["E"]) #Interpolate fited DOS at those points where experimental measurements were made
@@ -59,9 +66,11 @@ class DosFitter():
     print("MSE: ", error, flush=True)
 
     plt.figure()
-    plt.plot(dosFit["E"], dosFit["DOS"], label="fit")
-    plt.plot(dosExp["E"], dosExp["DOS"], label="exp")
-    plt.plot(dosExp["E"], DosInterpolated, label="interpolated", linestyle="dashed")
+    plt.plot(dosFit["E"], dosFit["DOS"], label="Theory", color="black")
+    plt.scatter(dosExp["E"], dosExp["DOS"], label="Exp.", color="red", marker=".")
+    plt.xlabel(r"$E~(meV)$")
+    plt.ylabel(r"$G~(a.u.)$")
+    #plt.plot(dosExp["E"], DosInterpolated, label="interpolated", linestyle="dashed")
     plt.legend()
     plt.savefig(f"../Plots/DosFitHistory_{self.nEvals % 5}.png")
     plt.close()
@@ -73,18 +82,17 @@ class DosFitter():
     return error
 
   def __getDos(self, x: list) -> pd.DataFrame:
-    eFermi = x[0]
-    gammas = x[1:]
-    gammas = [gammas[0], gammas[0], gammas[1]] #Assume that coupling in two directions is the same and only one is different - as in s-wave from self-consistency
+    gammas = x[:]
+    gammas = [gammas[0], gammas[1], gammas[2]] #Assume that coupling in two directions is the same and only one is different - as in s-wave from self-consistency
     self.__constructAndWriteGamma(gammas)
-    self.__changeFermiEnergy(eFermi)
-    os.chdir("/home/pwojcik/LAO-STO")
-    result = subprocess.run("srun -c 64 bin/POST_LAO_STO.x", shell=True, check=True)
-    os.chdir("/home/pwojcik/LAO-STO/Analyzer")
-    self.dataReader.LoadDos("/home/pwojcik/LAO-STO/OutputData/DOS.dat")
-    result = subprocess.run(f"cp /home/pwojcik/LAO-STO/OutputData/DOS.dat /home/pwojcik/DOS_train/DOS_{self.nEvals}.dat", shell=True, check=True)
-    with open(f"/home/pwojcik/DOS_train/X_{self.nEvals}.dat", "w") as file:
-      print(f"{x[0]} {x[1]} {x[2]}", file=file)
+    #self.__changeFermiEnergy(eFermi)
+    os.chdir("/home/jczarnecki/LAO-STO")
+    result = subprocess.run("./bin/POST_LAO_STO.x", shell=True, check=True)
+    os.chdir("/home/jczarnecki/LAO-STO/Analyzer")
+    self.dataReader.LoadDos("/home/jczarnecki/LAO-STO/OutputData/DOS.dat")
+    #result = subprocess.run(f"cp /home/jczarnecki/LAO-STO/OutputData/DOS.dat /home/pwojcik/DOS_train/DOS_{self.nEvals}.dat", shell=True, check=True)
+    # with open(f"/home/pwojcik/DOS_train/X_{self.nEvals}.dat", "w") as file:
+    #   print(f"{x[0]} {x[1]} {x[2]}", file=file)
     return self.dataReader.dosDataframe
 
   def __constructAndWriteGamma(self, gammas: list) -> None:
@@ -116,10 +124,50 @@ class DosFitter():
               print(" ", file=file)
 
   def __changeFermiEnergy(self, energy: float) -> None:
-    nml = f90nml.read("/home/pwojcik/LAO-STO/input.nml")
+    nml = f90nml.read("/home/jczarnecki/LAO-STO/input.nml")
     nml["physical_params"]["E_Fermi"] = energy * 1000 # Convert eV to meV
-    nml.write("/home/pwojcik/LAO-STO/input.nml", force = True)
+    nml.write("/home/jczarnecki/LAO-STO/input.nml", force = True)
 
+  def __initializePlotParams(self):
+      plt.rcParams["text.usetex"] = True
+      plt.rcParams["font.family"] = "serif"
+      plt.rcParams["font.serif"] = "Computer Modern Roman"
+      plt.rcParams["font.sans-serif"] = "Computer Modern Sans serif"
+      plt.rcParams["font.monospace"] = "Computer Modern Typewriter"
+      plt.rcParams["axes.titlesize"] = 30
+      plt.rcParams["axes.labelsize"] = 30
+      plt.rcParams["xtick.labelsize"] = 26
+      plt.rcParams["ytick.labelsize"] = 26
+      plt.rcParams["legend.fontsize"] = 20
+      plt.rcParams["legend.title_fontsize"] = 24
+      # Optionally, add custom LaTeX preamble
+      plt.rcParams["text.latex.preamble"] = (
+          r"\usepackage{amsmath} \usepackage{amsfonts} \usepackage{amssymb}"
+      )
+
+      self.__setPalette()
+
+      # Set rcParams for tighter layout
+      plt.rcParams["figure.autolayout"] = True
+      plt.rcParams["figure.constrained_layout.use"] = False
+      plt.rcParams["axes.linewidth"] = 1.2
+
+      # Set rcParams to show ticks on both left and right sides
+      plt.rcParams["xtick.direction"] = "in"
+      plt.rcParams["ytick.direction"] = "in"
+      plt.rcParams["xtick.bottom"] = True
+      plt.rcParams["ytick.left"] = True
+      plt.rcParams["xtick.top"] = True
+      plt.rcParams["ytick.right"] = True
+
+      plt.rcParams["axes.xmargin"] = 0.01
+
+  def __setPalette(self, nColors: int = 3, palette: str = "colorblind"):
+      # Choose a seaborn palette
+      # has to specify number of lines
+      self.palette = sns.color_palette(palette, nColors)
+      # Set the color cycle
+      plt.rcParams["axes.prop_cycle"] = plt.cycler(color=self.palette)
 def main():
   dosFit = DosFitter()
   dosFit.fit()

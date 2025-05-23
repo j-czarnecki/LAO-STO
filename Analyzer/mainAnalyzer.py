@@ -48,7 +48,7 @@ def plotGammas():
 
 def plotDispersions():
     # eMin = -1053
-    # dispersionPlotter = DispersionPlotter(sublattices=2, subbands=0)
+    #dispersionPlotter = DispersionPlotter(sublattices=2, subbands=0)
     # for j_sc in [50, 75, 100]:
     #     for ef in [-1026, -966]:
     #         dispersionPlotter.LoadSuperconductingGap(
@@ -74,7 +74,7 @@ def plotDispersions():
     #         postfix=f"_J_100_Ef_{ef}", title=rf"$E_{{Fermi}} = {ef - eMin}$ (meV)"
     #     )
 
-    # dispersionPlotter.LoadDispersion("../OutputData/Energies.dat")
+    #dispersionPlotter.LoadDispersion("../OutputData/Energies.dat")
     # for j_sc in range(370, 380, 10):
     #     for ef in range(50, 130, 10):
     #         try:
@@ -105,8 +105,8 @@ def plotDispersions():
     #                 ) for ef in fermiList]
     # dispersionPlotter.plotStackedDos(0.8, f"../Plots/DOS_stack.png", True, 8e-2, dirsList, fermiList)
 
-    # dispersionPlotter.GetStatistics()
-    # dispersionPlotter.shiftEnergies()
+    #dispersionPlotter.GetStatistics()
+    #dispersionPlotter.shiftEnergies()
 
     # dispersionPlotter.plotCrossection(
     #     "../Plots/DispersionSliceKy", 300, "ky", 0.0, 2, False
@@ -116,12 +116,15 @@ def plotDispersions():
     #     "../Plots/DispersionSliceKx", 300, "kx", 0.0, 2, False
     # )
 
-    # dispersionPlotter.plotFermiCrossection(75, 2.0, "../Plots/FermiSlice75.png")
+    #dispersionPlotter.plotFermiCrossection(200, 1.0, "../Plots/FermiSlice200.png")
+    # dispersionPlotter.plotFermiCrossection(100, 2.0, "../Plots/FermiSlice100.png")
+    # dispersionPlotter.plotFermiCrossection(150, 2.0, "../Plots/FermiSlice150.png")
+    # dispersionPlotter.plotFermiCrossection(200, 2.0, "../Plots/FermiSlice200.png")
     # dispersionPlotter.plotFermiCrossection(500, 1.0, "../Plots/FermiSlice500.png")
-    dispersionPlotter = DispersionPlotter(sublattices=3, subbands=2)
+    dispersionPlotter = DispersionPlotter(sublattices=3, subbands=1)
     dispersionPlotter.LoadSuperconductingGap(
                 os.path.join(
-                    "/home/pwojcik/LAO-STO",
+                    "/home/jczarnecki/LAO-STO",
                     "OutputData",
                     "SuperconductingGap.dat",
                 )
@@ -131,22 +134,22 @@ def plotDispersions():
     dispersionPlotter.LoadDos(
                     os.path.join(
                         "/home",
-                        "pwojcik",
+                        "jczarnecki",
                         "LAO-STO",
                         "OutputData",
                         "DOS.dat",
                     )
                 )
-    dispersionPlotter.plotDos(50, "../Plots/DOS.png", False, 1e-2)
+    # dispersionPlotter.plotDos(50, "../Plots/DOS.png", False, 1e-2)
 
     # dispersionPlotter.plotGammaKMap(
-    #     inputPath="/home/pwojcik/LAO-STO"
+    #     inputPath="/home/jczarnecki/LAO-STO-results/LAO-STO-E_Fermi_J_SC/RUN_E_Fermi_-950.0_J_SC_170.0"
     # )
 
 
 def main():
-    plotGammas()
-    #plotDispersions()
+    #plotGammas()
+    plotDispersions()
 
 
 if __name__ == "__main__":
