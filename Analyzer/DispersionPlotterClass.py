@@ -278,10 +278,10 @@ class DispersionPlotter(DataReader):
             fig, ax = plt.subplots(figsize=(7, 5), dpi=400)
 
         if addSmearing:
-            ax.plot(self.dosDataframe.E, dosSmoothed, color=color, linewidth=1)
+            ax.plot(self.dosDataframe.E, dosSmoothed, color=color, linewidth=1.5)
         else:
             ax.plot(
-                self.dosDataframe.E, self.dosDataframe.DOS, color=color, linewidth=1
+                self.dosDataframe.E, self.dosDataframe.DOS, color=color, linewidth=1.5
             )
 
         if isSingle:
@@ -310,6 +310,7 @@ class DispersionPlotter(DataReader):
 
         for dir in dosDirsList:
             self.LoadDos(dir)
+            self.dosDataframe["DOS"] = self.dosDataframe["DOS"] / 1e14
             color = cmap(norm(colorParamList[dosDirsList.index(dir)]))
             self.plotDos(
                 eMax,
@@ -324,11 +325,11 @@ class DispersionPlotter(DataReader):
         sm = ScalarMappable(cmap=cmap, norm=norm)
         sm.set_array([])  # Required for ScalarMappable
         colorbar = fig.colorbar(sm, ax=ax)
-        colorbar.set_label(r"$E_\text{Fermi}$ (meV)")  # Update label as needed
+        colorbar.set_label(r"$\mu$ (meV)")  # Update label as needed
 
         ax.set_xlim(left=-eMax, right=eMax)
         ax.set_xlabel(r"E (meV)")
-        ax.set_ylabel(r"DOS")
+        ax.set_ylabel(r"DOS (a.u.)")
         plt.savefig(plotOutputPath)
         plt.close()
 
@@ -364,26 +365,45 @@ class DispersionPlotter(DataReader):
         plt.close()
 
     def plotSuperconductingGapAngular(self, postfix: str = "", title: str = None):
-        self.__setPalette(nColors=self.superconductingGapDataframe['state'].nunique())
-
+        #self.__setPalette(nColors=self.superconductingGapDataframe['state'].nunique(), palette="tab10")
+        stateColors = ["black", "red", "blue", "orange"]
         figAngular, axAngular = plt.subplots(figsize=(7, 5), dpi=400)
         #baxAngular = brokenaxes(ylims=((0,1), (15,50)), hspace=0.1)
         figFourier, axFourier = plt.subplots(figsize=(7, 5), dpi=400)
 
         for state, group in self.superconductingGapDataframe.groupby("state"):
-            angles = np.arctan2(group.ky, group.kx) / (np.pi)
-            sortedIndices = np.argsort(angles)
-            sortedAngles = angles.iloc[sortedIndices]
-            sortedGaps = group.gap.iloc[sortedIndices]
-            axAngular.plot(
-                sortedAngles,
-                sortedGaps,
-                label=f"{int(state)}",
-            )
+            dPhi = 0.05                                   # the maximum allowed x–gap
 
-            gapFft = np.fft.fft(sortedGaps) / len(sortedGaps)
-            freqs = np.fft.fftfreq(len(sortedGaps), d=np.mean(np.diff(sortedAngles))) / np.pi
-            axFourier.scatter(freqs, np.abs(gapFft), label=f"{int(state)}")
+            # --- sort by polar angle ----------------------------------------------------
+            angles = np.arctan2(group.ky, group.kx) / np.pi
+            order   = np.argsort(angles)               # pandas/Series works fine with np.argsort
+            x = angles.iloc[order].to_numpy()          # turn into contiguous NumPy arrays
+            y = group.gap.iloc[order].to_numpy()
+
+            # --- split data into “continuous” chunks ------------------------------------
+            break_pts = np.where(np.diff(x) > dPhi)[0] + 1   # index AFTER each large jump
+            segments  = np.split(np.arange(x.size), break_pts)
+
+            # --- draw each chunk separately so Matplotlib never bridges the gap ---------
+            for seg in segments:
+                axAngular.plot(
+                    x[seg], y[seg],
+                    label=f"{int(state)}" if seg is segments[0] else None,   # one legend entry
+                    color=stateColors[int(state) - 1]
+                )
+            # angles = np.arctan2(group.ky, group.kx) / (np.pi)
+            # sortedIndices = np.argsort(angles)
+            # sortedAngles = angles.iloc[sortedIndices]
+            # sortedGaps = group.gap.iloc[sortedIndices]
+            # axAngular.plot(
+            #     sortedAngles,
+            #     sortedGaps,
+            #     label=f"{int(state)}",
+            # )
+
+            # gapFft = np.fft.fft(sortedGaps) / len(sortedGaps)
+            # freqs = np.fft.fftfreq(len(sortedGaps), d=np.mean(np.diff(sortedAngles))) / np.pi
+            # axFourier.scatter(freqs, np.abs(gapFft), label=f"{int(state)}")
 
         axAngular.set_title(title)
         axAngular.legend(title="n", loc="upper right")

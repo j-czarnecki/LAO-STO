@@ -1,0 +1,7 @@
+runsDir: KTO-SC/NicolasDosFitting/J2_0mT
+dosExpPath: /net/people/plgrid/plgjczarnecki/NicolasFit/J2_exp_0mT.dat
+eMax: 0.25
+bounds:
+  - [-0.3, 0.3] #gamma1
+  - [-0.3, 0.3] #gamma2
+  - [-0.3, 0.3] #gamma3

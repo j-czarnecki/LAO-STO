@@ -5,13 +5,10 @@ from GammaAndFillingPlotter import *
 
 SCRATCH_PATH = os.getenv("SCRATCH")
 
-SCRATCH_PATH = os.getenv("SCRATCH")
-
-
 def plotGammas():
     eMin = -1053
-    # eMin = -1480
-    # eMin = 0
+    #eMin = -1480
+    #eMin = 0
     gammaAndFillingPlotter = GammaAndFillingPlotter(
         runsPath=os.path.join(SCRATCH_PATH, "STO-SC", "LAO-STO-E_Fermi_J_SC_J_SC_NNN"),
         # runsPath=os.path.join(
@@ -31,19 +28,19 @@ def plotGammas():
     gammaAndFillingPlotter.sortData()
     gammaAndFillingPlotter.CalculateSymmetryGamma()
     gammaAndFillingPlotter.getMaxvalSymmetrizedGamma()
-    gammaAndFillingPlotter.plotGammasFermi()
+    #gammaAndFillingPlotter.plotGammasFermi(continuousColor=False, eMax=150)
     #gammaAndFillingPlotter.plotGammasSingleTripletFermi(eMax = 150)
     #gammaAndFillingPlotter.plotSymmetryRatios(eMax=100)
-    gammaAndFillingPlotter.plotNnnGammasFermi()
+    gammaAndFillingPlotter.plotNnnGammasFermi(eMax=150)
     #gammaAndFillingPlotter.plotNnnSymmetryRatios(eMax = 100)
     # gammaAndFillingPlotter.plotNnnGammasSingleTripletFermi(eMax=150)
     # gammaAndFillingPlotter.plotGammaFermiUnsymmetrized()
-    # gammaAndFillingPlotter.plotFillingFermi()
+    #gammaAndFillingPlotter.plotFillingFermi()
     # gammaAndFillingPlotter.plotGammasJ()
     # gammaAndFillingPlotter.plotFillingFermi()
     #gammaAndFillingPlotter.plotGammasTemperature()
-    #gammaAndFillingPlotter.plotGammasTemperatureMap(eMax = 120)
-    #gammaAndFillingPlotter.plotNnnGammasTemperatureMap(eMax = 120)
+    #gammaAndFillingPlotter.plotGammasTemperatureMap(eMax = 150)
+    #gammaAndFillingPlotter.plotNnnGammasTemperatureMap(eMax = 150)
 
 
 def plotDispersions():
@@ -66,13 +63,18 @@ def plotDispersions():
     #             title=rf"$E_\text{{Fermi}} = {ef - eMin}$~meV",
     #         )
 
-    # for ef in [-1280, -1320, -1400]:
-    #     dispersionPlotter.LoadSuperconductingGap(
-    #         os.path.join(SCRATCH_PATH, f"RUN_E_Fermi_{ef}.0_J_SC_200.0", "OutputData", "SuperconductingGap.dat")
-    #     )
-    #     dispersionPlotter.plotSuperconductingGap(
-    #         postfix=f"_J_100_Ef_{ef}", title=rf"$E_{{Fermi}} = {ef - eMin}$ (meV)"
-    #     )
+    for ef in [-966, -1026]:
+        dispersionPlotter.LoadSuperconductingGap(
+            os.path.join(SCRATCH_PATH,
+                         "STO-SC",
+                         "LAO-STO-E_Fermi_J_SC",
+                         f"RUN_E_Fermi_{ef}.0_J_SC_110.0",
+                         "OutputData",
+                         "SuperconductingGap.dat")
+        )
+        dispersionPlotter.plotSuperconductingGap(
+            postfix=f"Ef_{ef}", title=""
+        )
 
     #dispersionPlotter.LoadDispersion("../OutputData/Energies.dat")
     # for j_sc in range(370, 380, 10):
@@ -99,7 +101,7 @@ def plotDispersions():
     #                     SCRATCH_PATH,
     #                     "KTO-SC",
     #                     "KTO-fit-E_Fermi_100-150meV",
-    #                     f"RUN_E_Fermi_{ef}.0_J_SC_370.0_SUBLATTICES_3_SUBBANDS_2",
+    #                     f"RUN_E_Fermi_{ef}.0_J_SC_360.0_SUBLATTICES_3_SUBBANDS_2",
     #                     "OutputData",
     #                     "DOS.dat"
     #                 ) for ef in fermiList]
@@ -147,9 +149,50 @@ def plotDispersions():
     # )
 
 
+def addMissingBandNumber():
+    runsPath=os.path.join(SCRATCH_PATH, "STO-SC", "LAO-STO-E_Fermi_J_SC_NNN")
+    matchPattern="RUN_.*_J_SC_NNN_100.0"#"RUN_.*"
+    directories = [
+        dir for dir in os.listdir(runsPath) if re.match(matchPattern, dir)
+    ]
+
+    for dir in directories:
+        gammaFile = None
+        if os.path.exists(os.path.join(runsPath, dir, "OutputData", "Gamma_SC_final.dat")):
+            gammaFile = os.path.join(runsPath, dir, "OutputData", "Gamma_SC_final.dat")
+        else:
+            gammaFile = os.path.join(runsPath, dir, "OutputData", "Gamma_SC_iter.dat")
+
+        chargeFile = None
+        if os.path.exists(os.path.join(runsPath, dir, "OutputData", "Charge_dens_final.dat")):
+            chargeFile = os.path.join(runsPath, dir, "OutputData", "Charge_dens_final.dat")
+        else:
+            chargeFile = os.path.join(runsPath, dir, "OutputData", "Charge_dens_iter.dat")
+
+        files = [gammaFile, chargeFile]
+        for file in files:
+            with open(file, 'r+') as f:
+                firstRow = True
+                lines = f.readlines()
+                f.seek(0)
+                for line in lines:
+                    if firstRow:
+                        newLine = f"#band {line}\n"
+                        f.write(newLine)
+                        firstRow = False
+                    else:
+                        line = line.strip()
+                        if line:  # skip empty lines
+                            new_line = f"1  {line}\n"
+                            f.write(new_line)
+                        else:
+                            f.write("\n")
+                f.truncate()
+
 def main():
-    #plotGammas()
-    plotDispersions()
+    plotGammas()
+    #plotDispersions()
+    #addMissingBandNumber()
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import numpy as np
 from DataReaderClass import *
 from SymmetryResolverClass import *
@@ -95,7 +96,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 colorIndex += 1
 
             band, spin, sublat, symmetry = key
-            plt.legend(title=r"$E_{F}$ (meV)")
+            plt.legend(title=r"$\mu$ (meV)")
             plt.xlabel(r"$J$ (meV)")
             plt.ylabel(
                 rf"{self.__getNearestNeighborGammaLabel(sublat, symmetry, spin)} (meV)",
@@ -108,7 +109,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
             )
             plt.close()
 
-    def plotGammasFermi(self, eMax: float = None):
+    def plotGammasFermi(self, eMax: float = None, continuousColor: bool = False):
         secondParamValues = [element[1] for element in self.params]
         secondParamValues = sorted(list(set(secondParamValues)))
         self.__setPalette(nColors=len(set(secondParamValues)))
@@ -116,11 +117,18 @@ class GammaAndFillingPlotter(SymmetryResolver):
         ef_plot = []
         n_total_plot = []
 
-        # cmap = plt.cm.viridis
-        # norm = Normalize(vmin=min(secondParamValues), vmax=max(secondParamValues))
+        if continuousColor:
+            cmap = plt.cm.viridis
+            norm = Normalize(vmin=min(secondParamValues), vmax=max(secondParamValues))
 
         for key in self.symmetryKeys:
-            fig, ax1 = plt.subplots(figsize=(7, 5), dpi=400)
+            fig = plt.figure(figsize=(7, 5), dpi=400)
+            # Set up GridSpec (1 row, 1 column, with some spacing)
+            if continuousColor:
+                gs = gridspec.GridSpec(1, 1, figure=fig, left=0.25, right=0.9, top=0.8, bottom=0.2)
+            else:
+                gs = gridspec.GridSpec(1, 1, figure=fig, left=0.25, right=0.95, top=0.8, bottom=0.2)
+            ax1 = fig.add_subplot(gs[0,0])
 
             for secondParam in secondParamValues:
                 gamma_plot = []
@@ -138,9 +146,11 @@ class GammaAndFillingPlotter(SymmetryResolver):
                             self.fillingTotal[i]/12.
                         )
 
-                # color = cmap(norm(secondParam))
-                # ax1.plot(ef_plot, gamma_plot, label=secondParam, color=color)
-                ax1.plot(ef_plot, gamma_plot, label=secondParam)
+                if continuousColor:
+                    color = cmap(norm(secondParam))
+                    ax1.plot(ef_plot, gamma_plot, label=secondParam, color=color, linewidth=2)
+                else:
+                    ax1.plot(ef_plot, gamma_plot, label=secondParam)
 
             band, spin, sublat, symmetry = key
 
@@ -151,13 +161,13 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 rf"{self.__getNearestNeighborGammaLabel(sublat, symmetry, spin)} (meV)",
                 labelpad=20,
             )
-
-            ax1.legend(title=r"$U$ (meV)", loc="best")
-
-            # sm = ScalarMappable(cmap=cmap, norm=norm)
-            # sm.set_array([])  # Required for ScalarMappable
-            # colorbar = fig.colorbar(sm, ax=ax1)
-            # colorbar.set_label(r"$J$ (meV)")  # Update label as needed
+            if continuousColor:
+                sm = ScalarMappable(cmap=cmap, norm=norm)
+                sm.set_array([])  # Required for ScalarMappable
+                colorbar = fig.colorbar(sm, ax=ax1)
+                colorbar.set_label(r"$J$ (meV)")  # Update label as needed
+            else:
+                ax1.legend(title=r"$J$ (meV)", loc="best")
 
             # Do this as a last step and trigger plt.draw() so that the ticks are already set in their final form
             plt.draw()
@@ -216,7 +226,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
 
             ax1.set_ylim(top=1.02 * self.maxval)
             ax1.set_xlim(right=eMax if eMax != None else max(ef_plot))
-            ax1.set_xlabel(r"$E_{F}$ (meV)")
+            ax1.set_xlabel(r"$\mu$ (meV)")
             ax1.set_ylabel(
                 rf"{self.__getNearestNeighborSingletTripletGammaLabel(sublat, symmetry, spin)} (meV)",
                 labelpad=10,
@@ -245,6 +255,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
             #     r"$n $ (10\textsuperscript{14} cm\textsuperscript{-2})", labelpad=10
             # )  # Customize units as needed
             ax2.set_xlabel(r"$n$", labelpad = 16)
+
             plt.savefig(
                 f"../Plots/GammaFermiSingletTriplet_band{band}_spin{spin}_lat{sublat}_{symmetry}.png",
                 bbox_inches="tight"
@@ -287,7 +298,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
 
             ax1.set_ylim(top=1.02 * self.maxval)
             ax1.set_xlim(right=eMax if eMax != None else max(ef_plot))
-            ax1.set_xlabel(r"$E_{F}$ (meV)")
+            ax1.set_xlabel(r"$\mu$ (meV)")
             ax1.set_ylabel(
                 rf"{self.__getNextNearestNeighborSingletTripletGammaLabel(sublat, symmetry, spin)} (meV)",
                 labelpad=10,
@@ -316,6 +327,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
             #     r"$n $ (10\textsuperscript{14} cm\textsuperscript{-2})", labelpad=10
             # )  # Customize units as needed
             ax2.set_xlabel(r"$n$", labelpad = 16)
+
             plt.savefig(
                 f"../Plots/nnnGammaFermiSingletTriplet_band{band}_spin{spin}_lat{sublat}_{symmetry}.png",
                 bbox_inches="tight"
@@ -389,7 +401,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 ax1.plot(ef_plot, gammaD2Ratio, label=r"$d_2$", marker=7, markersize=6)
 
                 ax1.legend(title=r"$\xi$", loc="center left")
-                ax1.set_xlabel(r"$E_F$ (meV)")
+                ax1.set_xlabel(r"$\mu$ (meV)")
                 ax1.set_ylabel(r"$\Gamma^\xi$ (\%)", labelpad=16)
                 ax1.set_ylim(bottom=0, top=100)
                 ax1.set_xlim(left=6, right=eMax if eMax != None else max(ef_plot))
@@ -410,6 +422,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 # ax2.set_xlabel(
                 #     r"$n $ (10\textsuperscript{14} cm\textsuperscript{-2})", labelpad=10
                 # )  # Customize units as needed
+
                 plt.savefig(
                     f"../Plots/GammaSymmetryRatios_band{band}_spin{spin}_lat{sublat}_J_SC_{secondParam}.png"
                 )
@@ -487,7 +500,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
 
                 band, spin, sublat = key
                 ax1.legend(title=r"$\xi$", loc="center left")
-                ax1.set_xlabel(r"$E_{F}$ (meV)")
+                ax1.set_xlabel(r"$\mu$ (meV)")
                 ax1.set_ylabel(r"$\Gamma^\xi$ (\%)", labelpad=20)
                 ax1.set_ylim(bottom=0, top=100)
                 ax1.set_xlim(left=6, right=eMax if eMax != None else max(ef_plot))
@@ -508,6 +521,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 #     r"$n $ (10\textsuperscript{14} cm\textsuperscript{-2})", labelpad=10
                 # )  # Customize units as needed
                 ax2.set_xlabel(r"$n$", labelpad = 16)
+
                 plt.savefig(
                     f"../Plots/nnnGammaSymmetryRatios_band{band}_spin{spin}_lat{sublat}_J_SC_{secondParam}.png"
                 )
@@ -539,7 +553,10 @@ class GammaAndFillingPlotter(SymmetryResolver):
             )
 
         for key in self.symmetryKeys:
-            fig, ax1 = plt.subplots(figsize=(7, 5), dpi=400)
+            fig = plt.figure(figsize=(7, 5), dpi=400)
+            # Set up GridSpec (1 row, 1 column, with some spacing)
+            gs = gridspec.GridSpec(1, 1, figure=fig, left=0.15, right=0.95, top=0.95, bottom=0.2)
+            ax1 = fig.add_subplot(gs[0,0])
             for thirdParam in thirdParamValues:
                 if matchThirdParam is not None:
                     if thirdParam not in matchThirdParam:
@@ -574,7 +591,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
             sm = ScalarMappable(cmap=cmap, norm=norm)
             sm.set_array([])  # Required for ScalarMappable
             colorbar = fig.colorbar(sm, ax=ax1)
-            colorbar.set_label(r"$E_{F}$ (meV)")  # Update label as needed
+            colorbar.set_label(r"$\mu$ (meV)")  # Update label as needed
 
             plt.savefig(
                 f"../Plots/GammaTemperature_band{band}_spin{spin}_lat{sublat}_{symmetry}.png"
@@ -592,29 +609,35 @@ class GammaAndFillingPlotter(SymmetryResolver):
         thirdParamValues = sorted(list(set(thirdParamValues)))
 
         for key in self.symmetryKeys:
-            fig, ax1 = plt.subplots(figsize=(7, 5), dpi=400)
+            fig = plt.figure(figsize=(7, 5), dpi=400)
+            # Set up GridSpec (1 row, 1 column, with some spacing)
+            gs = gridspec.GridSpec(1, 1, figure=fig, left=0.2, right=0.8, top=0.8, bottom=0.25)
+            ax1 = fig.add_subplot(gs[0,0])
 
             for secondParam in secondParamValues:
                 T = []
                 Ef = []
                 Gap = []
-                N_total = []
+                Ef_T0 = []
+                N_total_T0 = []
                 for thirdParam in thirdParamValues:
                     for i in range(len(self.params)):
                         if int(self.params[i][1]) == secondParam:
                             T.append(self.params[i][0])
                             Ef.append(self.params[i][2] - self.eMinimal)
                             Gap.append(np.abs(self.symmetryGammaDict[key][i]))
-                            N_total.append(
-                                # self.__calculateFillingPerCm2(
-                                #     self.fillingTotal[i], self.a_tilde
-                                # )
-                                self.fillingTotal[i] / 12
-                            )
+                            if self.params[i][0] == self.params[0][0]:
+                                Ef_T0.append(self.params[i][2] - self.eMinimal)
+                                N_total_T0.append(
+                                    # self.__calculateFillingPerCm2(
+                                    #     self.fillingTotal[i], self.a_tilde
+                                    # )
+                                    self.fillingTotal[i] / 12
+                                )
+
 
                 T_unique = np.unique(T)  # Find unique T values
                 Ef_unique = np.unique(Ef)  # Find unique Ef values
-                N_total_unique = np.unique(N_total)
                 Ef_grid, T_grid = np.meshgrid(Ef_unique, T_unique)
 
                 points = np.array([Ef, T]).T
@@ -624,11 +647,11 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 )
 
                 colormesh = ax1.pcolormesh(
-                    Ef_grid, T_grid, Gap_grid, cmap="inferno", norm=PowerNorm(gamma=0.8)
+                    Ef_grid, T_grid, Gap_grid, cmap="inferno", norm=PowerNorm(gamma=.8, vmin=0.0, vmax=self.maxval)
                 )
 
                 band, spin, sublat, symmetry = key
-                ax1.set_xlabel(rf"$E_{{F}}$ (meV)")
+                ax1.set_xlabel(rf"$\mu$ (meV)")
                 ax1.set_ylabel(rf"T (K)")
                 ax1.set_xlim(left=0, right=eMax if eMax != None else max(Ef))
 
@@ -641,7 +664,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 ax1_ticks = ax1.get_xticks()
                 # Plot secondary axis for occupation
                 tick_labels = np.interp(
-                    ax1_ticks, Ef, N_total
+                    ax1_ticks, Ef_T0, N_total_T0
                 )  # Interpolate the mapping
                 ax2 = ax1.secondary_xaxis("top")
                 ax2.set_xticks(ax1_ticks)  # Use the same positions as `ef_plot`
@@ -674,29 +697,34 @@ class GammaAndFillingPlotter(SymmetryResolver):
         thirdParamValues = sorted(list(set(thirdParamValues)))
 
         for key in self.nnnSymmetryKeys:
-            fig, ax1 = plt.subplots(figsize=(7, 5), dpi=400)
+            fig = plt.figure(figsize=(7, 5), dpi=400)
+            # Set up GridSpec (1 row, 1 column, with some spacing)
+            gs = gridspec.GridSpec(1, 1, figure=fig, left=0.2, right=0.8, top=0.8, bottom=0.25)
+            ax1 = fig.add_subplot(gs[0,0])
 
             for secondParam in secondParamValues:
                 T = []
                 Ef = []
                 Gap = []
-                N_total = []
+                N_total_T0 = []
+                Ef_T0 = []
                 for thirdParam in thirdParamValues:
                     for i in range(len(self.params)):
                         if int(self.params[i][1]) == secondParam:
                             T.append(self.params[i][0])
                             Ef.append(self.params[i][2] - self.eMinimal)
                             Gap.append(np.abs(self.nnnSymmetryGammaDict[key][i]))
-                            N_total.append(
-                                # self.__calculateFillingPerCm2(
-                                #     self.fillingTotal[i], self.a_tilde
-                                # )
-                                self.fillingTotal[i] / 12
-                            )
+                            if self.params[i][0] == self.params[0][0]:
+                                Ef_T0.append(self.params[i][2] - self.eMinimal)
+                                N_total_T0.append(
+                                    # self.__calculateFillingPerCm2(
+                                    #     self.fillingTotal[i], self.a_tilde
+                                    # )
+                                    self.fillingTotal[i] / 12
+                                )
 
                 T_unique = np.unique(T)  # Find unique T values
                 Ef_unique = np.unique(Ef)  # Find unique Ef values
-                N_total_unique = np.unique(N_total)
                 Ef_grid, T_grid = np.meshgrid(Ef_unique, T_unique)
 
                 points = np.array([Ef, T]).T
@@ -706,11 +734,11 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 )
 
                 colormesh = ax1.pcolormesh(
-                    Ef_grid, T_grid, Gap_grid, cmap="inferno", norm=PowerNorm(gamma=0.8)
+                    Ef_grid, T_grid, Gap_grid, cmap="inferno", norm=PowerNorm(gamma=1.2, vmin=0.0, vmax=self.maxval)
                 )
 
                 band, spin, sublat, symmetry = key
-                ax1.set_xlabel(rf"$E_{{F}}$ (meV)")
+                ax1.set_xlabel(rf"$\mu$ (meV)")
                 ax1.set_ylabel(rf"T (K)")
                 ax1.set_xlim(left=0, right=eMax if eMax != None else max(Ef))
 
@@ -723,7 +751,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 ax1_ticks = ax1.get_xticks()
                 # Plot secondary axis for occupation
                 tick_labels = np.interp(
-                    ax1_ticks, Ef, N_total
+                    ax1_ticks, Ef_T0, N_total_T0
                 )  # Interpolate the mapping
                 ax2 = ax1.secondary_xaxis("top")
                 ax2.set_xticks(ax1_ticks)  # Use the same positions as `ef_plot`
@@ -738,7 +766,6 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 ax1.tick_params(axis="x", direction="out")
                 ax1.tick_params(axis="y", direction="out")
                 ax2.tick_params(axis="x", direction="out")
-
                 plt.savefig(
                     f"../Plots/nnnGammaTemperatureMap{secondParam}_band{band}_spin{spin}_lat{sublat}_{symmetry}.png"
                 )
@@ -753,7 +780,11 @@ class GammaAndFillingPlotter(SymmetryResolver):
         ef_plot = []
         n_total_plot = []
         for key in self.nnnSymmetryKeys:
-            fig, ax1 = plt.subplots(figsize=(7, 5), dpi=400)
+            fig = plt.figure(figsize=(7, 5), dpi=400)
+            # Set up GridSpec (1 row, 1 column, with some spacing)
+            gs = gridspec.GridSpec(1, 1, figure=fig, left=0.22, right=0.95, top=0.8, bottom=0.2)
+            ax1 = fig.add_subplot(gs[0,0])
+
             for secondParam in secondParamValues:
                 gamma_plot = []
                 ef_plot = []
@@ -773,10 +804,10 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 ax1.plot(ef_plot, gamma_plot, label=secondParam)
 
             band, spin, sublat, symmetry = key
-            ax1.legend(title=r"$J$ (meV)", loc="best")
+            ax1.legend(title=r"$J_{nnn}$ (meV)", loc="best")
             ax1.set_ylim(top=1.02 * self.maxval)
             ax1.set_xlim(left=0, right=eMax if eMax != None else max(ef_plot))
-            ax1.set_xlabel(r"$E_{F}$ (meV)")
+            ax1.set_xlabel(r"$\mu$ (meV)")
             ax1.set_ylabel(
                 rf"{self.__getNextNearestNeighborGammaLabel(sublat, symmetry, spin)} (meV)",
                 labelpad=20,
@@ -805,49 +836,31 @@ class GammaAndFillingPlotter(SymmetryResolver):
     def plotFillingFermi(self):
         secondParamValues = [element[1] for element in self.params]
         secondParamValues = sorted(list(set(secondParamValues)))
+        self.__setPalette(nColors=len(set(secondParamValues)))
 
-        colors = ["black", "blue", "red", "magenta"]
-        colorIndex = 0
-        plt.figure(0)
+        fig = plt.figure(figsize=(7, 5), dpi=400)
+        # Set up GridSpec (1 row, 1 column, with some spacing)
+        gs = gridspec.GridSpec(1, 1, figure=fig, left=0.15, right=0.95, top=0.95, bottom=0.2)
+        ax1 = fig.add_subplot(gs[0,0])
+
         for secondParam in secondParamValues:
-            print(secondParam)
             ef_plot = []
             n_total_plot = []
-            n_chosen_plot_lat1 = []
-            n_chosen_plot_lat2 = []
 
             for i in range(len(self.params)):
                 if int(self.params[i][1]) == int(secondParam):
                     n_total_plot.append(self.fillingTotal[i] / 12.0)
-                    n_chosen_plot_lat1.append(
-                        self.filling[(1, 1, 1)][i] / 12.0
-                    )  # key (spin,sublat,orbital)
-                    n_chosen_plot_lat2.append(self.filling[(1, 2, 1)][i] / 12.0)
-                    # gamma_plot.append(np.abs(symmetryResolver.symmetryGammaDict[key][i]))
                     ef_plot.append(self.params[i][0] - self.eMinimal)
-            plt.plot(
+            ax1.plot(
                 ef_plot,
-                n_chosen_plot_lat1,
+                n_total_plot,
                 "-",
                 label=format(secondParam, ".1f"),
-                color=self.palette[colorIndex],
             )
-            plt.plot(ef_plot, n_chosen_plot_lat2, "--", color=self.palette[colorIndex])
-            colorIndex += 1
 
-        plt.legend(title=r"$U$ (meV)")
-        plt.xlabel(r"$E_{F}$ (meV)")
-        plt.ylabel(r"$n_{orb}$")
-        # plt.grid()
-        plt.savefig(f"../Plots/FillingFermiOrbital.png")
-        plt.close()
-
-        plt.figure(1)
-        plt.plot(ef_plot, n_total_plot, "-", label=secondParam)
-        plt.legend(title=r"$U$ (meV)")
-        plt.xlabel(r"$E_{F}$ (meV)")
-        plt.ylabel(r"$n_{tot}$")
-        plt.grid()
+        ax1.legend(title=r"$U$ (meV)", loc="upper right")
+        ax1.set_xlabel(r"$\mu$ (meV)")
+        ax1.set_ylabel(r"$n$")
         plt.savefig(f"../Plots/FillingFermiTotal.png")
         plt.close()
 
@@ -881,7 +894,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 rf"$\sigma$ = {-spin + 1.5}, $\alpha$ = {sublat}, l = {self.orbitalNameMapping[orbital - 1]}"
             )
             plt.legend(title=r"$J_{SC}$ (meV)")
-            plt.xlabel(r"$E_{F}$ (meV)")
+            plt.xlabel(r"$\mu$ (meV)")
             plt.ylabel(rf"$\Gamma_{neighbor}$ (meV)")
             # plt.grid()
             plt.xlim(right=-900)
@@ -900,7 +913,12 @@ class GammaAndFillingPlotter(SymmetryResolver):
         for band in range(1, max(1, self.subbands) + 1):
             for spin in range(1, 3):
                 for sublat in range(1, self.layerCouplings + 1):
-                    for symmetry in ("s", "f", "p_1", "p_2", "p_3", "p_4", "p_5", "p_6", "d_1", "d_2", "d_3", "d_4", "d_5", "d_6"):
+                    for symmetry in (r"A_1^{(1)}", r"A_1^{(2)}",
+                                     r"A_2^{(1)}",
+                                     r"B_1^{(1)}", r"B_1^{(2)}",
+                                     r"B_2^{(1)}",
+                                     r"E_1^{(1)}", r"E_1^{(2)}", r"E_1^{(3)}", r"E_1^{(4)}", r"E_1^{(5)}", r"E_1^{(6)}",
+                                     r"E_2^{(1)}", r"E_2^{(2)}", r"E_2^{(3)}", r"E_2^{(4)}", r"E_2^{(5)}", r"E_2^{(6)}"):
                         self.symmetryKeys.append(
                             (band, spin, sublat, symmetry)
                         )
@@ -909,7 +927,12 @@ class GammaAndFillingPlotter(SymmetryResolver):
         for band in range(1, max(1, self.subbands) + 1):
             for spin in range(1, 3):
                 for sublat in range(1, self.sublattices + 1):
-                    for symmetry in ("s", "f", "p_1", "p_2", "p_3", "p_4", "p_5", "p_6", "d_1", "d_2", "d_3", "d_4", "d_5", "d_6"):
+                    for symmetry in (r"A_1^{(1)}", r"A_1^{(2)}",
+                                     r"A_2^{(1)}",
+                                     r"B_1^{(1)}", r"B_1^{(2)}",
+                                     r"B_2^{(1)}",
+                                     r"E_1^{(1)}", r"E_1^{(2)}", r"E_1^{(3)}", r"E_1^{(4)}", r"E_1^{(5)}", r"E_1^{(6)}",
+                                     r"E_2^{(1)}", r"E_2^{(2)}", r"E_2^{(3)}", r"E_2^{(4)}", r"E_2^{(5)}", r"E_2^{(6)}"):
                         self.nnnSymmetryKeys.append(
                             (band, spin, sublat, symmetry)
                         )
@@ -931,10 +954,10 @@ class GammaAndFillingPlotter(SymmetryResolver):
         plt.rcParams["font.serif"] = "Computer Modern Roman"
         plt.rcParams["font.sans-serif"] = "Computer Modern Sans serif"
         plt.rcParams["font.monospace"] = "Computer Modern Typewriter"
-        plt.rcParams["axes.titlesize"] = 30
-        plt.rcParams["axes.labelsize"] = 30
-        plt.rcParams["xtick.labelsize"] = 26
-        plt.rcParams["ytick.labelsize"] = 26
+        plt.rcParams["axes.titlesize"] = 36
+        plt.rcParams["axes.labelsize"] = 36
+        plt.rcParams["xtick.labelsize"] = 30
+        plt.rcParams["ytick.labelsize"] = 30
         plt.rcParams["legend.fontsize"] = 20
         plt.rcParams["legend.title_fontsize"] = 24
         # Optionally, add custom LaTeX preamble
@@ -945,7 +968,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
         self.__setPalette()
 
         # Set rcParams for tighter layout
-        plt.rcParams["figure.autolayout"] = True
+        plt.rcParams["figure.autolayout"] = False
         plt.rcParams["figure.constrained_layout.use"] = False
         plt.rcParams["axes.linewidth"] = 1.2
 
@@ -959,10 +982,22 @@ class GammaAndFillingPlotter(SymmetryResolver):
 
         plt.rcParams["axes.xmargin"] = 0.01
 
-    def __setPalette(self, nColors: int = 3, palette: str = "colorblind"):
-        # Choose a seaborn palette
-        # has to specify number of lines
-        self.palette = sns.color_palette(palette, nColors)
+    def __setPalette(self, nColors: int = 3, palette: str = "contrast5"):
+        # Define available custom palettes
+        custom_palettes = {
+            "contrast5": ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd'],
+            "contrast10": ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd','#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'],
+            "contrastScientific9": ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2','#D55E00', '#CC79A7', '#999999', '#000000', '#FFFFFF'],
+        }
+
+        if palette in custom_palettes:
+            base_palette = custom_palettes[palette]
+            # Repeat colors if nColors > palette length
+            self.palette = [base_palette[i % len(base_palette)] for i in range(nColors)]
+        else:
+            # Use seaborn palette
+            self.palette = sns.color_palette(palette, nColors)
+
         # Set the color cycle
         plt.rcParams["axes.prop_cycle"] = plt.cycler(color=self.palette)
 
@@ -992,7 +1027,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
         spinSubstring = (
             f"{self.spinSymbolsMapping[spin - 1]} {self.spinSymbolsMapping[spin % 2]}"
         )
-        return rf"$\Gamma_{{{latSubstring},{symmetry}}}^{{{spinSubstring}}}$"
+        return rf"$\Gamma_{{\alpha \alpha}}^{{{symmetry}}}$"
 
     def __getMaterialsLatticeConstant(self, material: str) -> float:
         """Calculates lattice constant of hexagonal lattice for a given material."""

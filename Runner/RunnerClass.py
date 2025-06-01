@@ -7,9 +7,10 @@ if os.path.exists("/net/home/pwojcik/.local/lib/python2.7/site-packages"):
     sys.path.insert(0, "/net/home/pwojcik/.local/lib/python2.7/site-packages")
 import time
 from RunnerConfigClass import *
-
+import yaml
 
 SCRATCH_PATH = os.getenv('SCRATCH')
+HOME_PATH = os.getenv('HOME')
 
 class Runner(RunnerConfig):
     def __init__(self):
@@ -107,6 +108,59 @@ class Runner(RunnerConfig):
         simulate = subprocess.run(["sbatch", "job.sh"])
         os.chdir(runner_cwd)
 
+    def run_slurm_dos_fitter(self,
+                             fitConfig: dict,
+                             paramValuePairs: list,
+                             material: str,
+                             isAres: bool = False):
+
+        print(fitConfig)
+
+        # Prepare directory structure
+        os.makedirs(os.path.join(SCRATCH_PATH, fitConfig['runsDir']), exist_ok=True)
+        os.makedirs(os.path.join(SCRATCH_PATH, fitConfig['runsDir'], "OutputData"), exist_ok=True)
+        os.makedirs(os.path.join(SCRATCH_PATH, fitConfig['runsDir'], "Plots"), exist_ok=True)
+        os.makedirs(os.path.join(SCRATCH_PATH, fitConfig['runsDir'], "DOS_train"), exist_ok=True)
+        #A dummy charge dens file has to exists for postprocessing
+        subprocess.run(f"cp {os.path.join(HOME_PATH,'LAO-STO', 'OutputData', 'Charge_dens_final.dat')} {os.path.join(SCRATCH_PATH, fitConfig['runsDir'], 'OutputData')}", shell=True, check=True)
+
+        runnerCwd = os.getcwd()
+        os.chdir(fitConfig["runsDir"])
+
+
+
+        self.__create_and_write_input_nml(paramValuePairs, material)
+
+        # Setup postprocessing_input
+        nml = self.LAO_STO_postprocessing_default_nml()
+        nml['dos_calculation']['enable_dos_calc'] = True
+        nml['dos_calculation']['path_to_run_dir_dos'] = f"{fitConfig['runsDir']}/"
+        with open("postprocessing_input.nml", "w") as nml_file:
+            f90nml.write(nml, nml_file, sort=False)
+
+        # Save fitConfig.yaml
+        defaultFitConfig = self.DOS_fitter_yaml()
+        for key in fitConfig:
+            defaultFitConfig[key] = fitConfig[key]
+        with open(os.path.join(SCRATCH_PATH, fitConfig["runsDir"], "fitConfig.yaml"), "w") as f:
+            yaml.dump(defaultFitConfig, f, sort_keys=True)
+
+
+        # setting up slurm script
+        os.chdir(fitConfig["runsDir"])
+        with open("job.sh", "w") as job_file:
+            if isAres:
+                print(self.job_header_ares, file=job_file)
+            else:
+                print(self.job_header, file=job_file)
+
+            print(f"cd {os.path.join(HOME_PATH, 'LAO-STO')}", file=job_file)
+            print(f"python3 -m Fitter.mainFitter --config {os.path.join(fitConfig['runsDir'], 'fitConfig.yaml')}", file=job_file)
+
+        # queue slurm job
+        subprocess.run(["sbatch", "job.sh"], check=True)
+        os.chdir(runnerCwd)
+
     def run_sequential(self):
         """
         Runs jobs sequentialy i.e. output of first job is the starting point for the second etc.
@@ -189,3 +243,19 @@ class Runner(RunnerConfig):
             nml["self_consistency"]["gamma_start"] = 0.0
         if nml["physical_params"]["J_SC_NNN"] == 0.0:
             nml["self_consistency"]["gamma_nnn_start"] = 0.0
+
+    def __create_and_write_input_nml(self, paramValuePairs: list, material: str) -> None:
+        # Getting namelist with parameters
+        nml = f90nml.Namelist()
+        if material == "STO":
+            nml = self.LAO_STO_default_nml()
+        elif material == "KTO":
+            nml = self.LAO_KTO_default_nml()
+
+        for pair in paramValuePairs:
+            nml[pair[0]][pair[1]] = pair[2]  # editing all key-value pairs
+
+        self.__set_derived_values(nml)
+
+        with open("input.nml", "w") as nml_file:
+            f90nml.write(nml, nml_file, sort=False)

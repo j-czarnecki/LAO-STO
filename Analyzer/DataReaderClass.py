@@ -168,7 +168,7 @@ class DataReader:
                 # shutil.rmtree(os.path.join(self.runsPath, dir))
                 # print('Directory removed')
                 continue
-            
+
             namelistPath = os.path.join(self.runsPath, dir, "input.nml")
             with open(namelistPath) as nmlFile:
                 nml = f90nml.read(nmlFile)
@@ -222,7 +222,7 @@ class DataReader:
         """
         Loads DOS data from dosPath.
         """
-        print("---> Loading DOS data")
+        #print("---> Loading DOS data")
         if os.path.exists(dosPath):
             # dispersion = pd.read_fwf(energiesPath, skiprows=1, colspecs=[(0,6), (7,21), (22,36), (37,51), (52, 66), (67, 81), (82, 96), (97, 111), (112,126), (127, 141), (142, 156)])
             self.dosDataframe = pd.read_fwf(

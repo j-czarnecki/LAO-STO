@@ -21,19 +21,19 @@ class RunnerConfig:
             """\
         #!/bin/bash -l
         ## Job name
-        #SBATCH -J STO-SC-T
+        #SBATCH -J DOS-fit-finetune
         ## Number of allocated nodes
         #SBATCH -N 1
         ## Number of tasks per node (by default this corresponds to the number of cores allocated per node)
-        #SBATCH --ntasks-per-node=20
+        #SBATCH --ntasks-per-node=48
         ## Memory allocated per core (default is 5GB), comment if mem for whole job should be taken
         ##SBATCH --mem-per-cpu=3800MB
         ## Memory allocated for whole job, comment if mem-per-cpu should be taken
-        #SBATCH --mem=5GB
+        #SBATCH --mem=16GB
         ## Max task execution time (format is HH:MM:SS)
         #SBATCH --time=72:00:00
         ## Name of grant to which resource usage will be charged
-        #SBATCH -A plglaosto111-cpu
+        #SBATCH -A plgtopoxides-cpu
         ## Name of partition
         #SBATCH -p plgrid
         ## Name of file to which standard output will be redirected
@@ -69,7 +69,8 @@ class RunnerConfig:
                 V_HUB = 0e3, \
                 E_Fermi = -1.0e3, \
                 V_layer = 0.0, 0.0, \
-                Subband_energies = 0.0e3 / \
+                Subband_energies = 0.0e3, \
+                b_field = 0.0, 0.0, 0.0 / \
             &self_consistency \
                 read_gamma_from_file = .FALSE., \
                 path_to_gamma_start = '', \
@@ -99,7 +100,7 @@ class RunnerConfig:
             f"&discretization \
                 k1_steps = 100, \
                 k2_steps = 100, \
-                SUBLATTICES = 2, \
+                SUBLATTICES = 3, \
                 SUBBANDS = 1 / \
             &physical_params \
                 T = 0.0, \
@@ -118,8 +119,9 @@ class RunnerConfig:
                 U_HUB = 0e3, \
                 V_HUB = 0e3, \
                 E_Fermi = -1.0e3, \
-                V_layer = 0.0, 0.0, \
-                Subband_energies = 0.0e3 / \
+                V_layer = 1.946e3, 1.946e3, 1.946e3, \
+                Subband_energies = 0.0e3, \
+                b_field = 0.0, 0.0, 0.0 / \
             &self_consistency \
                 read_gamma_from_file = .FALSE., \
                 path_to_gamma_start = '', \
@@ -150,7 +152,8 @@ class RunnerConfig:
                 enable_sc_gap_calc = .FALSE., \
                 path_to_run_dir_sc_gap = '', \
                 dE_sc_gap = 1e-3, \
-                Nk_points_sc_gap = 10000 / \
+                Nk_points_sc_gap = 4000, \
+                Nk_points_sc_gap_refined = 4 / \
             &chern_number_calculation \
                 enable_chern_number_calc = .FALSE., \
                 path_to_run_dir_chern_number = '', \
@@ -163,11 +166,29 @@ class RunnerConfig:
             &dos_calculation\
                 enable_dos_calc = .FALSE.,\
                 path_to_run_dir_dos = '',\
-                E_DOS_min = -1.,\
-                E_DOS_max = 1.,\
-                dE0 = 1e-3,\
-                zeta_DOS = 2e-3,\
+                E_DOS_min = -0.35,\
+                E_DOS_max = 0.35,\
+                dE0 = 2e-3,\
+                zeta_DOS = 1.5e-2,\
                 include_sc_in_dos = .TRUE.,\
-                Nk_points_dos = 15000 /"
-        )
+                Nk_points_dos = 1000,\
+                Nk_points_dos_refined = 10 /\
+            &gamma_k_calculation \
+                enable_gamma_k_calc = .FALSE., \
+                path_to_run_dir_gamma_k = '/home/pwojcik/LAO-STO/', \
+                Nk_points_gamma_k = 700 /"
+    )
         return params_nml
+
+    def DOS_fitter_yaml(self):
+        fitConfig = {
+            "runsDir": "KTO-SC/NicolasDosFitting/J2_0mT",
+            "dosExpPath": "/net/people/plgrid/plgjczarnecki/NicolasFit/J2_exp_0mT.dat",
+            "eMax": 0.25,
+            "bounds":[
+                [-0.3, 0.3], #gamma1
+                [-0.3, 0.3], #gamma2
+                [-0.3, 0.3] #gamma3
+            ]
+        }
+        return fitConfig
