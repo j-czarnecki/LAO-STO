@@ -103,6 +103,12 @@ LOGICAL :: enable_gamma_k_calc = .FALSE.
 CHARACTER(1000) :: path_to_run_dir_gamma_k = ""
 INTEGER*4 :: Nk_points_gamma_k = 0
 
+!Projections calculation
+LOGICAL :: enable_projections_calc = .FALSE.
+CHARACTER(1000) :: path_to_run_dir_projections = ""
+INTEGER*4 :: Nr_points_projections
+INTEGER*4 :: Nphi_points_projections
+
 NAMELIST /physical_params/  &
 & T,                        &
 & t_D,                      &
@@ -185,6 +191,12 @@ NAMELIST /gamma_k_calculation/ &
 & enable_gamma_k_calc, &
 & path_to_run_dir_gamma_k, &
 & Nk_points_gamma_k
+
+NAMELIST /projections_calculation/ &
+& enable_projections_calc, &
+& path_to_run_dir_projections, &
+& Nr_points_projections, &
+& Nphi_points_projections
 
 CONTAINS
 SUBROUTINE GET_INPUT(nmlfile)
@@ -393,13 +405,48 @@ SUBROUTINE GET_POSTPROCESSING_INPUT(nmlfile)
     IF (path_to_run_dir_gamma_k == "") STOP "path_to_run_dir_gamma_k must not be empty"
   END IF
 
+  READ (9, NML=projections_calculation)
+  IF (enable_projections_calc) THEN
+    IF (Nr_points_projections .LE. 0) STOP "Nr_points_projections must be > 0"
+    IF (Nphi_points_projections .LE. 0) STOP "Nphi_points_projections must be > 0"
+    IF (path_to_run_dir_projections == "") STOP "path_to_run_dir_projections must not be empty"
+  END IF
+
   CLOSE (9)
 
 END SUBROUTINE GET_POSTPROCESSING_INPUT
 
+SUBROUTINE GET_SAFE_GAMMA_SC(Gamma_SC, input_path)
+  !! This subroutine tries to read the Gamma_SC file from self-consistent simulation, checking for final result first,
+  !! then checking the latest iteration file, and logging an error if neither is found.
+  COMPLEX*16, INTENT(OUT) :: Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, 2, LAYER_COUPLINGS, SUBBANDS) !! Gamma array to be filled
+  CHARACTER(LEN=*), INTENT(IN) :: input_path !! input path in which to look for the Gamma file
+  LOGICAL :: file_exists !! whether the file exists or not
+
+  !Read Gammas
+  !Check the convergent simulation first
+  INQUIRE (FILE=TRIM(input_path)//"OutputData/Gamma_SC_final.dat", EXIST=file_exists)
+  IF (file_exists) THEN
+    CALL GET_GAMMA_SC(Gamma_SC, TRIM(input_path)//"OutputData/Gamma_SC_final.dat")
+  ELSE
+    !Check the non-convergent simulation latest iteration
+    INQUIRE (FILE=TRIM(input_path)//"OutputData/Gamma_SC_iter.dat", EXIST=file_exists)
+    IF (file_exists) THEN
+      CALL GET_GAMMA_SC(Gamma_SC, TRIM(input_path)//"OutputData/Gamma_SC_iter.dat")
+    ELSE
+      !No other file could have been produced, no Gamma file found
+      WRITE (log_string, *) "No Gamma file found"
+      LOG_ERROR(log_string)
+    END IF
+  END IF
+
+END SUBROUTINE GET_SAFE_GAMMA_SC
+
 SUBROUTINE GET_GAMMA_SC(Gamma_SC, path)
-  CHARACTER(LEN=*), INTENT(IN) :: path
-  COMPLEX*16, INTENT(OUT) :: Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, 2, LAYER_COUPLINGS, SUBBANDS)
+  !! This subroutine reads the Gamma_SC file from self-consistent simulation at given path.
+  !! User should check if the file exists before calling this subroutine
+  CHARACTER(LEN=*), INTENT(IN) :: path !! path from which to read Gamma file
+  COMPLEX*16, INTENT(OUT) :: Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, 2, LAYER_COUPLINGS, SUBBANDS) !! Gamma to be filled
   INTEGER*4 :: n, lat, orb, spin, band
   INTEGER*4 :: n_read, lat_read, orb_read, spin_read, band_read
   REAL*8 :: Gamma_re, Gamma_im
@@ -451,9 +498,31 @@ SUBROUTINE GET_GAMMA_SC(Gamma_SC, path)
 
 END SUBROUTINE GET_GAMMA_SC
 
+SUBROUTINE GET_SAFE_CHARGE_DENS(Charge_dens, input_path)
+  !! This subroutine tries to read the Chargen_dens file from self-consistent simulation, checking for final result first,
+  !! then checking the latest iteration file, and logging an error if neither is found.
+  REAL*8, INTENT(OUT) :: Charge_dens(DIM_POSITIVE_K, SUBBANDS) !! Charge density to be filled
+  CHARACTER(LEN=*), INTENT(IN) :: input_path !! Input path in which to look for Charge file
+  LOGICAL :: file_exists !! Whether the file exists or not
+  !Read charges
+  INQUIRE (FILE=TRIM(input_path)//"OutputData/Charge_dens_final.dat", EXIST=file_exists)
+  IF (file_exists) THEN
+    CALL GET_CHARGE_DENS(Charge_dens, TRIM(input_path)//"OutputData/Charge_dens_final.dat")
+  ELSE
+    INQUIRE (FILE=TRIM(input_path)//"OutputData/Charge_dens_iter.dat", EXIST=file_exists)
+    IF (file_exists) THEN
+      CALL GET_CHARGE_DENS(Charge_dens, TRIM(input_path)//"OutputData/Charge_dens_iter.dat")
+    ELSE
+      WRITE (log_string, *) "No charge density file found"
+      LOG_ERROR(log_string)
+    END IF
+  END IF
+END SUBROUTINE GET_SAFE_CHARGE_DENS
+
 SUBROUTINE GET_CHARGE_DENS(Charge_dens, path)
-  CHARACTER(LEN=*), INTENT(IN) :: path
-  REAL*8, INTENT(OUT) :: Charge_dens(DIM_POSITIVE_K, SUBBANDS)
+  !! Read a file containing the charge density from given path. Whether file exists has to be checked before.
+  CHARACTER(LEN=*), INTENT(IN) :: path !! Path to file
+  REAL*8, INTENT(OUT) :: Charge_dens(DIM_POSITIVE_K, SUBBANDS) !! Charge density to be filled
   INTEGER*4 :: spin, lat, orb, n, band, band_read
   CHARACTER(LEN=20) :: output_format
 

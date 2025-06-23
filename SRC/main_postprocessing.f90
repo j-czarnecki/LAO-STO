@@ -47,6 +47,12 @@ IF (enable_gamma_k_calc) THEN
   CALL CALCULATE_GAMMA_K(path_to_run_dir_gamma_k, Nk_points_gamma_k)
 END IF
 
+IF (enable_projections_calc) THEN
+  WRITE (log_string, *) "Calculating projections"
+  LOG_INFO(log_string)
+  CALL CALCULATE_PROJECTIONS(path_to_run_dir_projections, Nr_points_projections, Nphi_points_projections)
+END IF
+
 CALL CLOSE_LOGGER()
 
 END PROGRAM main_postprocessing

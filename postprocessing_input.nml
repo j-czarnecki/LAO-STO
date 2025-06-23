@@ -1,8 +1,8 @@
 &sc_gap_calculation
-    enable_sc_gap_calc = .TRUE.,
+    enable_sc_gap_calc = .FALSE.,
     path_to_run_dir_sc_gap = "/home/jczarnecki/LAO-STO/",
     dE_sc_gap = 5e-3,
-    Nk_points_sc_gap = 10000,
+    Nk_points_sc_gap = 4000,
     Nk_points_sc_gap_refined = 20 /
 
 &chern_number_calculation
@@ -13,8 +13,8 @@
 &dispersion_relation_calculation
     enable_dispersion_relation_calc = .FALSE.,
     path_to_run_dir_dispersion_relation = "/home/jczarnecki/LAO-STO/",
-    include_sc_in_dispersion = .FALSE.,
-    Nk_points_dispersion_relation = 300 /
+    include_sc_in_dispersion = .TRUE.,
+    Nk_points_dispersion_relation = 200 /
 
 &dos_calculation
     enable_dos_calc = .FALSE.,
@@ -22,7 +22,7 @@
     E_DOS_min = -.3,
     E_DOS_max = .3,
     dE0 = 0.002,
-    zeta_DOS = 0.015,
+    zeta_DOS = 0.005,
     include_sc_in_dos = .TRUE.,
     Nk_points_dos = 1000,
     Nk_points_dos_refined = 10 /
@@ -30,4 +30,10 @@
 &gamma_k_calculation
     enable_gamma_k_calc = .FALSE.,
     path_to_run_dir_gamma_k = "/home/jczarnecki/LAO-STO/",
-    Nk_points_gamma_k = 500 /
+    Nk_points_gamma_k = 100 /
+
+&projections_calculation
+    enable_projections_calc = .TRUE.,
+    path_to_run_dir_projections = "/home/jczarnecki/LAO-STO/",
+    Nr_points_projections = 50,
+    Nphi_points_projections = 50 /

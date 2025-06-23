@@ -913,12 +913,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
         for band in range(1, max(1, self.subbands) + 1):
             for spin in range(1, 3):
                 for sublat in range(1, self.layerCouplings + 1):
-                    for symmetry in (r"A_1^{(1)}", r"A_1^{(2)}",
-                                     r"A_2^{(1)}",
-                                     r"B_1^{(1)}", r"B_1^{(2)}",
-                                     r"B_2^{(1)}",
-                                     r"E_1^{(1)}", r"E_1^{(2)}", r"E_1^{(3)}", r"E_1^{(4)}", r"E_1^{(5)}", r"E_1^{(6)}",
-                                     r"E_2^{(1)}", r"E_2^{(2)}", r"E_2^{(3)}", r"E_2^{(4)}", r"E_2^{(5)}", r"E_2^{(6)}"):
+                    for symmetry in self.projector.getSymmetryNames():
                         self.symmetryKeys.append(
                             (band, spin, sublat, symmetry)
                         )
@@ -927,12 +922,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
         for band in range(1, max(1, self.subbands) + 1):
             for spin in range(1, 3):
                 for sublat in range(1, self.sublattices + 1):
-                    for symmetry in (r"A_1^{(1)}", r"A_1^{(2)}",
-                                     r"A_2^{(1)}",
-                                     r"B_1^{(1)}", r"B_1^{(2)}",
-                                     r"B_2^{(1)}",
-                                     r"E_1^{(1)}", r"E_1^{(2)}", r"E_1^{(3)}", r"E_1^{(4)}", r"E_1^{(5)}", r"E_1^{(6)}",
-                                     r"E_2^{(1)}", r"E_2^{(2)}", r"E_2^{(3)}", r"E_2^{(4)}", r"E_2^{(5)}", r"E_2^{(6)}"):
+                    for symmetry in self.projector.getSymmetryNames():
                         self.nnnSymmetryKeys.append(
                             (band, spin, sublat, symmetry)
                         )

@@ -304,13 +304,17 @@ class DispersionPlotter(DataReader):
         Plots subsequent DOSes on top of each other. User should provide a new LoadDos call for each DOS.
         Moreover list of parameters from which color should be deduced has to be provided.
         """
-        fig, ax = plt.subplots(figsize=(7, 5), dpi=400)
+        gs = gridspec.GridSpec(len(dosDirsList), 1, hspace=-0.3, left=0.1, right=0.9, top=0.95, bottom=0.1)  # negative hspace causes overlap
+        fig = plt.figure(figsize=(8,10))
+        #fig, ax = plt.subplots(figsize=(7, 5), dpi=400, sharex=True)
         cmap = plt.cm.viridis
         norm = Normalize(vmin=min(colorParamList), vmax=max(colorParamList))
-
-        for dir in dosDirsList:
+        axes = []
+        for i, dir in enumerate(dosDirsList[::-1]):
+            ax = fig.add_subplot(gs[i, 0])
+            axes.append(ax)
             self.LoadDos(dir)
-            self.dosDataframe["DOS"] = self.dosDataframe["DOS"] / 1e14
+            self.dosDataframe["DOS"] = self.dosDataframe["DOS"]
             color = cmap(norm(colorParamList[dosDirsList.index(dir)]))
             self.plotDos(
                 eMax,
@@ -321,15 +325,26 @@ class DispersionPlotter(DataReader):
                 ax=ax,
                 color=color,
             )
+            ax.set_facecolor("none")
+            ax.set_yticks([])
+            ax.set_xlim(left=-eMax, right=eMax)
+
+            if i != 0:
+                ax.spines['top'].set_visible(False)
+                ax.tick_params(top=False)
+            if i != len(dosDirsList) - 1:
+                ax.set_xticks([])
+                ax.spines['bottom'].set_visible(False)
+            else:
+                ax.set_xlabel(r"E (meV)")
+
 
         sm = ScalarMappable(cmap=cmap, norm=norm)
         sm.set_array([])  # Required for ScalarMappable
-        colorbar = fig.colorbar(sm, ax=ax)
+        colorbar = fig.colorbar(sm, ax=axes)
         colorbar.set_label(r"$\mu$ (meV)")  # Update label as needed
 
-        ax.set_xlim(left=-eMax, right=eMax)
-        ax.set_xlabel(r"E (meV)")
-        ax.set_ylabel(r"DOS (a.u.)")
+        fig.text(0.04, 0.5, r"DOS (a.u.)", va='center', rotation='vertical')
         plt.savefig(plotOutputPath)
         plt.close()
 
@@ -684,6 +699,7 @@ class DispersionPlotter(DataReader):
         plt.rcParams["axes.labelsize"] = 30
         plt.rcParams["xtick.labelsize"] = 26
         plt.rcParams["ytick.labelsize"] = 26
+        plt.rcParams["font.size"] = 26
         plt.rcParams["legend.fontsize"] = 20
         plt.rcParams["legend.title_fontsize"] = 24
         # Optionally, add custom LaTeX preamble

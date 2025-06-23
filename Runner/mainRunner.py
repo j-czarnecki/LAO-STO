@@ -107,7 +107,7 @@ def configureAndRunPostprocessing():
         nmlDirectoryDos = ("dos_calculation", "path_to_run_dir_dos", dir)
         nmlDirectoryGammaK = ("gamma_k_calculation", "path_to_run_dir_gamma_k", dir)
         runner.run_slurm_postprocessing(
-            dir, [enable_sc, nmlDirectorySC, enable_gamma_k, nmlDirectoryGammaK], True
+            dir, [enable_sc, nmlDirectorySC, enable_gamma_k, nmlDirectoryGammaK], False
         )
 
 
@@ -207,8 +207,8 @@ def runDosFitting():
 def main():
     #runTemperatureDependence()
     #configureAndRunSc()
-    #configureAndRunPostprocessing()
-    runDosFitting()
+    configureAndRunPostprocessing()
+    #runDosFitting()
 
 if __name__ == "__main__":
     main()

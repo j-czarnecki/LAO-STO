@@ -100,8 +100,11 @@ tsan: $(TARGET)
 
 post: $(POSTPROCESSING_TARGET)
 
-post_debug: F90FLAGS = -O0 -g -fpp -DDEBUG -module $(MOD_DIR) -debug all -traceback -check bounds $(LIB_OPENMP) $(READ_OLD_FLAG)
+post_debug: F90FLAGS = -O0 -g -fpp -DDEBUG -module $(MOD_DIR) -debug all -fpe0 -fstack-protector -traceback -check bounds,pointers $(LIB_OPENMP) $(READ_OLD_FLAG)
 post_debug:	$(POSTPROCESSING_TARGET)
+
+post_tsan: F90FLAGS = -O0 -g -fpp -DDEBUG -fsanitize=thread $(LIB_OPENMP) $(READ_OLD_FLAG)
+post_tsan: $(POSTPROCESSING_TARGET)
 
 test:
 	mkdir -p $(SRC_DIR)/test/$(MOD_DIR)

@@ -21,14 +21,14 @@
     j_sc_prime_nnn = 30.0
     u_hub = 0.0
     v_hub = 0.0
-    e_fermi = -20.0
+  e_fermi = 300
     v_layer = 1946.0, 1946.0, 1946.0
     subband_energies = 0.0
     b_field = 0.0, 0.0, 0.0
 /
 
 &self_consistency
-    read_gamma_from_file = .true.
+    read_gamma_from_file = .false.
     path_to_gamma_start = '/home/jczarnecki/LAO-STO/OutputData/Gamma_SC_final.dat'
     read_charge_from_file = .false.
     path_to_charge_start = ''
@@ -36,7 +36,7 @@
     gamma_nnn_start = 1.0
     charge_start = 0.1
     max_sc_iter = 1
-    sc_alpha = 1.0
+    sc_alpha = 0.2
     sc_alpha_adapt = 1.0
     gamma_eps_convergence = 0.01
     charge_eps_convergence = 0.01
@@ -45,8 +45,8 @@
 &romberg_integration
     romb_eps_x = 0.01
     interpolation_deg_x = 3
-    max_grid_refinements_x = 10
+    max_grid_refinements_x = 6
     romb_eps_y = 0.01
     interpolation_deg_y = 3
-    max_grid_refinements_y = 10
+    max_grid_refinements_y = 6
 /
