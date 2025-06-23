@@ -177,12 +177,11 @@ class ProjectorC3v(Projector):
   """ ---------------------------------------------------------------------------------- """
   def getSymmetryNames(self) -> tuple[str, ...]:
     symmetries = (r"A_1^{(1)}", r"A_1^{(2)}", r"A_1^{(3)}", r"A_1^{(4)}",
-                  r"A_2^{(1)}", r"A_2^{(2)}"
+                  r"A_2^{(1)}", r"A_2^{(2)}",
                   r"E^{(1)}", r"E^{(2)}", r"E^{(3)}", r"E^{(4)}", r"E^{(5)}", r"E^{(6)}",
                   r"E^{(7)}", r"E^{(8)}", r"E^{(9)}", r"E^{(10)}", r"E^{(11)}", r"E^{(12)}")
     return symmetries
 
-  
   def getCallbacks(self) -> list[Callable[[list[np.complex128]], np.complex128]]:
       symmetryCallbacks = [
         self.A1Projection1,
