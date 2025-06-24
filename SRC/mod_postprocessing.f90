@@ -96,22 +96,6 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_poi
     END IF
   END IF
 
-  Gamma_SC(:, :, :, :, :) = 0.0d0
-
-  Gamma_SC(1, 1, 1, :, :) = 2 * 0.07 * meV2au
-  Gamma_SC(1, 2, 1, :, :) = -0.07 * meV2au
-  Gamma_SC(1, 3, 1, :, :) = -0.07 * meV2au
-
-  Gamma_SC(2, 1, 1, :, :) = -0.07 * meV2au
-  Gamma_SC(2, 2, 1, :, :) = 2 * 0.07 * meV2au
-  Gamma_SC(2, 3, 1, :, :) = -0.07 * meV2au
-
-  Gamma_SC(3, 1, 1, :, :) = -0.07 * meV2au
-  Gamma_SC(3, 2, 1, :, :) = -0.07 * meV2au
-  Gamma_SC(3, 3, 1, :, :) = 2 * 0.07 * meV2au
-
-  Gamma_SC(:, :, 2, :, :) = -Gamma_SC(:, :, 1, :, :)
-
   !Computing k-independent terms
   CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:, :))
   CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:, :))
@@ -745,22 +729,6 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
     CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
   END IF
 
-  Gamma_SC(:, :, :, :, :) = 0.0d0
-
-  Gamma_SC(1, 1, 1, :, :) = 0.07 * meV2au
-  Gamma_SC(1, 2, 1, :, :) = 0.07 * meV2au
-  Gamma_SC(1, 3, 1, :, :) = 0.07 * meV2au
-
-  Gamma_SC(2, 1, 1, :, :) = 0.07 * meV2au
-  Gamma_SC(2, 2, 1, :, :) = 0.07 * meV2au
-  Gamma_SC(2, 3, 1, :, :) = 0.07 * meV2au
-
-  Gamma_SC(3, 1, 1, :, :) = 0.07 * meV2au
-  Gamma_SC(3, 2, 1, :, :) = 0.07 * meV2au
-  Gamma_SC(3, 3, 1, :, :) = 0.07 * meV2au
-
-  Gamma_SC(:, :, 2, :, :) = -Gamma_SC(:, :, 1, :, :)
-
   INQUIRE (FILE=TRIM(inputPath)//"OutputData/Charge_dens_final.dat", EXIST=fileExists)
   IF (fileExists) THEN
     CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
@@ -1125,23 +1093,6 @@ SUBROUTINE CALCULATE_PROJECTIONS(input_path, n_r_points, n_phi_points)
   CALL GET_SAFE_GAMMA_SC(Gamma_SC, input_path)
   CALL GET_SAFE_CHARGE_DENS(Charge_dens, input_path)
 
-  Gamma_SC(:, :, :, :, :) = 0.0d0
-
-  !Gamma_SC(:, :, 1, :, :) = 1.*meV2au
-  Gamma_SC(1, 1, 1, :, :) = 2 * 1 * meV2au
-  Gamma_SC(1, 2, 1, :, :) = -1 * meV2au
-  Gamma_SC(1, 3, 1, :, :) = -1 * meV2au
-
-  Gamma_SC(2, 1, 1, :, :) = -1 * meV2au
-  Gamma_SC(2, 2, 1, :, :) = 2 * 1 * meV2au
-  Gamma_SC(2, 3, 1, :, :) = -1 * meV2au
-
-  Gamma_SC(3, 1, 1, :, :) = -1 * meV2au
-  Gamma_SC(3, 2, 1, :, :) = -1 * meV2au
-  Gamma_SC(3, 3, 1, :, :) = 2 * 1 * meV2au
-
-  Gamma_SC(:, :, 2, :, :) = -Gamma_SC(:, :, 1, :, :)
-
   CALL GET_REAL_SPACE_PROJECTIONS(Projections_real_space, Gamma_SC)
   DO n = 1, N_PROJECTIONS
     PRINT *, "Projection real space ", TRIM(ADJUSTL(Projections_name_mapping(n))), " = ", Projections_real_space(n) / SUM(Projections_real_space)
@@ -1165,7 +1116,7 @@ SUBROUTINE CALCULATE_PROJECTIONS(input_path, n_r_points, n_phi_points)
   OPEN (unit=gamma_next_weighted_file, FILE=TRIM(input_path)//"OutputData/Gamma_K_next_weighted.dat", FORM="FORMATTED", ACTION="WRITE")
   WRITE (gamma_next_weighted_file, '(A)') "#kx[1/a]   ky[1/a]   Re(Gamma_orb_1)[meV]   Im(Gamma_orb_1)[meV]  Re(Gamma_basis_2)[meV] ... Re(Gamma_weighted)[meV]   Im(Gamma_weighted)[meV]"
 
-  !$omp parallel do collapse(3) schedule(dynamic, 1) private(phi_k, r_k, r_max, dr, kx, ky, Kappa, C_l, Gamma_nearest_orb, Gamma_next_orb, n_triangle, j_phi, i_r, orb, n, Active_orbital)
+  !$omp parallel do collapse(3) schedule(dynamic, 1) private(phi_k, r_k, r_max, dr, kx, ky, Kappa_nearest, Kappa_next, C_l, Gamma_nearest_orb, Gamma_next_orb, n_triangle, j_phi, i_r, orb, n, Active_orbital)
   DO n_triangle = -N_BZ_SECTIONS / 2, N_BZ_SECTIONS / 2 - 1
     DO j_phi = 0, n_phi_points - 1
       DO i_r = 0, n_r_points - 1
@@ -1218,7 +1169,8 @@ SUBROUTINE CALCULATE_PROJECTIONS(input_path, n_r_points, n_phi_points)
         !Project onto basis functions and write basis functions onto which we project
         DO n = 1, N_PROJECTIONS
           !$omp critical (projections_update)
-          Projections_k_space(n) = Projections_k_space(n) + Projections_cb(n) % cb(Kappa_nearest, Gamma_nearest_orb) * r_k * dr * dphi_k
+          Projections_k_space_nearest(n) = Projections_k_space_nearest(n) + Projections_cb(n) % cb(Kappa_nearest, Gamma_nearest_orb) * r_k * dr * dphi_k
+          Projections_k_space_next(n) = Projections_k_space_next(n) + Projections_cb(n) % cb(Kappa_next, Gamma_next_orb) * r_k * dr * dphi_k
           WRITE (FIRST_FILE_UNIT + n - 1, '(2F15.5)', ADVANCE='NO') kx, ky
           DO orb = 1, ORBITALS
             Active_orbital = 0.0d0
@@ -1236,16 +1188,18 @@ SUBROUTINE CALCULATE_PROJECTIONS(input_path, n_r_points, n_phi_points)
   !$omp end parallel do
 
   DO n = 1, N_PROJECTIONS
-    PRINT *, "Projection k-space ", TRIM(ADJUSTL(Projections_name_mapping(n))), " = ", Projections_k_space(n) / SUM(Projections_k_space)
+    PRINT *, "Projection k-space ", TRIM(ADJUSTL(Projections_name_mapping(n))), " = ", Projections_k_space_nearest(n) / SUM(Projections_k_space_nearest)
   END DO
 
   !Writing normalized projections since we are interested only in relative contributions
-  OPEN (unit=gamma_nearest_weighted_file + 1, FILE=TRIM(input_path)//"OutputData/Projections.dat", FORM="FORMATTED", ACTION="WRITE")
-  WRITE (gamma_nearest_weighted_file + 1, '(A)') "#Irrep      ABS(R-space projection)      ABS(K-space projection)"
+  OPEN (unit=gamma_next_weighted_file + 1, FILE=TRIM(input_path)//"OutputData/Projections_nearest.dat", FORM="FORMATTED", ACTION="WRITE")
+  WRITE (gamma_next_weighted_file + 1, '(A)') "#Irrep      ABS(R-space projection)      ABS(K-space projection)"
   DO n = 1, N_PROJECTIONS
-    WRITE (gamma_nearest_weighted_file + 1, '(A, 2F15.5)') Projections_name_mapping(n), ABS(Projections_real_space(n) / SUM(Projections_real_space)), ABS(Projections_k_space(n) / SUM(Projections_k_space))
+    WRITE (gamma_next_weighted_file + 1, '(A, 2F15.5)') Projections_name_mapping(n), &
+    & ABS(Projections_real_space(n) / SUM(Projections_real_space)), ABS(Projections_k_space_nearest(n) / SUM(Projections_k_space_nearest)), &
+    & ABS(Projections_k_space_next(n) / SUM(Projections_k_space_next))
   END DO
-  CLOSE (gamma_nearest_weighted_file + 1)
+  CLOSE (gamma_next_weighted_file + 1)
 
   CLOSE (gamma_nearest_weighted_file)
   CLOSE (gamma_next_weighted_file)
