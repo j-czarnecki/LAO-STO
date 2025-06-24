@@ -12,6 +12,8 @@ from IPython.display import display
 import sys
 import os
 from contextlib import contextmanager
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from matplotlib.patches import Polygon
 
 try:
     from IPython.utils.io import capture_output
@@ -56,23 +58,57 @@ class SymmetryPlotterClass:
     self.__createLamdifiedOrbitalShapeFunctions()
     self.__createCoordinateSystemAndDeltaTabs()
 
-  def plotBasisFunctions(self, irrepsEigenvectors: dict[str, list[tuple[int, int, list[sp.Matrix]]]], enablePrinting=True):
+  def plotBasisFunctions(self, irrepsEigenvectors: dict[str, list[tuple[int, int, list[sp.Matrix]]]], neighbor:str = "nearest", enablePrinting=True):
+    nCols = 2 #Real and imaginary part
+    nRows: dict[str, int] = {}
+    if neighbor == "nearest":
+      maxRows = 4
+    elif neighbor == "next":
+      maxRows = 3
+    else:
+      raise ValueError(f"Neighbor {neighbor} not supported")
+
+    for irrep in irrepsEigenvectors:
+      rowCount = 0
+      for v in irrepsEigenvectors[irrep]:
+        if np.abs(v[0]) == 1:
+          for i in range(v[1]):
+            rowCount += 1
+      nRows[irrep] = rowCount
+
     with initPrinting(enablePrinting):
       for irrep in irrepsEigenvectors:
-        print(irrep)
+        if nRows[irrep] > maxRows:
+          nCols = 2 * nRows[irrep] // maxRows
+          nRows[irrep] = maxRows
+
+        fig, axes = plt.subplots(nRows[irrep], nCols, figsize=(nCols*4, nRows[irrep]*4), sharex=True, sharey=True)
+        row = 0
+        for col in range(0, nCols, 2):
+          axes[row, col].set_title(r"$\mathfrak{Re}$")
+          axes[row, col + 1].set_title(r"$\mathfrak{Im}$")
+          axes[nRows[irrep] - 1, col].set_xticks([-2, 0 , 2])
+          axes[nRows[irrep] - 1, col + 1].set_xticks([-2, 0 , 2])
+          axes[nRows[irrep] - 1, col].set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
+          axes[nRows[irrep] - 1, col + 1].set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
 
         for v in irrepsEigenvectors[irrep]:
+          col = 0
           if np.abs(v[0]) == 1:
             for i in range(v[1]):
-              self.__getSingleBasisFunction(v[2][i])
+              axes[row, 0].set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
+              axes[row, 0].set_yticks([-2, 0 , 2])
+              self.__getSingleBasisFunction(v[2][i], axes[row, col:col + 2], neighbor)
+              row += 1
+              col += 2 * (row // maxRows)
+              row = row % maxRows
 
-        print("------------------------------------------------------------")
-        print("\n")
+        fig.subplots_adjust(wspace=0, hspace=0, left=0, right=1, top=1, bottom=0)
+        plt.show()
 
   def plotOrbitalWeights(self):
     f_yz, f_zx, f_xy = self.fOrbitals
     X, Y = self.kMesh
-    #self.__plotRGBLegend()
 
     #Orbital shape functions
     R_yz = f_yz(X[:-1, :-1], Y[:-1, :-1])
@@ -94,8 +130,14 @@ class SymmetryPlotterClass:
     ax = fig.add_subplot(gs[0,0])
     cax = ax.pcolormesh(X, Y, np.zeros_like(R_yz), color=RGB, shading='flat')
     self.__plotFirstBrillouinZoneBoundary()
+    ax.set_xticks([-2, 0 , 2])
+    ax.set_yticks([-2, 0 , 2])
     ax.set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
     ax.set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
+
+    self.__plotRGBLegend(ax)
+
+
     plt.gca().set_aspect("equal", adjustable="box")
     plt.show()
     plt.close()
@@ -148,13 +190,20 @@ class SymmetryPlotterClass:
     self.N = CoordSys3D('N')
     self.deltaNearestTab = [
       0 * self.N.i - 1 * self.N.j,                                           # (0, -1)
-      sp.sqrt(3)/sp.S(2) * self.N.i - sp.Rational(1, 2) * self.N.j,              # (√3/2, -1/2)
       sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(1, 2) * self.N.j,             # (√3/2, 1/2)
-      -1 * (0 * self.N.i - 1 * self.N.j),                                    # (0, 1)
       -1 * (sp.sqrt(3)/sp.S(2) * self.N.i - sp.Rational(1, 2) * self.N.j),       # (-√3/2, 1/2)
-      -1 * (sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(1, 2) * self.N.j)       # (-√3/2, -1/2)
+      -1 * (0 * self.N.i - 1 * self.N.j),                                    # (0, 1)
+      -1 * (sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(1, 2) * self.N.j),       # (-√3/2, -1/2)
+      sp.sqrt(3)/sp.S(2) * self.N.i - sp.Rational(1, 2) * self.N.j               # (√3/2, -1/2)
     ]
     self.deltaNextTab = [
+      sp.sqrt(3) * self.N.i + 0 * self.N.j,                                  # (√3, 0)
+      sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(3, 2) * self.N.j,              # (√3/2, 3/2)
+      -sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(3, 2) * self.N.j,             # (-√3/2, 3/2)
+      -1 * (sp.sqrt(3) * self.N.i + 0 * self.N.j),                           # (-√3, 0)
+      -1 * (sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(3, 2) * self.N.j),       # (-√3/2, -3/2)
+      -1 * (-sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(3, 2) * self.N.j),       # (√3/2, -3/2)
+      #Second sublattice
       sp.sqrt(3) * self.N.i + 0 * self.N.j,                                  # (√3, 0)
       sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(3, 2) * self.N.j,              # (√3/2, 3/2)
       -sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(3, 2) * self.N.j,             # (-√3/2, 3/2)
@@ -163,53 +212,51 @@ class SymmetryPlotterClass:
       -1 * (-sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(3, 2) * self.N.j)       # (√3/2, -3/2)
     ]
 
-  def __getSingleBasisFunction(self, eigenvec):
+  def __getSingleBasisFunction(self, eigenvec, axes, neighbor):
     N = CoordSys3D('N')
     nOrbs = 3
-    nSites = 6
     k_x, k_y, k_z = self.cartesianKSymbols
     kVec = self.N.i * k_x + self.N.j * k_y + self.N.k * k_z
-
+    orbBasisFunctions = []
+    latexOrbBasisFunctions = []
+    orbKxKyBasisFunctions = []
 
     #Nearest neighbours
-    orbBasisFunctions = []
-    latexOrbBasisFunctions = []
-    orbKxKyBasisFunctions = []
-    for io in range(nOrbs):
-      basisOrb = 0
-      for ir in range(nSites):
-        idx = io * nSites + ir
-        basisOrb += sp.exp(-sp.I * (kVec & self.deltaNearestTab[ir])) * eigenvec[idx]
-      trig = sp.simplify(basisOrb.rewrite(sp.cos))
-      orbKxKyBasisFunctions.append(trig) # To solve for zeros later
-      newBasis = trig.subs(self.substitutionsNearest)
-      orbBasisFunctions.append(newBasis)
-      latexOrbBasisFunctions.append(sp.latex(newBasis))
-    display(orbBasisFunctions)
-    print(latexOrbBasisFunctions)
-    self.__getZerosOfBasisFunction(orbKxKyBasisFunctions)
-
+    if neighbor == 'nearest':
+      nSites = 6
+      for io in range(nOrbs):
+        basisOrb = 0
+        for ir in range(nSites):
+          idx = io * nSites + ir
+          basisOrb += sp.exp(-sp.I * (kVec & self.deltaNearestTab[ir])) * eigenvec[idx]
+        trig = sp.simplify(basisOrb.rewrite(sp.cos))
+        orbKxKyBasisFunctions.append(trig) # To solve for zeros later
+        newBasis = trig.subs(self.substitutionsNearest)
+        orbBasisFunctions.append(newBasis)
+        latexOrbBasisFunctions.append(sp.latex(newBasis))
 
     #Next nearest neighbors
-    orbBasisFunctions = []
-    latexOrbBasisFunctions = []
-    orbKxKyBasisFunctions = []
-    for io in range(nOrbs):
-      basisOrb = 0
-      for ir in range(nSites):
-        idx = io * nSites + ir
-        basisOrb += sp.exp(-sp.I * (kVec & self.deltaNextTab[ir])) * eigenvec[idx]
-      trig = sp.simplify(basisOrb.rewrite(sp.cos))
-      orbKxKyBasisFunctions.append(trig) # To solve for zeros later
-      newBasis = trig.subs(self.substitutionsNext)
-      orbBasisFunctions.append(newBasis)
-      latexOrbBasisFunctions.append(sp.latex(newBasis))
+    if neighbor == 'next':
+      nSites = 12
+      #Next nearest neighbors
+      for io in range(nOrbs):
+        basisOrb = 0
+        for ir in range(nSites):
+          idx = io * nSites + ir
+          basisOrb += sp.exp(-sp.I * (kVec & self.deltaNextTab[ir])) * eigenvec[idx]
+        trig = sp.simplify(basisOrb.rewrite(sp.cos))
+        orbKxKyBasisFunctions.append(trig) # To solve for zeros later
+        newBasis = trig.subs(self.substitutionsNext)
+        orbBasisFunctions.append(newBasis)
+        latexOrbBasisFunctions.append(sp.latex(newBasis))
+
     display(orbBasisFunctions)
     print(latexOrbBasisFunctions)
-    self.__getZerosOfBasisFunction(orbKxKyBasisFunctions)
+
+    self.__getZerosOfBasisFunction(orbKxKyBasisFunctions, axes)
 
 
-  def __getZerosOfBasisFunction(self, orbBasisFunctions):
+  def __getZerosOfBasisFunction(self, orbBasisFunctions, axes):
     """
     Orbitals are stored in the following order:
     d_yz, d_zx, d_xy
@@ -227,34 +274,27 @@ class SymmetryPlotterClass:
 
     Z = f(X, Y)
     Z = Z / np.max(np.abs(Z)) #Normalize
+    norm = TwoSlopeNorm(vmin=-1, vcenter=0, vmax=1)
+    axRe, axIm = axes
 
     for part in ("real", "imag"):
       zPlot = np.zeros(Z.shape)
-      cbarLabel = ""
       if part == "real":
         zPlot = np.real(Z)
-        cbarLabel = r"$\mathfrak{Re}\left( \Gamma  \right)$ (meV)"
+        self.__plotFirstBrillouinZoneBoundary(axRe)
+        axRe.pcolormesh(X, Y, zPlot, cmap='bwr', norm=norm)
+        axRe.contour(X, Y, zPlot, levels=[0], colors='black', linestyles='dotted', linewidths=0.5)
+        axRe.set_aspect("equal")
       elif part == "imag":
         zPlot = np.imag(Z)
-        cbarLabel = r"$\mathfrak{Im}\left( \Gamma  \right)$ (meV)"
+        self.__plotFirstBrillouinZoneBoundary(axIm)
+        axIm.pcolormesh(X, Y, zPlot, cmap='bwr', norm=norm)
+        axIm.contour(X, Y, zPlot, levels=[0], colors='black', linestyles='dotted', linewidths=0.5)
+        axIm.set_aspect("equal")
 
-      norm = TwoSlopeNorm(vmin=-1, vcenter=0, vmax=1)
-      fig = plt.figure(figsize=(7, 5), dpi=100)
-      # Set up GridSpec (1 row, 1 column, with some spacing)
-      gs = gridspec.GridSpec(1, 1, figure=fig, left=0.2, right=0.8, top=0.8, bottom=0.25)
-      ax = fig.add_subplot(gs[0,0])
-      cax = ax.pcolormesh(X, Y, zPlot, cmap='bwr', norm=norm)
-      cbar = fig.colorbar(cax, ax=ax)
-      cbar.set_label(cbarLabel)
-      ax.contour(X, Y, zPlot, levels=[0], colors='black', linestyles='dotted', linewidths=0.5)
 
-      self.__plotFirstBrillouinZoneBoundary()
-      ax.set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
-      ax.set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
-      plt.show()
-      plt.close()
 
-  def __plotFirstBrillouinZoneBoundary(self):
+  def __plotFirstBrillouinZoneBoundary(self, ax = None):
     brillouinZoneVertices = np.zeros((7, 2))  # One more to close the polygon
 
     brillouinZoneVertices[:, 0] = np.array(
@@ -280,17 +320,20 @@ class SymmetryPlotterClass:
         0.0,
       ]
     )
-    plt.plot(
+    if ax == None:
+      ax = plt.gca()
+    ax.plot(
       brillouinZoneVertices[:, 0],
       brillouinZoneVertices[:, 1],
       "--",
       color="black",
       linewidth=1,
     )
+    ax.set_aspect("equal")
 
-  def __plotRGBLegend(self):
+  def __plotRGBLegend(self, parent_ax):
     size = 512
-    image = np.zeros((size, size, 3))
+    image = np.ones((size, size, 3))
 
     # Triangle vertices for RGB channels
     v1 = np.array([1.0, 0.0])  # Red corner
@@ -317,21 +360,41 @@ class SymmetryPlotterClass:
             l1, l2, l3 = barycentric_coords(x_val, y_val)
             if (l1 >= 0) and (l2 >= 0) and (l3 >= 0):  # Inside triangle
                 image[i, j, :] = [l1, l2, l3]
+    # Create inset
+    ax_inset = inset_axes(parent_ax,
+                          width="40%",
+                          height="50%",
+                          bbox_to_anchor=(1.05, 0.0, 1.0, 1.0),
+                          bbox_transform=parent_ax.transAxes,
+                          loc='center left',
+                          borderpad = 0.5)
+    ax_inset.imshow(image, extent=(0, 1, 0, np.sqrt(3)/2), origin='lower')
 
-    # Plot the triangle
-    ax = plt.gca()
-    ax.imshow(image, extent=(0, 1, 0, np.sqrt(3)/2), origin='lower')
+    # Triangle border
+    triangle = Polygon([v1, v2, v3], closed=True, edgecolor='k', fill=False, lw=1)
+    ax_inset.add_patch(triangle)
 
-    # Add triangle border and labels
-    triangle = Polygon([v1, v2, v3], closed=True, edgecolor='k', fill=False, lw=2)
-    ax.add_patch(triangle)
-    ax.text(*v1, r'$d_{yz}$', color='black', ha='right', va='top')
-    ax.text(*v2, r'$d_{zx}$', color='black', ha='left', va='top')
-    ax.text(*v3, r'$d_{xy}$', color='black', ha='center', va='bottom')
+    # Labels
+    ax_inset.text(*(v1 + np.array([0.1, 0.])), r'$yz$', color='black', ha='right', va='top', fontsize=28)
+    ax_inset.text(*(v2 + np.array([-0.1, 0.])), r'$zx$', color='black', ha='left', va='top', fontsize=28)
+    ax_inset.text(*v3, r'$xy$', color='black', ha='center', va='bottom', fontsize=28)
 
-    ax.axis('off')
-    plt.tight_layout()
-    plt.show()
+    ax_inset.axis('off')
+
+    # # Plot the triangle
+    # ax = plt.gca()
+    # ax.imshow(image, extent=(0, 1, 0, np.sqrt(3)/2), origin='lower')
+
+    # # Add triangle border and labels
+    # triangle = Polygon([v1, v2, v3], closed=True, edgecolor='k', fill=False, lw=2)
+    # ax.add_patch(triangle)
+    # ax.text(*v1, r'$d_{yz}$', color='black', ha='right', va='top', fontsize=32)
+    # ax.text(*v2, r'$d_{zx}$', color='black', ha='left', va='top', fontsize = 32)
+    # ax.text(*v3, r'$d_{xy}$', color='black', ha='center', va='bottom', fontsize = 32)
+
+    # ax.axis('off')
+    # plt.tight_layout()
+    # plt.show()
 
   def __setPlotParams(self):
     plt.rcParams["text.usetex"] = True

@@ -22,4 +22,4 @@
 
 #cd Analyzer
 #python3 mainAnalyzer.py
-python3 Analyzer/DosFitter.py
+python3 ./Analyzer/DosFitter.py
