@@ -45,7 +45,7 @@ def plotGammas():
 
 def plotDispersions():
     # eMin = -1053
-    dispersionPlotter = DispersionPlotter(sublattices=3, subbands=1)
+    dispersionPlotter = DispersionPlotter(sublattices=2, subbands=1)
     # for j_sc in [50, 75, 100]:
     #     for ef in [-1026, -966]:
     #         dispersionPlotter.LoadSuperconductingGap(
@@ -76,7 +76,6 @@ def plotDispersions():
     #         postfix=f"Ef_{ef}", title=""
     #     )
 
-    #dispersionPlotter.LoadDispersion("../OutputData/Energies.dat")
     # for j_sc in range(370, 380, 10):
     #     for ef in range(50, 130, 10):
     #         try:
@@ -97,44 +96,60 @@ def plotDispersions():
     #             continue
 
     #fermiList = [ef for ef in range(50,130, 10)]
-    # fermiList = [-60, -40, -20, 0, 20, 60, 100, 140, 200, 250, 300]
+    #fermiList = [30, 50,75, 100, 125, 150, 175, 200]
     # dirsList = [os.path.join(
     #                     "/home",
-    #                     "jczarnecki",
+    #                     "czarnecki",
     #                     "LAO-STO",
     #                     "OutputData",
-    #                     #"DOS_S",
+    #                     "DOS_E2",
     #                     f"DOS_{ef}.dat"
     #                 ) for ef in fermiList]
-    # dispersionPlotter.plotStackedDos(0.2, f"../Plots/DOS_stack_d12.png", False, 8e-2, dirsList, fermiList)
+    # dispersionPlotter.plotStackedDos(0.2, f"../Plots/DOS_stack_E2.png", False, 1e-3, dirsList, fermiList)
+    # fermiList = [50, 100]
+    # for ef in fermiList:
+    #     dispersionPlotter.LoadSuperconductingGap(
+    #         os.path.join(SCRATCH_PATH,
+    #                         "/home",
+    #                         "czarnecki",
+    #                         "LAO-STO",
+    #                         "OutputData",
+    #                         "Gap_A1",
+    #                         f"SuperconductingGap_{ef}.dat")
+    #     )
+    #     dispersionPlotter.plotSuperconductingGap(
+    #         postfix=f"A1_Ef_{ef}", title=""
+    #     )
 
-    # dispersionPlotter.GetStatistics()
-    # dispersionPlotter.shiftEnergies()
 
-    # dispersionPlotter.plotCrossection(
-    #     "../Plots/DispersionSliceKy", 300, "ky", 0.0, 2, True
-    # )
+    dispersionPlotter.LoadDispersion("../OutputData/Energies.dat")
+    dispersionPlotter.GetStatistics()
+    dispersionPlotter.shiftEnergies()
 
-    # dispersionPlotter.plotCrossection(
-    #     "../Plots/DispersionSliceKx", 300, "kx", 0.0, 2, True
-    # )
+    dispersionPlotter.plotCrossection(
+        "../Plots/DispersionSliceKy", 300, "ky", 0.0, 2, False
+    )
+
+    dispersionPlotter.plotCrossection(
+        "../Plots/DispersionSliceKx", 300, "kx", 0.0, 2, False
+    )
 
     #dispersionPlotter.plotFermiCrossection(200, 1.0, "../Plots/FermiSlice200.png")
-    # dispersionPlotter.plotFermiCrossection(100, 2.0, "../Plots/FermiSlice100.png")
+    dispersionPlotter.plotFermiCrossection(50, 2.0, "../Plots")
     # dispersionPlotter.plotFermiCrossection(150, 2.0, "../Plots/FermiSlice150.png")
     # dispersionPlotter.plotFermiCrossection(200, 2.0, "../Plots/FermiSlice200.png")
     # dispersionPlotter.plotFermiCrossection(500, 1.0, "../Plots/FermiSlice500.png")
-    for ef in [-40, 300]:
-        dispersionPlotter = DispersionPlotter(sublattices=3, subbands=1)
-        dispersionPlotter.LoadSuperconductingGap(
-                    os.path.join(
-                        "/home/jczarnecki/LAO-STO",
-                        "OutputData",
-                        f"SuperconductingGap_{ef}.dat",
-                    )
-                )
-        dispersionPlotter.plotSuperconductingGapAngular(postfix=f"_S_{ef}", title=rf"")
-        dispersionPlotter.plotSuperconductingGap(postfix=f"_S_{ef}", title=rf"")
+    # for ef in [-40, 300]:
+    #     dispersionPlotter = DispersionPlotter(sublattices=3, subbands=1)
+    #     dispersionPlotter.LoadSuperconductingGap(
+    #                 os.path.join(
+    #                     "/home/jczarnecki/LAO-STO",
+    #                     "OutputData",
+    #                     f"SuperconductingGap_{ef}.dat",
+    #                 )
+    #             )
+    #     dispersionPlotter.plotSuperconductingGapAngular(postfix=f"_S_{ef}", title=rf"")
+    #     dispersionPlotter.plotSuperconductingGap(postfix=f"_S_{ef}", title=rf"")
     # dispersionPlotter.LoadDos(
     #                 os.path.join(
     #                     "/home",

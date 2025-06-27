@@ -1,4 +1,4 @@
-MODULE mod_compute_hamiltonians
+MODULE mod_local_integrand
 USE mod_parameters
 USE mod_utilities
 USE mod_hamiltonians
@@ -30,11 +30,7 @@ SUBROUTINE GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge_dens, 
   Energies(:) = 0.
   Hamiltonian(:, :) = DCMPLX(0., 0.)
   U_transformation(:, :) = DCMPLX(0., 0.)
-  CALL COMPUTE_TBA_TERM(Hamiltonian(:, :), kx, ky)
-  CALL COMPUTE_TI1_TI2(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-  CALL COMPUTE_H_PI(Hamiltonian(:, :), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-  CALL COMPUTE_H_SIGMA(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-  CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:, :), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
+  CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky)
   CALL COMPUTE_HUBBARD(Hamiltonian(:, :), Charge_dens(:))
   CALL COMPUTE_SC(Hamiltonian(:, :), kx, ky, Gamma_SC(:, :, :, :))
 
@@ -156,4 +152,4 @@ SUBROUTINE GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge_dens, 
   Charge_dens_local = Charge_dens_local * k1
 END SUBROUTINE GET_LOCAL_CHARGE_AND_DELTA
 
-END MODULE mod_compute_hamiltonians
+END MODULE mod_local_integrand

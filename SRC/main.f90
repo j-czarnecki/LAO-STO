@@ -9,7 +9,7 @@ USE mod_utilities
 USE mod_writers
 USE mod_reader
 USE mod_broydenV2
-USE mod_compute_hamiltonians
+USE mod_local_integrand
 USE mod_integrate
 USE mod_self_consistency
 USE omp_lib
@@ -129,13 +129,7 @@ gamma_max_error = 0.
 charge_max_error = 0.
 
 !Computing k-independent terms
-CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:, :))
-CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:, :))
-CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian_const(:, :))
-CALL COMPUTE_LAYER_POTENTIAL(Hamiltonian_const(:, :))
-CALL COMPUTE_FERMI_ENERGY(Hamiltonian_const(:, :))
-CALL COMPUTE_ZEEMAN(B_field, Hamiltonian_const(:, :))
-CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
+CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const)
 
 OPEN (unit=99, FILE="./OutputData/Convergence.dat", FORM="FORMATTED", ACTION="WRITE")
 WRITE (99, *) '# sc_iter, Re(Gamma), Im(Gamma), Re(Gamma_new), Im(Gamma_new), n, n_new, gamma_max_err, charge_max_err'

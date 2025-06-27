@@ -219,7 +219,7 @@ class DispersionPlotter(DataReader):
         plt.xlim(-2.5, 2.5)
         plt.ylim(-2.5, 2.5)
         plt.gca().set_aspect("equal", adjustable="box")
-        plt.savefig(plotOutputPath)
+        plt.savefig(os.path.join(plotOutputPath, f"FermiCrossection_orbital_Ef_{eFermi}"))
         plt.close()
 
         #Spin projection
@@ -241,7 +241,7 @@ class DispersionPlotter(DataReader):
         plt.xlim(-2.5, 2.5)
         plt.ylim(-2.5, 2.5)
         plt.gca().set_aspect("equal", adjustable="box")
-        plt.savefig(plotOutputPath)
+        plt.savefig(os.path.join(plotOutputPath, f"FermiCrossection_spin_Ef_{eFermi}"))
         plt.close()
 
 
@@ -304,11 +304,11 @@ class DispersionPlotter(DataReader):
         Plots subsequent DOSes on top of each other. User should provide a new LoadDos call for each DOS.
         Moreover list of parameters from which color should be deduced has to be provided.
         """
-        gs = gridspec.GridSpec(len(dosDirsList), 1, hspace=-0.3, left=0.1, right=0.9, top=0.95, bottom=0.1)  # negative hspace causes overlap
+        gs = gridspec.GridSpec(len(dosDirsList), 1, hspace=-0.7, left=0.1, right=0.9, top=0.95, bottom=0.1)  # negative hspace causes overlap
         fig = plt.figure(figsize=(8,10))
         #fig, ax = plt.subplots(figsize=(7, 5), dpi=400, sharex=True)
         cmap = plt.cm.viridis
-        norm = Normalize(vmin=min(colorParamList), vmax=max(colorParamList))
+        norm = Normalize(0, vmax=max(colorParamList))
         axes = []
         for i, dir in enumerate(dosDirsList[::-1]):
             ax = fig.add_subplot(gs[i, 0])
@@ -336,7 +336,8 @@ class DispersionPlotter(DataReader):
                 ax.set_xticks([])
                 ax.spines['bottom'].set_visible(False)
             else:
-                ax.set_xlabel(r"E (meV)")
+                ax.set_xticks([])
+                ax.set_xlabel(r"E (a.u.)")
 
 
         sm = ScalarMappable(cmap=cmap, norm=norm)
@@ -359,7 +360,7 @@ class DispersionPlotter(DataReader):
             s=0.5,
             cmap="inferno",
             norm=PowerNorm(
-                gamma=1.3, vmin=0, vmax=self.superconductingGapDataframe.gap.max()
+                gamma=1.2, vmin=0, vmax=self.superconductingGapDataframe.gap.max()
             ),
         )
         print("Minimal value of gap is ", self.superconductingGapDataframe.gap.min())

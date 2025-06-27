@@ -40,7 +40,7 @@ OBJS = 	$(OBJ_DIR)/main.o \
 				$(OBJ_DIR)/mod_writers.o \
 				$(OBJ_DIR)/mod_reader.o \
 				$(OBJ_DIR)/mod_broydenV2.o \
-				$(OBJ_DIR)/mod_compute_hamiltonians.o \
+				$(OBJ_DIR)/mod_local_integrand.o \
 				$(OBJ_DIR)/mod_integrate.o \
 				$(OBJ_DIR)/mod_types.o \
 				$(OBJ_DIR)/mod_self_consistency.o \
@@ -54,7 +54,7 @@ POSTPROCESSING_OBJS = 	$(OBJ_DIR)/main_postprocessing.o \
 						$(OBJ_DIR)/mod_utilities.o \
 						$(OBJ_DIR)/mod_writers.o \
 						$(OBJ_DIR)/mod_reader.o \
-						$(OBJ_DIR)/mod_compute_hamiltonians.o \
+						$(OBJ_DIR)/mod_local_integrand.o \
 						$(OBJ_DIR)/mod_types.o \
 						$(OBJ_DIR)/mod_self_consistency.o \
 						$(OBJ_DIR)/mod_logger.o
@@ -147,7 +147,7 @@ $(OBJ_DIR)/main.o:	$(OBJ_DIR)/mod_hamiltonians.o \
 										$(OBJ_DIR)/mod_writers.o \
 										$(OBJ_DIR)/mod_reader.o \
 										$(OBJ_DIR)/mod_broydenV2.o \
-										$(OBJ_DIR)/mod_compute_hamiltonians.o \
+										$(OBJ_DIR)/mod_local_integrand.o \
 										$(OBJ_DIR)/mod_integrate.o \
 										$(OBJ_DIR)/mod_self_consistency.o \
 										$(OBJ_DIR)/mod_logger.o
@@ -157,7 +157,7 @@ $(OBJ_DIR)/main_postprocessing.o: 	$(OBJ_DIR)/mod_hamiltonians.o \
 																		$(OBJ_DIR)/mod_utilities.o \
 																		$(OBJ_DIR)/mod_writers.o \
 																		$(OBJ_DIR)/mod_reader.o \
-																		$(OBJ_DIR)/mod_compute_hamiltonians.o \
+																		$(OBJ_DIR)/mod_local_integrand.o \
 																		$(OBJ_DIR)/mod_postprocessing.o \
 																		$(OBJ_DIR)/mod_logger.o
 
@@ -166,7 +166,7 @@ $(OBJ_DIR)/chern.o: 		$(OBJ_DIR)/mod_hamiltonians.o \
 												$(OBJ_DIR)/mod_utilities.o \
 												$(OBJ_DIR)/mod_writers.o \
 												$(OBJ_DIR)/mod_reader.o \
-												$(OBJ_DIR)/mod_compute_hamiltonians.o
+												$(OBJ_DIR)/mod_local_integrand.o
 
 $(OBJ_DIR)/mod_utilities.o: $(OBJ_DIR)/mod_parameters.o \
 														$(OBJ_DIR)/mod_reader.o
@@ -183,13 +183,13 @@ $(OBJ_DIR)/mod_writers.o: $(OBJ_DIR)/mod_parameters.o \
 $(OBJ_DIR)/mod_reader.o: $(OBJ_DIR)/mod_parameters.o \
 						 $(OBJ_DIR)/mod_logger.o
 
-$(OBJ_DIR)/mod_compute_hamiltonians.o: 	$(OBJ_DIR)/mod_parameters.o \
+$(OBJ_DIR)/mod_local_integrand.o: 	$(OBJ_DIR)/mod_parameters.o \
 										$(OBJ_DIR)/mod_utilities.o \
 										$(OBJ_DIR)/mod_hamiltonians.o \
 										$(OBJ_DIR)/mod_writers.o
 
 $(OBJ_DIR)/mod_integrate.o: $(OBJ_DIR)/mod_parameters.o \
-							$(OBJ_DIR)/mod_compute_hamiltonians.o \
+							$(OBJ_DIR)/mod_local_integrand.o \
 							$(OBJ_DIR)/mod_logger.o
 
 $(OBJ_DIR)/mod_postprocessing.o: 	$(OBJ_DIR)/mod_hamiltonians.o \
@@ -197,7 +197,7 @@ $(OBJ_DIR)/mod_postprocessing.o: 	$(OBJ_DIR)/mod_hamiltonians.o \
 									$(OBJ_DIR)/mod_utilities.o \
 									$(OBJ_DIR)/mod_writers.o \
 									$(OBJ_DIR)/mod_reader.o \
-									$(OBJ_DIR)/mod_compute_hamiltonians.o \
+									$(OBJ_DIR)/mod_local_integrand.o \
 									$(OBJ_DIR)/mod_self_consistency.o \
 									$(OBJ_DIR)/mod_logger.o
 

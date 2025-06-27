@@ -5,7 +5,7 @@ USE mod_parameters
 USE mod_utilities
 USE mod_writers
 USE mod_reader
-USE mod_compute_hamiltonians
+USE mod_local_integrand
 USE mod_postprocessing
 USE mod_logger
 IMPLICIT NONE

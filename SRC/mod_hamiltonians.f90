@@ -5,6 +5,34 @@ USE mod_reader
 IMPLICIT NONE
 CONTAINS
 
+
+RECURSIVE SUBROUTINE COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian)
+  !! Computes all terms that do not depend on k, including complex conjugate elements
+  IMPLICIT NONE
+  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM, DIM) !! Hamiltonian of the system that is to be filled
+  CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian(:, :))
+  CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian(:, :))
+  CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian(:, :))
+  CALL COMPUTE_LAYER_POTENTIAL(Hamiltonian(:, :))
+  CALL COMPUTE_TETRAGONAL_STRAIN(Hamiltonian(:, :))
+  CALL COMPUTE_FERMI_ENERGY(Hamiltonian(:, :))
+  CALL COMPUTE_ZEEMAN(B_field, Hamiltonian(:, :))
+  CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
+END SUBROUTINE COMPUTE_K_INDEPENDENT_TERMS
+
+RECURSIVE SUBROUTINE COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky)
+  !! Computes all terms that depend on k, excluding complex conjugate elements
+  IMPLICIT NONE
+  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM, DIM) !! Hamiltonian of the system that is to be filled
+  REAL*8, INTENT(INOUT) :: kx !! Wavevector in X direction
+  REAL*8, INTENT(INOUT) :: ky !! Wavevector in Y direction
+  CALL COMPUTE_TBA_TERM(Hamiltonian(:, :), kx, ky)
+  CALL COMPUTE_TI1_TI2(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+  CALL COMPUTE_H_PI(Hamiltonian(:, :), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+  CALL COMPUTE_H_SIGMA(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
+  CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:, :), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
+END SUBROUTINE COMPUTE_K_DEPENDENT_TERMS
+
 RECURSIVE SUBROUTINE COMPUTE_TBA_TERM(Hamiltonian, kx, ky)
   IMPLICIT NONE
   REAL*8, INTENT(INOUT) :: kx, ky
@@ -91,15 +119,15 @@ RECURSIVE SUBROUTINE COMPUTE_TRIGONAL_TERMS(Hamiltonian)
       DO spin = 0, 1
         row = nambu * DIM_POSITIVE_K + spin * TBA_DIM + lat * ORBITALS + 1
         col = nambu * DIM_POSITIVE_K + spin * TBA_DIM + lat * ORBITALS + 2
-        Hamiltonian(row, col) = Hamiltonian(row, col) + sign * DELTA_TRI / 2.
+        Hamiltonian(row, col) = Hamiltonian(row, col) + sign * delta_trigonal / 2.
 
         row = nambu * DIM_POSITIVE_K + spin * TBA_DIM + lat * ORBITALS + 1
         col = nambu * DIM_POSITIVE_K + spin * TBA_DIM + lat * ORBITALS + 3
-        Hamiltonian(row, col) = Hamiltonian(row, col) + sign * DELTA_TRI / 2.
+        Hamiltonian(row, col) = Hamiltonian(row, col) + sign * delta_trigonal / 2.
 
         row = nambu * DIM_POSITIVE_K + spin * TBA_DIM + lat * ORBITALS + 2
         col = nambu * DIM_POSITIVE_K + spin * TBA_DIM + lat * ORBITALS + 3
-        Hamiltonian(row, col) = Hamiltonian(row, col) + sign * DELTA_TRI / 2.
+        Hamiltonian(row, col) = Hamiltonian(row, col) + sign * delta_trigonal / 2.
       END DO
     END DO
   END DO
@@ -273,6 +301,26 @@ RECURSIVE SUBROUTINE COMPUTE_H_SIGMA(Hamiltonian, kx, ky)
   Hamiltonian(2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K) - CONJG(eta_p * 2 * imag * SQRT(3.) * V_pds / SQRT(15.) * (SIN(k2) + SIN(k3)))
 
 END SUBROUTINE COMPUTE_H_SIGMA
+
+RECURSIVE SUBROUTINE COMPUTE_TETRAGONAL_STRAIN(Hamiltonian)
+  !! Apply tetragonal strain effect. This energetically favours a single orbital.
+  IMPLICIT NONE
+  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM, DIM) !! Hamiltonian that is to be modified
+
+  INTEGER*4 :: nambu, spin, lat, row
+  REAL*8 :: sign
+
+  DO nambu = 0,1
+    sign = (-1)**nambu
+    DO spin = 0, 1
+      DO lat = 0, SUBLATTICES - 1
+        row = nambu * DIM_POSITIVE_K + spin * TBA_DIM + lat * ORBITALS + orb_affected_tetragonal
+        Hamiltonian(row, row) = Hamiltonian(row, row) + sign * zeta_tetragonal
+      END DO
+    END DO
+  END DO
+END SUBROUTINE COMPUTE_TETRAGONAL_STRAIN
+
 
 SUBROUTINE COMPUTE_RASHBA_HOPPING(Hamiltonian, kx, ky)
   IMPLICIT NONE

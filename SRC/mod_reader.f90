@@ -27,7 +27,9 @@ REAL*8 :: t_D = 0.
 REAL*8 :: t_I = 0.
 REAL*8 :: t_Rashba = 0.
 REAL*8 :: lambda_SOC = 0.
-REAL*8 :: DELTA_TRI = 0.
+REAL*8 :: delta_trigonal = 0.
+REAL*8 :: zeta_tetragonal = 0.
+INTEGER*4 :: orb_affected_tetragonal = 1
 REAL*8 :: v = 0.
 REAL*8 :: V_pdp = 0.
 REAL*8 :: V_pds = 0.
@@ -115,7 +117,9 @@ NAMELIST /physical_params/  &
 & t_I,                      &
 & t_Rashba,                 &
 & lambda_SOC,               &
-& DELTA_TRI,                &
+& delta_trigonal,           &
+& zeta_tetragonal,          &
+& orb_affected_tetragonal,  &
 & v,                        &
 & V_pdp,                    &
 & V_pds,                    &
@@ -243,12 +247,14 @@ SUBROUTINE GET_INPUT(nmlfile)
     STOP "Error reading physical_params"
   END IF
 
-  WRITE (log_string, '(16(A, E15.5))') "T: ", T,&
+  WRITE (log_string, '(18(A, E15.5))') "T: ", T,&
                                    & " t_D: ", t_D,&
                                    & " t_I: ", t_I,&
                                    & " t_Rashba: ", t_Rashba,&
                                    & " lambda_SOC: ", lambda_SOC,&
-                                   & " DELTA_TRI: ", DELTA_TRI,&
+                                   & " delta_trigonal: ", delta_trigonal,&
+                                   & " zeta_tetragonal: ", zeta_tetragonal,&
+                                   & " orb_affected_tetragonal: ", REAL(orb_affected_tetragonal),&
                                    & " v: ", v,&
                                    & " V_pdp: ", V_pdp,&
                                    & " V_pds: ", V_pds,&
@@ -275,7 +281,8 @@ SUBROUTINE GET_INPUT(nmlfile)
   t_I = t_I * meV2au
   t_Rashba = t_Rashba * meV2au
   lambda_SOC = lambda_SOC * meV2au
-  DELTA_TRI = DELTA_TRI * meV2au
+  delta_trigonal = delta_trigonal * meV2au
+  zeta_tetragonal = zeta_tetragonal * meV2au
   v = v * meV2au
   V_pdp = V_pdp * meV2au
   V_pds = V_pds * meV2au

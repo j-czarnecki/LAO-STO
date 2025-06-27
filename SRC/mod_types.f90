@@ -29,7 +29,9 @@ TYPE subband_params_t
   REAL*8 :: t_I = 0.0d0
   REAL*8 :: t_Rashba = 0.0d0
   REAL*8 :: lambda_SOC = 0.0d0
-  REAL*8 :: DELTA_TRI = 0.0d0
+  REAL*8 :: delta_trigonal = 0.0d0
+  REAL*8 :: zeta_tetragonal = 0.0d0
+  INTEGER*4 :: orb_affected_tetragonal = 1
   REAL*8 :: v = 0.0d0
   REAL*8 :: V_pdp = 0.0d0
   REAL*8 :: V_pds = 0.0d0

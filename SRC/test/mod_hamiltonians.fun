@@ -143,7 +143,7 @@ test test_compute_trigonal_terms
 COMPLEX*16 :: Hamiltonian(DIM, DIM)
 INTEGER*4 :: i, j
 
-DELTA_TRI = 1.
+delta_trigonal = 1.
 Hamiltonian(:, :) = 0.0d0
 
 CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian)
@@ -151,83 +151,83 @@ CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian)
 DO i = 1, DIM
   DO j = 1, DIM
     IF (i == 1 .AND. j == 2) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
     ELSE IF (i == 1 .AND. j == 3) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
     ELSE IF (i == 2 .AND. j == 3) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
 
     ELSE IF (i == ORBITALS + 1 .AND. j == ORBITALS + 2) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
     ELSE IF (i == ORBITALS + 1 .AND. j == ORBITALS + 3) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
     ELSE IF (i == ORBITALS + 2 .AND. j == ORBITALS + 3) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
 
     ELSE IF (i == 1 + TBA_DIM .AND. j == 2 + TBA_DIM) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
     ELSE IF (i == 1 + TBA_DIM .AND. j == 3 + TBA_DIM) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
     ELSE IF (i == 2 + TBA_DIM .AND. j == 3 + TBA_DIM) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
 
     ELSE IF (i == 1 + TBA_DIM + ORBITALS .AND. j == 2 + TBA_DIM + ORBITALS) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
     ELSE IF (i == 1 + TBA_DIM + ORBITALS .AND. j == 3 + TBA_DIM + ORBITALS) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
     ELSE IF (i == 2 + TBA_DIM + ORBITALS .AND. j == 3 + TBA_DIM + ORBITALS) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
 
     ELSE IF (i == DIM_POSITIVE_K + 1 .AND. j == DIM_POSITIVE_K + 2) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), -DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), -delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
     ELSE IF (i == DIM_POSITIVE_K + 1 .AND. j == DIM_POSITIVE_K + 3) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), -DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), -delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
     ELSE IF (i == DIM_POSITIVE_K + 2 .AND. j == DIM_POSITIVE_K + 3) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), -DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), -delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
 
     ELSE IF (i == DIM_POSITIVE_K + ORBITALS + 1 .AND. j == DIM_POSITIVE_K + ORBITALS + 2) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), -DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), -delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
     ELSE IF (i == DIM_POSITIVE_K + ORBITALS + 1 .AND. j == DIM_POSITIVE_K + ORBITALS + 3) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), -DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), -delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
     ELSE IF (i == DIM_POSITIVE_K + ORBITALS + 2 .AND. j == DIM_POSITIVE_K + ORBITALS + 3) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), -DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), -delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
 
     ELSE IF (i == DIM_POSITIVE_K + TBA_DIM + 1 .AND. j == DIM_POSITIVE_K + TBA_DIM + 2) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), -DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), -delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
     ELSE IF (i == DIM_POSITIVE_K + TBA_DIM + 1 .AND. j == DIM_POSITIVE_K + TBA_DIM + 3) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), -DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), -delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
     ELSE IF (i == DIM_POSITIVE_K + TBA_DIM + 2 .AND. j == DIM_POSITIVE_K + TBA_DIM + 3) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), -DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), -delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
 
     ELSE IF (i == DIM_POSITIVE_K + TBA_DIM + ORBITALS + 1 .AND. j == DIM_POSITIVE_K + TBA_DIM + ORBITALS + 2) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), -DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), -delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
     ELSE IF (i == DIM_POSITIVE_K + TBA_DIM + ORBITALS + 1 .AND. j == DIM_POSITIVE_K + TBA_DIM + ORBITALS + 3) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), -DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), -delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
     ELSE IF (i == DIM_POSITIVE_K + TBA_DIM + ORBITALS + 2 .AND. j == DIM_POSITIVE_K + TBA_DIM + ORBITALS + 3) THEN
-      assert_real_equal(REAL(Hamiltonian(i, j)), -DELTA_TRI / 2.0)
+      assert_real_equal(REAL(Hamiltonian(i, j)), -delta_trigonal / 2.0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
     ELSE
       assert_real_equal(REAL(Hamiltonian(i, j)), 0.0d0)

@@ -57,7 +57,9 @@ class RunnerConfig:
                 t_I = 0.04e3, \
                 t_Rashba = 0.000e3, \
                 lambda_SOC = 0.01e3, \
-                DELTA_TRI = -0.005e3, \
+                delta_trigonal = -0.005e3, \
+                zeta_tetragonal = 0.0, \
+                orb_affected_tetragonal = 1, \
                 v = 0.2e3, \
                 V_pdp = 0.028e3, \
                 V_pds = -0.065e3, \
@@ -108,7 +110,9 @@ class RunnerConfig:
                 t_I = 0.05e3, \
                 t_Rashba = 0.004e3, \
                 lambda_SOC = 0.265e3, \
-                DELTA_TRI = 0.0e3, \
+                delta_trigonal = 0.0e3, \
+                zeta_tetragonal = 0.0, \
+                orb_affected_tetragonal = 1, \
                 v = 0.0e3, \
                 V_pdp = 0.028e3, \
                 V_pds = -0.065e3, \

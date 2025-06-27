@@ -1,6 +1,6 @@
 MODULE mod_integrate
 USE mod_parameters
-USE mod_compute_hamiltonians
+USE mod_local_integrand
 USE mod_logger
 IMPLICIT NONE
 

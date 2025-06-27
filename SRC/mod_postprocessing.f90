@@ -5,7 +5,7 @@ USE mod_parameters
 USE mod_utilities
 USE mod_writers
 USE mod_reader
-USE mod_compute_hamiltonians
+USE mod_local_integrand
 USE mod_self_consistency
 USE mod_logger
 IMPLICIT NONE
@@ -97,17 +97,7 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_poi
   END IF
 
   !Computing k-independent terms
-  CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:, :))
-  CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:, :))
-  CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian_const(:, :))
-  CALL COMPUTE_LAYER_POTENTIAL(Hamiltonian_const(:, :))
-  CALL COMPUTE_ZEEMAN(B_field, Hamiltonian_const(:, :))
-  !Not shifting with the Fermi Energy, since we want "real" energy scale
-  !However If we want to include SC, we have to take into account actual Fermi energy for which Gammas were calculated
-  IF (include_sc) THEN
-    CALL COMPUTE_FERMI_ENERGY(Hamiltonian_const(:, :))
-  END IF
-  CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
+  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const)
 
   DO band = 1, SUBBANDS
     WRITE (log_string, *) "Band: ", band
@@ -131,14 +121,9 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_poi
         kx = 2.*PI / (SQRT(3.0d0)) * k1
         ky = -2.*PI / 3.*k1 + 4.*PI / 3.*k2
         Hamiltonian(:, :) = DCMPLX(0., 0.)
-        CALL COMPUTE_TBA_TERM(Hamiltonian(:, :), kx, ky)
-        CALL COMPUTE_TI1_TI2(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-        CALL COMPUTE_H_PI(Hamiltonian(:, :), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-        CALL COMPUTE_H_SIGMA(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-        CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:, :), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
+        CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian(:, :), kx, ky)
         CALL COMPUTE_HUBBARD(Hamiltonian(:, :), Charge_dens(:, band))
         CALL COMPUTE_SC(Hamiltonian(:, :), kx, ky, Gamma_SC(:, :, :, :, band))
-
         CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
 
         Hamiltonian(:, :) = sc_multiplier * (Hamiltonian_const_band + Hamiltonian) !Should by multiplied by 0.5 if in Nambu space
@@ -168,11 +153,7 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_poi
               kx = 2.*PI / (SQRT(3.0d0)) * k1
               ky = -2.*PI / 3.*k1 + 4.*PI / 3.*k2
               Hamiltonian(:, :) = DCMPLX(0., 0.)
-              CALL COMPUTE_TBA_TERM(Hamiltonian(:, :), kx, ky)
-              CALL COMPUTE_TI1_TI2(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-              CALL COMPUTE_H_PI(Hamiltonian(:, :), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-              CALL COMPUTE_H_SIGMA(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-              CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:, :), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
+              CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian(:, :), kx, ky)
               CALL COMPUTE_HUBBARD(Hamiltonian(:, :), Charge_dens(:, band))
               CALL COMPUTE_SC(Hamiltonian(:, :), kx, ky, Gamma_SC(:, :, :, :, band))
 
@@ -202,11 +183,7 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_poi
             kx = 2.*PI / (SQRT(3.0d0)) * k1
             ky = -2.*PI / 3.*k1 + 4.*PI / 3.*k2
             Hamiltonian(:, :) = DCMPLX(0., 0.)
-            CALL COMPUTE_TBA_TERM(Hamiltonian(:, :), kx, ky)
-            CALL COMPUTE_TI1_TI2(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-            CALL COMPUTE_H_PI(Hamiltonian(:, :), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-            CALL COMPUTE_H_SIGMA(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-            CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:, :), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
+            CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian(:, :), kx, ky)
             CALL COMPUTE_HUBBARD(Hamiltonian(:, :), Charge_dens(:, band))
             CALL COMPUTE_SC(Hamiltonian(:, :), kx, ky, Gamma_SC(:, :, :, :, band))
 
@@ -235,11 +212,7 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_poi
             kx = 2.*PI / (SQRT(3.0d0)) * k1
             ky = -2.*PI / 3.*k1 + 4.*PI / 3.*k2
             Hamiltonian(:, :) = DCMPLX(0., 0.)
-            CALL COMPUTE_TBA_TERM(Hamiltonian(:, :), kx, ky)
-            CALL COMPUTE_TI1_TI2(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-            CALL COMPUTE_H_PI(Hamiltonian(:, :), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-            CALL COMPUTE_H_SIGMA(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-            CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:, :), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
+            CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian(:, :), kx, ky)
             CALL COMPUTE_HUBBARD(Hamiltonian(:, :), Charge_dens(:, band))
             CALL COMPUTE_SC(Hamiltonian(:, :), kx, ky, Gamma_SC(:, :, :, :, band))
 
@@ -404,16 +377,7 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
   END IF
 
   !Computing k-independent terms
-  CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:, :))
-  CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:, :))
-  CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian_const(:, :))
-  CALL COMPUTE_LAYER_POTENTIAL(Hamiltonian_const(:, :))
-  !Not shifting with the Fermi Energy, since we want "real" energy scale.
-  !However If we want to include SC, we have to take into account actual Fermi energy for which Gammas were calculated
-  IF (include_sc) THEN
-    CALL COMPUTE_FERMI_ENERGY(Hamiltonian_const(:, :))
-  END IF
-  CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
+  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const)
 
   OPEN (unit=9, FILE=TRIM(inputPath)//"OutputData/Energies.dat", FORM="FORMATTED", ACTION="WRITE")
   WRITE (9, '(A)') "#N kx[1/a] ky[1/a] Energy[meV] P(yz) P(zx) P(xy) P(lat1) P(lat2) ... P(latN) P(s_up) P(s_down) P(electron) P(hole)"
@@ -435,11 +399,7 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
         IF (is_inside_polygon(brillouinZoneVertices, 6, kx, ky)) THEN
 
           Hamiltonian(:, :) = DCMPLX(0., 0.)
-          CALL COMPUTE_TBA_TERM(Hamiltonian(:, :), kx, ky)
-          CALL COMPUTE_TI1_TI2(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-          CALL COMPUTE_H_PI(Hamiltonian(:, :), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-          CALL COMPUTE_H_SIGMA(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-          CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:, :), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
+          CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky)
           CALL COMPUTE_HUBBARD(Hamiltonian(:, :), Charge_dens)
           CALL COMPUTE_SC(Hamiltonian(:, :), kx, ky, Gamma_SC)
           CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
@@ -736,12 +696,7 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
     CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
   END IF
   !Computing k-independent terms
-  CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:, :))
-  CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:, :))
-  CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian_const(:, :))
-  CALL COMPUTE_LAYER_POTENTIAL(Hamiltonian_const(:, :))
-  CALL COMPUTE_FERMI_ENERGY(Hamiltonian_const(:, :))
-  CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
+  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const)
 
   OPEN (unit=9, FILE=TRIM(inputPath)//"OutputData/SuperconductingGap.dat", FORM="FORMATTED", ACTION="WRITE")
   WRITE (9, *) '#kx[1/a] ky[1/a] gap_SC[meV] N_orbital'
@@ -767,11 +722,7 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
 
           Hamiltonian(:, :) = DCMPLX(0., 0.)
           Energies(:) = 0.
-          CALL COMPUTE_TBA_TERM(Hamiltonian(:, :), kx, ky)
-          CALL COMPUTE_TI1_TI2(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-          CALL COMPUTE_H_PI(Hamiltonian(:, :), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-          CALL COMPUTE_H_SIGMA(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-          CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:, :), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
+          CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian(:, :), kx, ky)
           CALL COMPUTE_HUBBARD(Hamiltonian(:, :), Charge_dens(:, band))
           !CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
 
@@ -806,11 +757,7 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
 
           Hamiltonian(:, :) = DCMPLX(0., 0.)
           Energies(:) = 0.
-          CALL COMPUTE_TBA_TERM(Hamiltonian(:, :), kx, ky)
-          CALL COMPUTE_TI1_TI2(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-          CALL COMPUTE_H_PI(Hamiltonian(:, :), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-          CALL COMPUTE_H_SIGMA(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-          CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:, :), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
+          CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian(:, :), kx, ky)
           CALL COMPUTE_HUBBARD(Hamiltonian(:, :), Charge_dens(:, band))
           CALL COMPUTE_SC(Hamiltonian(:, :), kx, ky, Gamma_SC(:, :, :, :, band))
           ! DO n = 1, DIM_POSITIVE_K
@@ -903,12 +850,7 @@ SUBROUTINE CALCULATE_GAMMA_K(input_path, n_brillouin_points)
   CALL GET_SAFE_CHARGE_DENS(Charge_dens, input_path)
 
   !Computing k-independent terms
-  CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:, :))
-  CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:, :))
-  CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian_const(:, :))
-  CALL COMPUTE_LAYER_POTENTIAL(Hamiltonian_const(:, :))
-  CALL COMPUTE_FERMI_ENERGY(Hamiltonian_const(:, :))
-  CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
+  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const)
 
   !Opening all files I will write gammas to and create a mapping of file units to appropriate names
   file_count = 10
@@ -1092,6 +1034,10 @@ SUBROUTINE CALCULATE_PROJECTIONS(input_path, n_r_points, n_phi_points)
 
   CALL GET_SAFE_GAMMA_SC(Gamma_SC, input_path)
   CALL GET_SAFE_CHARGE_DENS(Charge_dens, input_path)
+
+  Gamma_SC = 0.0d0
+  Gamma_SC(:,:,1,:,:) = 1*meV2au
+  Gamma_SC(:,:,2,:,:) = -1*meV2au
 
   CALL GET_REAL_SPACE_PROJECTIONS(Projections_real_space, Gamma_SC)
   DO n = 1, N_PROJECTIONS
@@ -1622,14 +1568,7 @@ SUBROUTINE TRANSFORM_DELTA_MATRIX(inputPath, nBrillouinPoints)
   Gamma_SC(:, :, 2, :) = -999.*meV2au
 
   !Initialize constant hamiltonian
-  CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:, :))
-  CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:, :))
-  CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian_const(:, :))
-  DO n = 1, DIM_POSITIVE_K
-    Hamiltonian_const(n, n) = Hamiltonian_const(n, n) - E_Fermi
-    Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) = Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) + E_Fermi
-  END DO
-  CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
+  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const)
 
   DO i = -kx_steps, kx_steps
     DO j = -ky_steps, ky_steps
@@ -1640,11 +1579,7 @@ SUBROUTINE TRANSFORM_DELTA_MATRIX(inputPath, nBrillouinPoints)
 
         Hamiltonian(:, :) = DCMPLX(0., 0.)
         Energies(:) = 0.
-        CALL COMPUTE_TBA_TERM(Hamiltonian(:, :), kx, ky)
-        CALL COMPUTE_TI1_TI2(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-        CALL COMPUTE_H_PI(Hamiltonian(:, :), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-        CALL COMPUTE_H_SIGMA(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-        CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:, :), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
+        CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky)
         CALL COMPUTE_HUBBARD(Hamiltonian(:, :), Charge_dens(:))
         CALL COMPUTE_SC(Hamiltonian(:, :), kx, ky, Gamma_SC(:, :, :, :))
         CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
@@ -1806,16 +1741,7 @@ SUBROUTINE LAO_STO_CHERN_ENERGIES(Nk1, Nk2, i, j, inputPath, U_transformation)
 
   !Computing k-independent terms
   Hamiltonian_const = DCMPLX(0., 0.)
-  CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_const(:, :))
-  CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_const(:, :))
-  CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian_const(:, :))
-  !CALL COMPUTE_ZEEMAN((/0.0d0, 0.0d0, 0.1*T2au/), Hamiltonian_const(:,:))
-  DO n = 1, DIM_POSITIVE_K
-    Hamiltonian_const(n, n) = Hamiltonian_const(n, n) - E_Fermi
-    Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) = Hamiltonian_const(DIM_POSITIVE_K + n, DIM_POSITIVE_K + n) + E_Fermi
-  END DO
-
-  CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
+  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const)
 
   !Calculate eigenvalues and eigenvectors to later compute chern numbers
   k1 = i * dk1_Chern
@@ -1824,11 +1750,7 @@ SUBROUTINE LAO_STO_CHERN_ENERGIES(Nk1, Nk2, i, j, inputPath, U_transformation)
   kx = 2.*PI / (SQRT(3.0d0)) * k1
   ky = -2.*PI / 3.*k1 + 4.*PI / 3.*k2
   Hamiltonian(:, :) = DCMPLX(0., 0.)
-  CALL COMPUTE_TBA_TERM(Hamiltonian(:, :), kx, ky)
-  CALL COMPUTE_TI1_TI2(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-  CALL COMPUTE_H_PI(Hamiltonian(:, :), kx, ky) !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-  CALL COMPUTE_H_SIGMA(Hamiltonian(:, :), kx, ky)  !There may be a problem since Ti1,Ti2 coupling is assumed to be equal Ti2,Ti1
-  CALL COMPUTE_RASHBA_HOPPING(Hamiltonian(:, :), kx, ky) !This is adapted from KTaO_3, see: PRB, 103, 035115
+  CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky)
   CALL COMPUTE_HUBBARD(Hamiltonian(:, :), Charge_dens(:))
   CALL COMPUTE_SC(Hamiltonian(:, :), kx, ky, Gamma_SC(:, :, :, :))
 

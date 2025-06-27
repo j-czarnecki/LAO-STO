@@ -1,18 +1,20 @@
 &discretization
     k1_steps = 100
     k2_steps = 100
-    sublattices = 3
+    sublattices = 2
     subbands = 1
 /
 
 &physical_params
     t = 0.0
-    t_d = 650.0
-    t_i = 50.0
-    t_rashba = 4.0
-    lambda_soc = 265.0
-    delta_tri = 0.0
-    v = 0.0
+    t_d = 500.0
+    t_i = 40.0
+    t_rashba = 0.0
+    lambda_soc = 10.0
+    delta_trigonal = -5.0
+    zeta_tetragonal = -30.0
+    orb_affected_tetragonal = 1
+    v = 200.0
     v_pdp = 28.0
     v_pds = -65.0
     j_sc = 100.0
@@ -21,8 +23,8 @@
     j_sc_prime_nnn = 30.0
     u_hub = 0.0
     v_hub = 0.0
-  e_fermi = 300
-    v_layer = 1946.0, 1946.0, 1946.0
+    e_fermi = 0
+    v_layer = 1053.0, 1053.0
     subband_energies = 0.0
     b_field = 0.0, 0.0, 0.0
 /
