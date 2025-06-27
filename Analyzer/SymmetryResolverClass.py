@@ -59,24 +59,25 @@ class SymmetryResolver(DataReader):
                         for orbital in range(1, 4):
                             # This code could be simplified, maybe list comprehension?
                             # Nearest neighbours pairing
-                            for neighbor in range(1, self.nNeighbors + 1):
-                                gammaKey = (
-                                    (spin, neighbor, sublat, orbital)
-                                    if self.subbands == 0
-                                    else (band, spin, neighbor, sublat, orbital)
-                                )
-                                gammaToSymmetrize.append(self.gamma[gammaKey][i])
-                                # Generating next atom from second sublattice
-                                # such that it obeys the order of neighbors defined on a regular hexagon
-                                gammaKeySecondSublat = (
-                                    (spin, self.__getFollowingNeighbor(neighbor), self.__getOppositeSublat(sublat), orbital)
-                                    if self.subbands == 0
-                                    else (band, spin, self.__getFollowingNeighbor(neighbor), self.__getOppositeSublat(sublat), orbital)
-                                )
-                                gammaToSymmetrize.append(self.gamma[gammaKeySecondSublat][i])
+                            for sublat in range(1, self.layerCouplings + 1):
+                                for neighbor in range(1, self.nNeighbors + 1):
+                                    gammaKey = (
+                                        (spin, neighbor, sublat, orbital)
+                                        if self.subbands == 0
+                                        else (band, spin, neighbor, sublat, orbital)
+                                    )
+                                    gammaToSymmetrize.append(self.gamma[gammaKey][i])
+                                    # Generating next atom from second sublattice
+                                    # such that it obeys the order of neighbors defined on a regular hexagon
+                                    # gammaKeySecondSublat = (
+                                    #     (spin, self.__getFollowingNeighbor(neighbor), self.__getOppositeSublat(sublat), orbital)
+                                    #     if self.subbands == 0
+                                    #     else (band, spin, self.__getFollowingNeighbor(neighbor), self.__getOppositeSublat(sublat), orbital)
+                                    # )
+                                    #gammaToSymmetrize.append(self.gamma[gammaKeySecondSublat][i])
                         for i, sym in enumerate(symmetries):
                             self.symmetryGammaDict[(*symmetryKey, sym)].append(
-                                symmetryCallbacks[i](gammaToSymmetrize)
+                                symmetryCallbacks[i](gammaToSymmetrize, "nearest")
                             )
         if self.nNextNeighbors == 0:
             return
@@ -103,7 +104,7 @@ class SymmetryResolver(DataReader):
                                     nnnGammaToSymmetrize.append(self.gamma[gammaKey][i])
                         for i, sym in enumerate(symmetries):
                             self.nnnSymmetryGammaDict[(*symmetryKey, sym)].append(
-                                symmetryCallbacks[i](nnnGammaToSymmetrize)
+                                symmetryCallbacks[i](nnnGammaToSymmetrize, "next")
                             )
 
     def calculateSingletTripletGammas(self) -> None:

@@ -12,14 +12,14 @@ class C6vGenerator:
     self.c6: sp.Matrix = c6
     self.s_v1: sp.Matrix = s_v1
     self.s_d1: sp.Matrix = s_d1
-    self.irrepsTuple = ("A_1", "A_2", "B_1", "B_2", "E_1", "E_2")
+    self.irrepsTuple = (r"$A_1$", r"$A_2$", r"$B_1$", r"$B_2$", r"$E_1$", r"$E_2$")
     self.conjugacyClassesTuple = ("E", "2C_6", "2C_3", "C_2", "3s_v", "3s_d")
-    self.chiTabDict = {"A_1": {"E" : sp.S(1), "2C_6" : sp.S(1) , "2C_3" : sp.S(1) , "C_2" : sp.S(1) , "3s_v" : sp.S(1) , "3s_d" : sp.S(1)},
-                       "A_2": {"E" : sp.S(1), "2C_6" : sp.S(1) , "2C_3" : sp.S(1) , "C_2" : sp.S(1) , "3s_v" : sp.S(-1), "3s_d" : sp.S(-1)},
-                       "B_1": {"E" : sp.S(1), "2C_6" : sp.S(-1), "2C_3" : sp.S(1) , "C_2" : sp.S(-1), "3s_v" : sp.S(1) , "3s_d" : sp.S(-1)},
-                       "B_2": {"E" : sp.S(1), "2C_6" : sp.S(-1), "2C_3" : sp.S(1) , "C_2" : sp.S(-1), "3s_v" : sp.S(-1), "3s_d" : sp.S(1)},
-                       "E_1": {"E" : sp.S(2), "2C_6" : sp.S(1) , "2C_3" : sp.S(-1), "C_2" : sp.S(-2), "3s_v" : sp.S(0) , "3s_d" : sp.S(0)},
-                       "E_2": {"E" : sp.S(2), "2C_6" : sp.S(-1), "2C_3" : sp.S(-1), "C_2" : sp.S(2) , "3s_v" : sp.S(0) , "3s_d" : sp.S(0)}}
+    self.chiTabDict = {r"$A_1$": {"E" : sp.S(1), "2C_6" : sp.S(1) , "2C_3" : sp.S(1) , "C_2" : sp.S(1) , "3s_v" : sp.S(1) , "3s_d" : sp.S(1)},
+                       r"$A_2$": {"E" : sp.S(1), "2C_6" : sp.S(1) , "2C_3" : sp.S(1) , "C_2" : sp.S(1) , "3s_v" : sp.S(-1), "3s_d" : sp.S(-1)},
+                       r"$B_1$": {"E" : sp.S(1), "2C_6" : sp.S(-1), "2C_3" : sp.S(1) , "C_2" : sp.S(-1), "3s_v" : sp.S(1) , "3s_d" : sp.S(-1)},
+                       r"$B_2$": {"E" : sp.S(1), "2C_6" : sp.S(-1), "2C_3" : sp.S(1) , "C_2" : sp.S(-1), "3s_v" : sp.S(-1), "3s_d" : sp.S(1)},
+                       r"$E_1$": {"E" : sp.S(2), "2C_6" : sp.S(1) , "2C_3" : sp.S(-1), "C_2" : sp.S(-2), "3s_v" : sp.S(0) , "3s_d" : sp.S(0)},
+                       r"$E_2$": {"E" : sp.S(2), "2C_6" : sp.S(-1), "2C_3" : sp.S(-1), "C_2" : sp.S(2) , "3s_v" : sp.S(0) , "3s_d" : sp.S(0)}}
 
   def getOperationsDict(self) -> dict[str, list[sp.Matrix]]:
     e = sp.eye(self.representationDim)

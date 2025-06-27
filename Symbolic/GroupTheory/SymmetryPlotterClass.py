@@ -59,12 +59,12 @@ class SymmetryPlotterClass:
     self.__createCoordinateSystemAndDeltaTabs()
 
   def plotBasisFunctions(self, irrepsEigenvectors: dict[str, list[tuple[int, int, list[sp.Matrix]]]], neighbor:str = "nearest", enablePrinting=True):
-    nCols = 2 #Real and imaginary part
+    nCols = 1 #Real and imaginary part plotted on separate figures
     nRows: dict[str, int] = {}
     if neighbor == "nearest":
-      maxRows = 4
+      maxRows = 2
     elif neighbor == "next":
-      maxRows = 3
+      maxRows = 2
     else:
       raise ValueError(f"Neighbor {neighbor} not supported")
 
@@ -79,31 +79,43 @@ class SymmetryPlotterClass:
     with initPrinting(enablePrinting):
       for irrep in irrepsEigenvectors:
         if nRows[irrep] > maxRows:
-          nCols = 2 * nRows[irrep] // maxRows
+          nCols = nRows[irrep] // maxRows
           nRows[irrep] = maxRows
 
-        fig, axes = plt.subplots(nRows[irrep], nCols, figsize=(nCols*4, nRows[irrep]*4), sharex=True, sharey=True)
+        figRe, axesRe = plt.subplots(nRows[irrep], nCols, figsize=(nCols*4, nRows[irrep]*4), sharex=True, sharey=True)
+        figIm, axesIm = plt.subplots(nRows[irrep], nCols, figsize=(nCols*4, nRows[irrep]*4), sharex=True, sharey=True)
+
+        axesRe = np.atleast_1d(axesRe)
+        axesIm = np.atleast_1d(axesIm)
+
+        axesRe = axesRe.reshape((nRows[irrep], nCols))
+        axesIm = axesIm.reshape((nRows[irrep], nCols))
+        print(axesRe.shape)
         row = 0
-        for col in range(0, nCols, 2):
-          axes[row, col].set_title(r"$\mathfrak{Re}$")
-          axes[row, col + 1].set_title(r"$\mathfrak{Im}$")
-          axes[nRows[irrep] - 1, col].set_xticks([-2, 0 , 2])
-          axes[nRows[irrep] - 1, col + 1].set_xticks([-2, 0 , 2])
-          axes[nRows[irrep] - 1, col].set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
-          axes[nRows[irrep] - 1, col + 1].set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
+        for col in range(nCols):
+          axesRe[nRows[irrep] - 1, col].set_xticks([-2, 0 , 2])
+          axesRe[nRows[irrep] - 1, col].set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
+
+          axesIm[nRows[irrep] - 1, col].set_xticks([-2, 0 , 2])
+          axesIm[nRows[irrep] - 1, col].set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
 
         for v in irrepsEigenvectors[irrep]:
           col = 0
           if np.abs(v[0]) == 1:
             for i in range(v[1]):
-              axes[row, 0].set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
-              axes[row, 0].set_yticks([-2, 0 , 2])
-              self.__getSingleBasisFunction(v[2][i], axes[row, col:col + 2], neighbor)
+              axesRe[row, 0].set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
+              axesRe[row, 0].set_yticks([-2, 0 , 2])
+              axesIm[row, 0].set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
+              axesIm[row, 0].set_yticks([-2, 0 , 2])
+
+              self.__getSingleBasisFunction(v[2][i], [axesRe[row, col], axesIm[row, col]], neighbor)
+
               row += 1
-              col += 2 * (row // maxRows)
+              col += row // maxRows
               row = row % maxRows
 
-        fig.subplots_adjust(wspace=0, hspace=0, left=0, right=1, top=1, bottom=0)
+        figRe.subplots_adjust(wspace=0, hspace=0, left=0, right=1, top=1, bottom=0)
+        figIm.subplots_adjust(wspace=0, hspace=0, left=0, right=1, top=1, bottom=0)
         plt.show()
 
   def plotOrbitalWeights(self):
@@ -196,6 +208,14 @@ class SymmetryPlotterClass:
       -1 * (sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(1, 2) * self.N.j),       # (-√3/2, -1/2)
       sp.sqrt(3)/sp.S(2) * self.N.i - sp.Rational(1, 2) * self.N.j               # (√3/2, -1/2)
     ]
+    # self.deltaNearestTab = [
+    #   0 * self.N.i - 1 * self.N.j,                                           # (0, -1)
+    #   sp.sqrt(3)/sp.S(2) * self.N.i - sp.Rational(1, 2) * self.N.j,               # (√3/2, -1/2)
+    #   sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(1, 2) * self.N.j,             # (√3/2, 1/2)
+    #   -1 * (0 * self.N.i - 1 * self.N.j),                                    # (0, 1)
+    #   -1 * (sp.sqrt(3)/sp.S(2) * self.N.i - sp.Rational(1, 2) * self.N.j),       # (-√3/2, 1/2)
+    #   -1 * (sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(1, 2) * self.N.j),       # (-√3/2, -1/2)
+    # ]
     self.deltaNextTab = [
       sp.sqrt(3) * self.N.i + 0 * self.N.j,                                  # (√3, 0)
       sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(3, 2) * self.N.j,              # (√3/2, 3/2)
@@ -203,13 +223,13 @@ class SymmetryPlotterClass:
       -1 * (sp.sqrt(3) * self.N.i + 0 * self.N.j),                           # (-√3, 0)
       -1 * (sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(3, 2) * self.N.j),       # (-√3/2, -3/2)
       -1 * (-sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(3, 2) * self.N.j),       # (√3/2, -3/2)
-      #Second sublattice
-      sp.sqrt(3) * self.N.i + 0 * self.N.j,                                  # (√3, 0)
-      sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(3, 2) * self.N.j,              # (√3/2, 3/2)
-      -sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(3, 2) * self.N.j,             # (-√3/2, 3/2)
-      -1 * (sp.sqrt(3) * self.N.i + 0 * self.N.j),                           # (-√3, 0)
-      -1 * (sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(3, 2) * self.N.j),       # (-√3/2, -3/2)
-      -1 * (-sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(3, 2) * self.N.j)       # (√3/2, -3/2)
+      # #Second sublattice
+      # sp.sqrt(3) * self.N.i + 0 * self.N.j,                                  # (√3, 0)
+      # sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(3, 2) * self.N.j,              # (√3/2, 3/2)
+      # -sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(3, 2) * self.N.j,             # (-√3/2, 3/2)
+      # -1 * (sp.sqrt(3) * self.N.i + 0 * self.N.j),                           # (-√3, 0)
+      # -1 * (sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(3, 2) * self.N.j),       # (-√3/2, -3/2)
+      # -1 * (-sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(3, 2) * self.N.j),       # (√3/2, -3/2)
     ]
 
   def __getSingleBasisFunction(self, eigenvec, axes, neighbor):
@@ -220,10 +240,10 @@ class SymmetryPlotterClass:
     orbBasisFunctions = []
     latexOrbBasisFunctions = []
     orbKxKyBasisFunctions = []
+    nSites = 6
 
     #Nearest neighbours
     if neighbor == 'nearest':
-      nSites = 6
       for io in range(nOrbs):
         basisOrb = 0
         for ir in range(nSites):
@@ -237,7 +257,6 @@ class SymmetryPlotterClass:
 
     #Next nearest neighbors
     if neighbor == 'next':
-      nSites = 12
       #Next nearest neighbors
       for io in range(nOrbs):
         basisOrb = 0

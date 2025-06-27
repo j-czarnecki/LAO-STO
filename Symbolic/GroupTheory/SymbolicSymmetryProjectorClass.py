@@ -66,8 +66,10 @@ class SymbolicSymmetryProjectorClass:
     return diagonalizedProjections
 
   def displayProjectionsMetadata(self, diagonalizedProjections: dict[str, list[tuple[int, int, list[sp.Matrix]]]]):
+    totalOutputStr: str = ""
     for irrep in self.irrepsTuple:
       print(f"IR: {irrep}")
+      degeneracyCount = 0
       #Only interested in eigenvalues +-1
       for v in diagonalizedProjections[irrep]:
         if np.abs(v[0]) == 1:
@@ -80,12 +82,13 @@ class SymbolicSymmetryProjectorClass:
                 oneIndeces.append(j)
               elif v[2][i][j] == -1:
                 minusOneIndeces.append(j)
-            display(f"indecesPlus = {oneIndeces}")
-            display(f"indecesMinus = {minusOneIndeces}")
+            #Weird notation to enable easy copying to projectionIndeces dict
+            totalOutputStr += f'r"{irrep[:-1]}^{{({i + 1})}}$" : {{"plus" : {oneIndeces}, "minus" : {minusOneIndeces} }},\n'
         else:
           print("No matching eigenvalue")
       print("------------")
       print("\n")
+    print(totalOutputStr)
 
   def __instantProjectionCheck(self, projection: sp.Matrix, irrep: str):
     """ Checks corectness of single projection operator """
