@@ -21,7 +21,7 @@ class RunnerConfig:
             """\
         #!/bin/bash -l
         ## Job name
-        #SBATCH -J DOS-fit-finetune
+        #SBATCH -J v_tuning_NNN
         ## Number of allocated nodes
         #SBATCH -N 1
         ## Number of tasks per node (by default this corresponds to the number of cores allocated per node)
@@ -33,13 +33,14 @@ class RunnerConfig:
         ## Max task execution time (format is HH:MM:SS)
         #SBATCH --time=72:00:00
         ## Name of grant to which resource usage will be charged
-        #SBATCH -A plgtopoxides-cpu
+        #SBATCH -A plgktosto111-cpu
         ## Name of partition
         #SBATCH -p plgrid
         ## Name of file to which standard output will be redirected
         #SBATCH --output="output.out"
         ## Name of file to which the standard error stream will be redirected
         #SBATCH --error="error.err"
+        #module load GCC/13.2.0 OpenMPI/5.0.3 FlexiBLAS/3.3.1 ScaLAPACK/2.2.0-fb gimkl/2023b
         """
         )
 
@@ -70,7 +71,7 @@ class RunnerConfig:
                 U_HUB = 0e3, \
                 V_HUB = 0e3, \
                 E_Fermi = -1.0e3, \
-                V_layer = 0.0, 0.0, \
+                V_layer = 1053.0, 1053.0, \
                 Subband_energies = 0.0e3, \
                 b_field = 0.0, 0.0, 0.0 / \
             &self_consistency \

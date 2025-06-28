@@ -142,8 +142,8 @@ SUBROUTINE GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge_dens, 
   !Charge density calculation
   DO m = 1, DIM_POSITIVE_K
     DO n = 1, DIM_POSITIVE_K
-      Charge_dens_local(m) = Charge_dens_local(m) + U_transformation(m, n) * CONJG(U_transformation(m, n)) * fd_distribution(Energies(n), 0d0, T) + &
-      & U_transformation(m, DIM_POSITIVE_K + n) * CONJG(U_transformation(m, DIM_POSITIVE_K + n)) * (1.-fd_distribution(-Energies(DIM_POSITIVE_K + n), 0d0, T))
+      Charge_dens_local(m) = Charge_dens_local(m) + REAL(U_transformation(m, n) * CONJG(U_transformation(m, n)), KIND=8) * fd_distribution(Energies(n), 0d0, T) + &
+      & REAL(U_transformation(m, DIM_POSITIVE_K + n) * CONJG(U_transformation(m, DIM_POSITIVE_K + n)), KIND=8) * (1.-fd_distribution(-Energies(DIM_POSITIVE_K + n), 0d0, T))
     END DO
   END DO
 

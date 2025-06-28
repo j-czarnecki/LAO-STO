@@ -304,17 +304,17 @@ SUBROUTINE GET_INPUT(nmlfile)
     LOG_ERROR(log_string)
     STOP "Error reading self_consistency"
   END IF
-  IF (read_gamma_from_file == .FALSE.) WRITE (path_to_gamma_start, *) ""
-  IF (read_charge_from_file == .FALSE.) WRITE (path_to_charge_start, *) ""
+  IF (read_gamma_from_file .eqv. .FALSE.) WRITE (path_to_gamma_start, *) ""
+  IF (read_charge_from_file .eqv. .FALSE.) WRITE (path_to_charge_start, *) ""
 
-  WRITE (log_string, '(2(A, I0, 2A), 10(A, E15.5))') "read_gamma_from_file: ", read_gamma_from_file,&
+  WRITE (log_string, '(2(A, L1, 2A), 10(A, E15.5))') "read_gamma_from_file: ", read_gamma_from_file,&
                                                   & " path_to_gamma_start: ", TRIM(path_to_gamma_start),&
                                                   & " read_charge_from_file: ", read_charge_from_file,&
                                                   & " path_to_charge_start: ", TRIM(path_to_charge_start),&
                                                   & " gamma_start: ", gamma_start,&
                                                   & " gamma_nnn_start: ", gamma_nnn_start,&
                                                   & " charge_start: ", charge_start,&
-                                                  & " max_sc_iter: ", max_sc_iter,&
+                                                  & " max_sc_iter: ", REAL(max_sc_iter),&
                                                   & " sc_alpha: ", sc_alpha,&
                                                   & " sc_alpha_adapt: ", sc_alpha_adapt,&
                                                   & " gamma_eps_convergence: ", gamma_eps_convergence,&

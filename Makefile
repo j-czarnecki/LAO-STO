@@ -85,7 +85,9 @@ ares_post: LIBS = -lscalapack -lflexiblas
 ares_post: $(POSTPROCESSING_TARGET)
 
 gnu: F90 = gfortran
-gnu: F90FLAGS = -O3 -Wall -Wextra -ffree-line-length-none $(LIB_OPENMP) $(READ_OLD_FLAG)
+gnu: LIB_OPENMP = -fopenmp -mkl
+gnu: LIBS = -lscalapack -lflexiblas
+gnu: F90FLAGS = -O3 -g -cpp -Wall -Wextra -ffree-line-length-none $(LIB_OPENMP) $(READ_OLD_FLAG) -J$(MOD_DIR)
 gnu: $(TARGET)
 
 debug: F90FLAGS = -O0 -g -fpp $(LIB_OPENMP) -module $(MOD_DIR) $(READ_OLD_FLAG) -check bounds -debug all #-diag-enable sc

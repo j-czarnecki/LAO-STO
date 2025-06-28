@@ -30,7 +30,7 @@ class SymmetryResolver(DataReader):
         self.symmetryGammaSingletTripletDict: dict = defaultdict(list)
         self.nnnSymmetryGammaDict: dict = defaultdict(list)
         self.nnnSymmetryGammaSingletTripletDict: dict = defaultdict(list)
-        self.projector = ProjectorC3v() #This should be changed according to group based on which symetry is to be analyzed
+        self.projector = ProjectorC6v() #This should be changed according to group based on which symetry is to be analyzed
 
     """ ---------------------------------------------------------------------------------- """
     """ ---------------------------- Interface methods ----------------------------------- """

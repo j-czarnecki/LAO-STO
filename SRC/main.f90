@@ -23,35 +23,25 @@ REAL*8, ALLOCATABLE :: Delta_broyden(:), Delta_new_broyden(:)
 COMPLEX*16, ALLOCATABLE :: Gamma_SC(:, :, :, :, :), Gamma_SC_new(:, :, :, :, :)
 REAL*8, ALLOCATABLE :: Charge_dens(:, :), Charge_dens_new(:, :), Charge_dens_local(:, :)
 
-REAL*8 :: gamma_error, gamma_max_error, charge_error, charge_max_error
+REAL*8 :: gamma_max_error, charge_max_error
 REAL*8 :: gamma_max_error_prev, charge_max_error_prev
 REAL*8 :: phi_k_min
 
-INTEGER*4 :: i, j, n, lat, orb, orb_prime, spin, band, band_prime
+INTEGER*4 :: band
 INTEGER*4 :: n_triangle, i_r, j_phi
 INTEGER*4 :: sc_iter
 LOGICAL :: sc_flag
 
-INTEGER*4 :: counter
 INTEGER*4 :: delta_real_elems
-INTEGER*4 :: broyden_index
 
 !OMP specific
-INTEGER*4 :: max_num_threads, used_threads
+INTEGER*4 :: max_num_threads
 
 max_num_threads = omp_get_max_threads()
 
 CALL INIT_LOGGER("")
 WRITE (log_string, *) "Max num threads", max_num_threads
 LOG_INFO(log_string)
-
-! CALL omp_set_num_threads(max_num_threads)
-! !$omp parallel
-! PRINT*, "Hello from process", omp_get_thread_num()
-! used_threads = omp_get_num_threads()
-! CALL SLEEP(3)
-! !$omp end parallel
-! PRINT*, "Allocated threads", used_threads
 
 CALL GET_INPUT("./input.nml")
 !N_NEIGHBOURS + N_NEXT_NEIGHBOURS = 9, to implement both pairings
