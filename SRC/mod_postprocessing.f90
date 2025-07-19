@@ -823,8 +823,8 @@ SUBROUTINE CALCULATE_GAMMA_K(input_path, n_brillouin_points)
   Brillouin_zone_vertices(:, 1) = (/4.*PI / (3 * SQRT(3.0d0)), 2.*PI / (3 * SQRT(3.0d0)), -2.*PI / (3 * SQRT(3.0d0)), -4.*PI / (3 * SQRT(3.0d0)), -2.*PI / (3 * SQRT(3.0d0)), 2.*PI / (3 * SQRT(3.0d0))/)
   Brillouin_zone_vertices(:, 2) = (/0.0d0, -2.*PI / 3.0d0, -2.*PI / 3.0d0, 0.0d0, 2.*PI / 3.0d0, 2.*PI / 3.0d0/)
 
-  dkx = 1 * KX_MAX / n_brillouin_points
-  dky = 1 * KY_MAX / n_brillouin_points
+  dkx = 3 * KX_MAX / n_brillouin_points
+  dky = 3 * KY_MAX / n_brillouin_points
 
   kx_steps = INT(n_brillouin_points)
   ky_steps = INT(n_brillouin_points)
@@ -959,6 +959,9 @@ SUBROUTINE CALCULATE_GAMMA_K(input_path, n_brillouin_points)
       END DO
     END DO
   END DO
+
+  IF (ALLOCATED(V_layer)) DEALLOCATE (V_layer)
+  IF (ALLOCATED(Subband_energies)) DEALLOCATE (Subband_energies) !Deallocate global variable
 
   DEALLOCATE (Hamiltonian_const)
   DEALLOCATE (Hamiltonian_const_band)
@@ -1152,6 +1155,9 @@ SUBROUTINE CALCULATE_PROJECTIONS(input_path, n_r_points, n_phi_points)
   DO n = 1, N_PROJECTIONS
     CLOSE (FIRST_FILE_UNIT + n - 1)
   END DO
+
+  IF (ALLOCATED(V_layer)) DEALLOCATE (V_layer)
+  IF (ALLOCATED(Subband_energies)) DEALLOCATE (Subband_energies) !Deallocate global variable
 
   DEALLOCATE (Gamma_SC)
   DEALLOCATE (Charge_dens)
