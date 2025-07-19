@@ -2,6 +2,10 @@ import numpy as np
 from DataReaderClass import *
 from collections import defaultdict
 from Projectors.Projectors import *
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class SymmetryResolver(DataReader):
 
@@ -106,48 +110,6 @@ class SymmetryResolver(DataReader):
                             self.nnnSymmetryGammaDict[(*symmetryKey, sym)].append(
                                 symmetryCallbacks[i](nnnGammaToSymmetrize, "next")
                             )
-
-    def calculateSingletTripletGammas(self) -> None:
-        if not self.symmetryGammaDict:
-            raise ValueError(
-                "Dictionary self.symmetryGammaSingletTripletDict is empty. Please, calculate symmetries first."
-            )
-        if self.nNextNeighbors != 0 and not self.nnnSymmetryGammaDict:
-            raise ValueError(
-                "Dictionary self.nnnSymmetryGammaSingletTripletDict is empty. Please, calculate symmetries first."
-            )
-
-        for key in self.symmetryGammaDict:
-            band, spin, sublat, orbital, symmetry = key
-            spinOpposite = spin + (-1) ** (spin + 1)  # generates opposite spin
-            spinStateSign = (-1) ** spin  # -1 for singlet state, +1 for triplet state
-            keyOpposite = (band, spinOpposite, sublat, orbital, symmetry)
-
-            self.symmetryGammaSingletTripletDict[key] = []
-            for i in range(len(self.symmetryGammaDict[key])):
-                value = 0.5 * (  # Check whether it should be 0.5 or 1/sqrt(2)
-                    self.symmetryGammaDict[key][i]
-                    + np.conj(self.symmetryGammaDict[keyOpposite][i])
-                    * spinStateSign
-                )
-                self.symmetryGammaSingletTripletDict[key].append(value)
-
-        if self.nNextNeighbors == 0:
-            return
-
-        for key in self.nnnSymmetryGammaDict:
-            band, spin, sublat, orbital, symmetry = key
-            spinOpposite = spin + (-1) ** (spin + 1)  # generates opposite spin
-            spinStateSign = (-1) ** spin  # -1 for singlet state, +1 for triplet state
-            keyOpposite = (band, spinOpposite, sublat, orbital, symmetry)
-
-            self.nnnSymmetryGammaSingletTripletDict[key] = []
-            for i in range(len(self.nnnSymmetryGammaDict[key])):
-                value = 0.5 * (  # Check whether it should be 0.5 or 1/sqrt(2)
-                    self.nnnSymmetryGammaDict[key][i]
-                    + np.conj(self.nnnSymmetryGammaDict[keyOpposite][i]) * spinStateSign
-                )
-                self.nnnSymmetryGammaSingletTripletDict[key].append(value)
 
     """ ---------------------------------------------------------------------------------- """
     """ ---------------------------- Private methods ------------------------------------- """

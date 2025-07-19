@@ -82,12 +82,12 @@ class ProjectorC6v(Projector):
     }
 
   def getSymmetryNames(self) -> tuple[str, ...]:
-    symmetries = (r"$A_1^{(1)}$", r"$A_1^{(2)}$",
-                  r"$A_2^{(1)}$",
-                  r"$B_1^{(1)}$", r"$B_1^{(2)}$",
-                  r"$B_2^{(1)}$",
-                  r"$E_1^{(1)}$", r"$E_1^{(2)}$", r"$E_1^{(3)}$", r"$E_1^{(4)}$", r"$E_1^{(5)}$", r"$E_1^{(6)}$",
-                  r"$E_2^{(1)}$", r"$E_2^{(2)}$", r"$E_2^{(3)}$", r"$E_2^{(4)}$", r"$E_2^{(5)}$", r"$E_2^{(6)}$")
+    symmetries = (r"A_1^{(1)}", r"A_1^{(2)}",
+                  r"A_2^{(1)}",
+                  r"B_1^{(1)}", r"B_1^{(2)}",
+                  r"B_2^{(1)}",
+                  r"E_1^{(1)}", r"E_1^{(2)}", r"E_1^{(3)}", r"E_1^{(4)}", r"E_1^{(5)}", r"E_1^{(6)}",
+                  r"E_2^{(1)}", r"E_2^{(2)}", r"E_2^{(3)}", r"E_2^{(4)}", r"E_2^{(5)}", r"E_2^{(6)}")
     return symmetries
 
   def getProjectionIndeces(self) -> dict[str, dict[str, dict[str,list[int]]]]:

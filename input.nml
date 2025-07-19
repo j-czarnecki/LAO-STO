@@ -12,7 +12,7 @@
     t_rashba = 0.0
     lambda_soc = 10.0
     delta_trigonal = -5.0
-    zeta_tetragonal = -30.0
+    zeta_tetragonal = 0.0
     orb_affected_tetragonal = 1
     v = 200.0
     v_pdp = 28.0

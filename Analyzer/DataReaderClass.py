@@ -4,7 +4,9 @@ import os
 import re
 import numpy as np
 import shutil
+import logging
 
+logger = logging.getLogger(__name__)
 
 class DataReader:
 
@@ -72,7 +74,7 @@ class DataReader:
         Loads filling data from simulations base on specified in __init__() runsPath and matchPattern.
         If simulation had not converged, takse values from _iter.dat file - the last iteration before program timeout.
         """
-        print("---> Loading filling data")
+        logger.info("Loading filling data")
         directories = [
             dir for dir in os.listdir(self.runsPath) if re.match(self.matchPattern, dir)
         ]
@@ -96,7 +98,7 @@ class DataReader:
                 )
                 self.__FillDictFilling(currentFilling, isFirstIter)
             elif os.path.exists(filePathIter):
-                print("No convergence in ", dir)
+                logger.info(f"No convergence in {dir}")
                 if loadUnfinished:
                     currentFilling = pd.read_fwf(
                         filePathIter,
@@ -109,7 +111,7 @@ class DataReader:
                 else:
                     self.__FillDictFilling(currentFilling, isFirstIter, fillNones=True)
             else:
-                print("No Charge dens file in ", dir)
+                logger.info(f"No Charge dens file in {dir}")
                 continue
             isFirstIter = False
 
@@ -121,7 +123,7 @@ class DataReader:
         that were changed during simulation.
         """
 
-        print("---> Loading gamma data")
+        logger.info("Loading gamma data")
         directories = [
             dir for dir in os.listdir(self.runsPath) if re.match(self.matchPattern, dir)
         ]
@@ -151,7 +153,7 @@ class DataReader:
 
             # If simulation did NOT converge, iteration file should exists
             elif os.path.exists(filePathGammaIter):
-                print("No convergence in ", dir)
+                logger.info(f"No convergence in {dir}")
                 if loadUnfinished:
                     currentGamma = pd.read_fwf(
                         filePathGammaIter,
@@ -164,7 +166,7 @@ class DataReader:
                 else:
                     self.__FillDictGamma(currentGamma, firstIter, fillNones=True)
             else:
-                print("No Gamma file in ", dir)
+                logger.warning(f"No Gamma file in {dir}")
                 # shutil.rmtree(os.path.join(self.runsPath, dir))
                 # print('Directory removed')
                 continue
@@ -183,7 +185,7 @@ class DataReader:
         """
         Loads dispersion relations data from energiesPath.
         """
-        print("---> Loading dispersion data")
+        logger.info("Loading dispersion data")
         names = [
             "N",
             "kx",
@@ -216,15 +218,14 @@ class DataReader:
                 low_memory=True,
             )
         else:
-            print("No such file ", energiesPath)
+            logger.warning(f"No such file {energiesPath}")
 
     def LoadDos(self, dosPath: str):
         """
         Loads DOS data from dosPath.
         """
-        #print("---> Loading DOS data")
+        logger.info("Loading DOS data")
         if os.path.exists(dosPath):
-            # dispersion = pd.read_fwf(energiesPath, skiprows=1, colspecs=[(0,6), (7,21), (22,36), (37,51), (52, 66), (67, 81), (82, 96), (97, 111), (112,126), (127, 141), (142, 156)])
             self.dosDataframe = pd.read_fwf(
                 dosPath,
                 skiprows=1,
@@ -233,13 +234,13 @@ class DataReader:
                 dtype=np.float64,
             )
         else:
-            print("No such file ", dosPath)
+            logger.warning(f"No such file {dosPath}")
 
     def LoadSuperconductingGap(self, gapPath: str):
         """
         Loads superconducting gap from gapPath.
         """
-        print("---> Loading superconducting gap")
+        logger.info("Loading superconducting gap data")
         if os.path.exists(gapPath):
             self.superconductingGapDataframe = pd.read_fwf(
                 gapPath,
@@ -250,13 +251,12 @@ class DataReader:
                 dtype=np.float64,
             )
         else:
-            print("No such file ", gapPath)
+            logger.warning(f"No such file {gapPath}")
 
     def LoadSuperconductingGapMap(self, runsPathGap: str, matchPatternGap: str):
         directories = [
             dir for dir in os.listdir(runsPathGap) if re.match(matchPatternGap, dir)
         ]
-        isFirstIter = True
 
         for dir in directories:
             filePath = os.path.join(
@@ -271,10 +271,9 @@ class DataReader:
                     names=["kx", "ky", "gap", "state"],
                     dtype=np.float64,
                 )
-                self.FillDictScGap(currentGap)
+                self.__fillDictScGap(currentGap)
             else:
-                print("No such file ", filePath)
-            isFirstIter = False
+                logger.warning(f"No Gap file in {dir}")
 
     def LoadGammaMap(self, gammaKPath: str):
         if os.path.exists(gammaKPath):
@@ -285,7 +284,7 @@ class DataReader:
                 skiprows=1,
             )
         else:
-            print("No such file ", gammaKPath)
+            logger.warning(f"No such file {gammaKPath}")
 
     def sortData(self):
         """
@@ -293,7 +292,6 @@ class DataReader:
         Based on the order of self.params list of tuples (first elements ???)
         """
         sortedIndexes = sorted(range(len(self.params)), key=lambda x: self.params[x])
-        print(len(sortedIndexes))
         for key, yList in self.gamma.items():
             self.gamma[key] = [yList[i] for i in sortedIndexes]
 
@@ -315,7 +313,7 @@ class DataReader:
         Extracts proper key from simulation files, converts gamma back to complex value and writes do dict
         """
         if len(pandasFile.spin) == 0:
-            print("ERROR: empty gamma file")
+            logger.error("Empty gamma file")
             for key in list(self.gamma.keys()):
                 self.gamma[key].append(np.nan)
             return
@@ -326,16 +324,13 @@ class DataReader:
                 int(x) for x in pandasFile.loc[row, self.colnamesGamma[:-2]]
             )
             if firstIter:
-                # self.gamma[dictKey] = [np.sqrt(pandasFile.gammaR[row]**2 + pandasFile.gammaIm[row]**2)]
                 if not fillNones:
                     self.gamma[dictKey] = [
                         pandasFile.gammaR[row] + pandasFile.gammaIm[row] * 1j
                     ]
                 else:
                     self.gamma[dictKey] = np.nan
-                # print(dictKey)
             else:
-                # self.gamma[dictKey].append(np.sqrt(pandasFile.gammaR[row]**2 + pandasFile.gammaIm[row]**2))
                 if not fillNones:
                     self.gamma[dictKey].append(
                         pandasFile.gammaR[row] + pandasFile.gammaIm[row] * 1j
@@ -350,7 +345,7 @@ class DataReader:
         Extracts proper key from simulation files and appends to filling dict
         """
         if len(pandasFile.spin) == 0:
-            print("ERROR: empty filling file")
+            logger.error("Empty filling file")
             for key in list(self.filling.keys()):
                 self.filling[key].append(np.nan)
             self.fillingTotal.append(np.nan)
@@ -361,24 +356,19 @@ class DataReader:
             dictKey = tuple(
                 int(x) for x in pandasFile.loc[row, self.colnamesCharge[:-1]]
             )
-            # dictKey = (
-            #     int(pandasFile.spin[row]),
-            #     int(pandasFile.sublat[row]),
-            #     int(pandasFile.orbital[row]),
-            # )
+
             if firstIter:
                 if not fillNones:
                     self.filling[dictKey] = [pandasFile.filling[row]]
                 else:
                     self.filling[dictKey] = np.nan
-                # print(dictKey)
             else:
                 if not fillNones:
                     self.filling[dictKey].append(pandasFile.filling[row])
                 else:
                     self.filling[dictKey].append(np.nan)
 
-    def FillDictScGap(self, pandasFile: pd.DataFrame, fillNones: bool = False):
+    def __fillDictScGap(self, pandasFile: pd.DataFrame, fillNones: bool = False):
         for row in range(len(pandasFile["kx"])):
             self.superconductingGapMap[int(pandasFile["state"][row])]["kx"].append(
                 pandasFile["kx"][row]
