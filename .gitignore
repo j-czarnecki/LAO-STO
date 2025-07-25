@@ -10,3 +10,4 @@
 OBJ/
 MOD/
 */__pycache__/*
+*.code-workspace
