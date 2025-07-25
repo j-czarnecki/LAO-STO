@@ -155,8 +155,8 @@ class DispersionPlotter(DataReader):
                 # axin.add_collection(lc)
 
             ax.grid(True, linestyle=':')
-            ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
-            ax.yaxis.set_major_locator(ticker.MultipleLocator(25))
+            ax.xaxis.set_major_locator(ticker.LinearLocator(5))
+            ax.yaxis.set_major_locator(ticker.LinearLocator(5))
             ax.set_xlim(-kMax, kMax)
             ax.set_ylim(bottom=minEnergy, top=maxEnergy)
             ax.set_xlabel(xLabelOnPlot)

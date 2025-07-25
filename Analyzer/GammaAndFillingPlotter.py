@@ -160,8 +160,8 @@ class GammaAndFillingPlotter(SymmetryResolver):
                     rf"{gammaLabelsCallbacks[nNeighborhood](sublat, symmetry, spin)} (meV)",
                     labelpad=20,
                 )
-                ax1.xaxis.set_major_locator(ticker.MultipleLocator(30))
-                ax1.yaxis.set_major_locator(ticker.MultipleLocator(0.2))
+                ax1.xaxis.set_major_locator(ticker.LinearLocator(5))
+                ax1.yaxis.set_major_locator(ticker.LinearLocator(5))
                 for mu in (31, 79, 141):
                     ax1.scatter(mu, 0.02, marker='v', s=75, color='deeppink', zorder=10, edgecolors='k', linewidth=1)
 

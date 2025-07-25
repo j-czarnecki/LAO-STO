@@ -17,7 +17,7 @@ class Runner(RunnerConfig):
         RunnerConfig.__init__(self)
 
     def run_slurm_param_value(
-        self, paramValuePairs: list, runsDir: str, material: str, isAres: bool = False
+        self, paramValuePairs: list, runsDir: str, material: str, machine: str = "default"
     ):
         """
         Sets all parameters given in key-value pairs.
@@ -25,22 +25,16 @@ class Runner(RunnerConfig):
         to be J_SC / 10.
         Also starting values of gamma parameters are automatically set to 0 if corresponding J is 0.
         """
-        if isAres:
-            pathToAppend = os.path.join(SCRATCH_PATH, runsDir)
-            os.makedirs(pathToAppend, exist_ok=True)
-            pathToAppend = os.path.join(pathToAppend, "RUN")
-        else:
-            pathToAppend = f"RUN"
+        pathToAppend = os.path.join(SCRATCH_PATH, runsDir)
+        os.makedirs(pathToAppend, exist_ok=True)
+        pathToAppend = os.path.join(pathToAppend, "RUN")
 
         for pair in paramValuePairs:
             if pair[0] != "self_consistency" and not isinstance(pair[2], list):
                 pathToAppend = pathToAppend + f"_{pair[1]}_{pair[2]}"
 
         runner_cwd = os.getcwd()
-        if isAres:
-            path = pathToAppend
-        else:
-            path = os.path.join(runner_cwd, pathToAppend)
+        path = pathToAppend
 
         output_dir = f"OutputData"
         if not os.path.exists(path):
@@ -64,11 +58,7 @@ class Runner(RunnerConfig):
             f90nml.write(nml, nml_file, sort=False)
         # setting up slurm script
         with open("job.sh", "w") as job_file:
-            if isAres:
-                print(self.job_header_ares, file=job_file)
-            else:
-                print(self.job_header, file=job_file)
-
+            print(self.job_header[machine], file=job_file)
             print("cd " + path, file=job_file)
             print(os.path.join(runner_cwd, "..", "bin", "LAO_STO.x"), file=job_file)
 
@@ -77,7 +67,7 @@ class Runner(RunnerConfig):
         os.chdir(runner_cwd)
         return path  # for sequential runner
 
-    def run_slurm_postprocessing(self, runDir, paramValuePairs, isAres: bool = False):
+    def run_slurm_postprocessing(self, runDir, paramValuePairs, machine: str = "default"):
 
         runner_cwd = os.getcwd()
         os.chdir(runDir)
@@ -93,10 +83,7 @@ class Runner(RunnerConfig):
         # setting up slurm script
         os.chdir(runDir)
         with open("job.sh", "w") as job_file:
-            if isAres:
-                print(self.job_header_ares, file=job_file)
-            else:
-                print(self.job_header, file=job_file)
+            print(self.job_header[machine], file=job_file)
 
             print("cd " + runDir, file=job_file)
             print(
@@ -112,7 +99,7 @@ class Runner(RunnerConfig):
                              fitConfig: dict,
                              paramValuePairs: list,
                              material: str,
-                             isAres: bool = False):
+                             machine: str = "default"):
 
         print(fitConfig)
 
@@ -149,10 +136,7 @@ class Runner(RunnerConfig):
         # setting up slurm script
         os.chdir(fitConfig["runsDir"])
         with open("job.sh", "w") as job_file:
-            if isAres:
-                print(self.job_header_ares, file=job_file)
-            else:
-                print(self.job_header, file=job_file)
+            print(self.job_header[machine], file=job_file)
 
             print(f"cd {os.path.join(HOME_PATH, 'LAO-STO')}", file=job_file)
             print(f"python3 -m Fitter.mainFitter --config {os.path.join(fitConfig['runsDir'], 'fitConfig.yaml')}", file=job_file)
@@ -163,6 +147,7 @@ class Runner(RunnerConfig):
 
     def run_sequential(self):
         """
+        ============= DEPRECATED =====================
         Runs jobs sequentialy i.e. output of first job is the starting point for the second etc.
         """
         nml_name = "physical_params"
@@ -180,39 +165,39 @@ class Runner(RunnerConfig):
 
         for Ef in Fermi_table:
 
-            if isFirstIter:
-                pathRun = self.run_slurm_param_value(
-                    [
-                        Ef,
-                        ("self_consistency", "read_gamma_from_file", False),
-                        ("self_consistency", "read_charge_from_file", False),
-                    ],
-                    isAres=False,
-                )
-                isFirstIter = False
-            else:
-                pathRun = self.run_slurm_param_value(
-                    [
-                        Ef,
-                        ("self_consistency", "read_gamma_from_file", True),
-                        (
-                            "self_consistency",
-                            "path_to_gamma_start",
-                            os.path.join(
-                                previousPathRun, "OutputData/Gamma_SC_final.dat"
-                            ),
-                        ),
-                        ("self_consistency", "read_charge_from_file", True),
-                        (
-                            "self_consistency",
-                            "path_to_charge_start",
-                            os.path.join(
-                                previousPathRun, "OutputData/Charge_dens_final.dat"
-                            ),
-                        ),
-                    ],
-                    isAres=False,
-                )
+            # if isFirstIter:
+            #     pathRun = self.run_slurm_param_value(
+            #         [
+            #             Ef,
+            #             ("self_consistency", "read_gamma_from_file", False),
+            #             ("self_consistency", "read_charge_from_file", False),
+            #         ],
+            #         isAres=False,
+            #     )
+            #     isFirstIter = False
+            # else:
+            #     pathRun = self.run_slurm_param_value(
+            #         [
+            #             Ef,
+            #             ("self_consistency", "read_gamma_from_file", True),
+            #             (
+            #                 "self_consistency",
+            #                 "path_to_gamma_start",
+            #                 os.path.join(
+            #                     previousPathRun, "OutputData/Gamma_SC_final.dat"
+            #                 ),
+            #             ),
+            #             ("self_consistency", "read_charge_from_file", True),
+            #             (
+            #                 "self_consistency",
+            #                 "path_to_charge_start",
+            #                 os.path.join(
+            #                     previousPathRun, "OutputData/Charge_dens_final.dat"
+            #                 ),
+            #             ),
+            #         ],
+            #         isAres=False,
+            #     )
 
             previousPathRun = pathRun
 

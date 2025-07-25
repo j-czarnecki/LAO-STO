@@ -1,6 +1,6 @@
 from RunnerClass import *
 import re
-
+import numpy as np
 
 def runTemperatureDependence():
     runner = Runner()
@@ -114,12 +114,12 @@ def configureAndRunPostprocessing():
 def configureAndRunSc():
     runner = Runner()
 
-    # Fermi energy
+    #Fermi energy
     nml_name = "physical_params"
     param_name = "E_Fermi"
-    Ef_min = -1.05e3
-    Ef_max = -0.9e3
-    Ef_steps = 75
+    Ef_min = -0.05e3
+    Ef_max = 0.0e3
+    Ef_steps = 1
     dE = abs(Ef_max - Ef_min) / Ef_steps
     Fermi_table = [(nml_name, param_name, Ef_min + i * dE) for i in range(Ef_steps + 1)]
 
@@ -139,35 +139,54 @@ def configureAndRunSc():
     # U_nml = (nml_name, param_name, U_hub_val)
     # V_nml = (nml_name, "V_HUB", U_hub_val)
 
-    #J_SC_NNN
+    #B_field
     nml_name = "physical_params"
-    param_name = "J_SC_NNN"
-    J_NNN = (nml_name, param_name, 0.075e3)
-    J_min = 0.05e3
-    J_max = 0.075e3
-    J_steps = 1
-    dJ = abs(J_max - J_min) / J_steps
-    J_table = [(nml_name, param_name, J_min + i * dJ) for i in range(J_steps + 1)]
+    param_name = "b_magnitude"
+    B_min = 1
+    B_max = 3
+    B_steps = 2
+    dB = abs(B_max - B_min) / B_steps
+    B_table = [(nml_name, param_name, B_min + i * dB) for i in range(B_steps + 1)]
+    B_table = [(nml_name, param_name, 2)]
 
+    #Phi
+    param_name = "b_phi"
+    phi_min = 0
+    phi_max = 90
+    phi_steps = 18
+    dphi = abs(phi_max - phi_min) / phi_steps
+    phi_table = [(nml_name, param_name, phi_min + i * dphi) for i in range(phi_steps + 1)]
 
-    for Ef in Fermi_table:
-        for J_sc in J_table:
-            runner.run_slurm_param_value(
-                paramValuePairs=[
-                    Ef,
-                    J_sc,
-                    #U_nml,
-                    #V_nml
-                    #J_NNN
-                    #V_layer_param,
-                    #Sublat_param,
-                    #Subband_param,
-                    #Subband_energies_param,
-                ],
-                runsDir="STO-SC/LAO-STO-E_Fermi_J_SC_NNN",
-                material="STO",
-                isAres=True,
-            )
+    # #J_SC_NNN
+    # nml_name = "physical_params"
+    # param_name = "J_SC_NNN"
+    # #J_NNN = (nml_name, param_name, 0.3e3)
+    # J_min = 0.25e3
+    # J_max = 0.35e3
+    # J_steps = 2
+    # dJ = abs(J_max - J_min) / J_steps
+    # J_table = [(nml_name, param_name, J_min + i * dJ) for i in range(J_steps + 1)]
+
+    for phi in phi_table:
+        for Ef in Fermi_table:
+            for B in B_table:
+                runner.run_slurm_param_value(
+                    paramValuePairs=[
+                        Ef,
+                        B,
+                        phi,
+                        #U_nml,
+                        #V_nml
+                        #J_NNN
+                        #V_layer_param,
+                        #Sublat_param,
+                        #Subband_param,
+                        #Subband_energies_param,
+                    ],
+                    runsDir="KTO-SC/KTO-B_planar_J_SC",
+                    material="KTO",
+                    machine="default",
+                )
 
 
 def runDosFitting():
@@ -206,8 +225,8 @@ def runDosFitting():
 
 def main():
     #runTemperatureDependence()
-    #configureAndRunSc()
-    configureAndRunPostprocessing()
+    configureAndRunSc()
+    #configureAndRunPostprocessing()
     #runDosFitting()
 
 if __name__ == "__main__":
