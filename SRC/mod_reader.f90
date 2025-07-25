@@ -42,7 +42,9 @@ REAL*8 :: V_HUB = 0.
 REAL*8 :: E_Fermi = 0.
 REAL*8, ALLOCATABLE :: V_layer(:)
 REAL*8, ALLOCATABLE :: Subband_energies(:)
-REAL*8 :: B_field(3)
+REAL*8 :: B_magnitude = 0 !! Magnitude of magnetic field [T]
+REAL*8 :: B_theta = 0 !! Angle of magnetic field defined with respect to Z axis [deg]
+REAL*8 :: B_phi = 0 !! Angle of magnetic field defined with respect to X axis [deg]
 
 !Self-consistency
 LOGICAL :: read_gamma_from_file = .FALSE.
@@ -69,6 +71,7 @@ INTEGER*4 :: max_grid_refinements_y = 0
 !Derived
 REAL * 8 eta_p
 REAL*8 :: dr_k, dphi_k, domega
+REAL*8 :: B_field(3)
 
 !Used for postprocessing
 !Superconducting gap calculation
@@ -132,7 +135,9 @@ NAMELIST /physical_params/  &
 & E_Fermi,                  &
 & V_layer,                  &
 & Subband_energies,         &
-& B_field
+& B_magnitude,              &
+& B_theta,                  &
+& B_phi
 
 NAMELIST /discretization/ &
 & k1_steps,               &
@@ -247,7 +252,7 @@ SUBROUTINE GET_INPUT(nmlfile)
     STOP "Error reading physical_params"
   END IF
 
-  WRITE (log_string, '(18(A, E15.5))') "T: ", T,&
+  WRITE (log_string, '(21(A, E15.5))') "T: ", T,&
                                    & " t_D: ", t_D,&
                                    & " t_I: ", t_I,&
                                    & " t_Rashba: ", t_Rashba,&
@@ -264,7 +269,15 @@ SUBROUTINE GET_INPUT(nmlfile)
                                    & " J_SC_PRIME_NNN: ", J_SC_PRIME_NNN,&
                                    & " U_HUB: ", U_HUB,&
                                    & " V_HUB: ", V_HUB,&
-                                   & " E_Fermi: ", E_Fermi
+                                   & " E_Fermi: ", E_Fermi,&
+                                   & " B_magnitude: ", B_magnitude,&
+                                   & " B_theta: ", B_theta,&
+                                   & " B_phi: ", B_phi
+
+  B_field(1) = COSD(B_phi) * SIND(B_theta) * B_magnitude
+  B_field(2) = SIND(B_phi) * SIND(B_theta) * B_magnitude
+  B_field(3) = COSD(B_theta) * B_magnitude
+
   LOG_INFO(log_string)
   WRITE (log_string, *) "V_layer: ", (V_layer(i), i=1, SUBLATTICES)
   LOG_INFO(log_string)
@@ -275,6 +288,7 @@ SUBROUTINE GET_INPUT(nmlfile)
 
   !Check input data
   IF (T < 0) STOP "Temperature in kelvins must be >= 0!"
+  IF (B_magnitude < 0) STOP "B_magnitude must be >= 0!"
 
   !Change to atomic units
   t_D = t_D * meV2au

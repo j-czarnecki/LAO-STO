@@ -11,10 +11,10 @@
     Nk_points_chern_number = 1000 /
 
 &dispersion_relation_calculation
-    enable_dispersion_relation_calc = .FALSE.,
+    enable_dispersion_relation_calc = .TRUE.,
     path_to_run_dir_dispersion_relation = "/home/czarnecki/LAO-STO/",
     include_sc_in_dispersion = .FALSE.,
-    Nk_points_dispersion_relation = 400 /
+    Nk_points_dispersion_relation = 200 /
 
 &dos_calculation
     enable_dos_calc = .FALSE.,
@@ -28,7 +28,7 @@
     Nk_points_dos_refined = 30 /
 
 &gamma_k_calculation
-    enable_gamma_k_calc = .TRUE.,
+    enable_gamma_k_calc = .FALSE.,
     path_to_run_dir_gamma_k = "/home/czarnecki/SCRATCH/STO-SC/LAO-STO-E_Fermi_J_SC/RUN_E_Fermi_-912.0_J_SC_110.0/",
     Nk_points_gamma_k = 200 /
 

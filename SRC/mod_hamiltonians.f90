@@ -17,6 +17,7 @@ RECURSIVE SUBROUTINE COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian)
   CALL COMPUTE_TETRAGONAL_STRAIN(Hamiltonian(:, :))
   CALL COMPUTE_FERMI_ENERGY(Hamiltonian(:, :))
   CALL COMPUTE_ZEEMAN(B_field, Hamiltonian(:, :))
+  CALL COMPUTE_ORBITAL_MAGNETIC_COUPLING(B_field, Hamiltonian(:,:))
   CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
 END SUBROUTINE COMPUTE_K_INDEPENDENT_TERMS
 
@@ -556,14 +557,62 @@ RECURSIVE SUBROUTINE COMPUTE_ZEEMAN(B, Hamiltonian)
       DO i = 1, TBA_DIM
         row = nambu * DIM_POSITIVE_K + spin * TBA_DIM + i
         col = MIN(row + TBA_DIM, DIM)
-        !Electrons
-        Hamiltonian(row, col) = Hamiltonian(row, col) + sign_nambu * 0.5d0 * muB * gFactor * (B(1) - imag * B(2))
+        !B_z terms
         Hamiltonian(row, row) = Hamiltonian(row, row) + sign_nambu * sign_spin * 0.5d0 * muB * gFactor * B(3)
       END DO
     END DO
   END DO
 
+  DO nambu = 0, 1
+    sign_nambu = (-1)**nambu
+    DO i = 1, TBA_DIM
+      row = nambu * DIM_POSITIVE_K + i
+      col = nambu * DIM_POSITIVE_K + TBA_DIM + i
+      !B_x and B_y terms
+      Hamiltonian(row, col) = Hamiltonian(row, col) + sign_nambu * 0.5d0 * muB * gFactor * (B(1) - imag * B(2))
+    END DO
+  END DO
 END SUBROUTINE COMPUTE_ZEEMAN
+
+RECURSIVE SUBROUTINE COMPUTE_ORBITAL_MAGNETIC_COUPLING(B, Hamiltonian)
+  !! Computes L \cdot B coupling, taking into account d orbitals
+  REAL*8, INTENT(IN) :: B(3) !! Magnetic field
+  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM, DIM) !! Hamiltonian to be updated
+
+  INTEGER*4 :: i_orb, j_orb, lat, spin, nambu, row, col
+  REAL*8 :: sign_nambu
+  REAL*8, PARAMETER :: muB = 0.5
+  COMPLEX*16, PARAMETER :: c_zero = (0.0d0, 0.0d0) ! So that compiler does not complain about type mismatch between 0 and imag
+  COMPLEX*16, PARAMETER :: L_x(3,3) = TRANSPOSE(RESHAPE([c_zero, c_zero, imag, &
+                                                         c_zero, c_zero, imag, &
+                                                         -imag, -imag, c_zero], &
+                                                         [3,3])) / SQRT(2.0d0)
+  COMPLEX*16, PARAMETER :: L_y(3,3) = TRANSPOSE(RESHAPE([c_zero, -2*imag, -imag, &
+                                                         2*imag, c_zero, imag, &
+                                                         imag, -imag, c_zero], &
+                                                         [3,3])) / SQRT(6.0d0)
+  COMPLEX*16, PARAMETER :: L_z(3,3)= TRANSPOSE(RESHAPE([c_zero, -imag, imag, &
+                                                         imag, c_zero, -imag, &
+                                                         -imag, imag, c_zero], &
+                                                         [3,3])) / SQRT(3.0d0)
+
+  DO nambu = 0, 1
+    sign_nambu = (-1)**nambu
+    DO spin = 0, 1
+      DO lat = 0, SUBLATTICES - 1
+        DO i_orb = 1, ORBITALS
+          DO j_orb = i_orb, ORBITALS
+            row = nambu * DIM_POSITIVE_K + spin * TBA_DIM + lat * ORBITALS + i_orb
+            col = nambu * DIM_POSITIVE_K + spin * TBA_DIM + lat * ORBITALS + j_orb
+            Hamiltonian(row, col) = Hamiltonian(row, col) + sign_nambu * muB * &
+            & (B(1) * L_x(i_orb, j_orb) + B(2) * L_y(i_orb, j_orb) + B(3) * L_z(i_orb, j_orb))
+          END DO
+        END DO
+      END DO
+    END DO
+  END DO
+
+END SUBROUTINE COMPUTE_ORBITAL_MAGNETIC_COUPLING
 
 !################ ADDITIONAL HAMILTONIANS FOR TESTING ########################
 RECURSIVE SUBROUTINE DIAGONAL_TBA(Hamiltonian, kx, ky)

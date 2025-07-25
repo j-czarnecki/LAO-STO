@@ -1,5 +1,9 @@
 test_suite mod_hamiltonians
 
+REAL*8, PARAMETER :: gFactor = 3.0d0
+REAL*8, PARAMETER :: muB = 0.5
+REAL*8, PARAMETER :: s = 0.5
+
 setup
 USE mod_parameters
 USE mod_utilities
@@ -379,5 +383,108 @@ END DO
 
 DEALLOCATE (V_layer)
 end test
+
+test test_compute_zeeman
+COMPLEX*16 :: Hamiltonian(DIM, DIM)
+INTEGER*4 :: i, j, nambu_sign, spin_sign
+REAL*8 :: B(3) = [1, 2, 3]
+
+Hamiltonian = 0.0d0
+CALL COMPUTE_ZEEMAN(B, Hamiltonian)
+
+DO i = 1, DIM
+  nambu_sign = (-1)**(INT(i - 1) / DIM_POSITIVE_K)
+  spin_sign = (-1)**(INT(i - 1) / TBA_DIM)
+  DO j = 1, DIM
+    IF (i == j) THEN
+      !B_z terms
+      assert_real_equal(REAL(Hamiltonian(i, j)), gFactor * muB * s * nambu_sign * spin_sign * B(3))
+      assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
+    ELSE IF ( ((i .LE. TBA_DIM) .OR. ((i .GE. DIM_POSITIVE_K + 1) .AND. (i .LE. TBA_DIM + DIM_POSITIVE_K)))&
+               .AND. j == i + TBA_DIM) THEN
+      !B_x term
+      assert_real_equal(REAL(Hamiltonian(i, j)), gFactor * muB * s * nambu_sign * spin_sign * B(1))
+      !B_y term
+      assert_real_equal(AIMAG(Hamiltonian(i, j)), -gFactor * muB * s * nambu_sign * spin_sign * B(2))
+    ELSE
+      assert_real_equal(REAL(Hamiltonian(i, j)), 0.0d0)
+      assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
+    END IF
+  END DO
+END DO
+end test
+
+test test_compute_orbital_magnetic_coupling
+COMPLEX*16 :: Hamiltonian(DIM, DIM)
+REAL*8, PARAMETER :: muB = 0.5
+INTEGER*4 :: i, j, nambu_sign, spin_sign
+REAL*8 :: B(3) = [1, 9, 18]
+COMPLEX*16 :: elem
+COMPLEX*16, PARAMETER :: c_zero = (0.0d0, 0.0d0) ! So that compiler does not complain about type mismatch between 0 and imag
+COMPLEX*16, PARAMETER :: L_x(3,3) = TRANSPOSE(RESHAPE([c_zero, c_zero, imag, &
+                                                        c_zero, c_zero, imag, &
+                                                        -imag, -imag, c_zero], &
+                                                        [3,3])) / SQRT(2.0d0)
+COMPLEX*16, PARAMETER :: L_y(3,3) = TRANSPOSE(RESHAPE([c_zero, -2*imag, -imag, &
+                                                        2*imag, c_zero, imag, &
+                                                        imag, -imag, c_zero], &
+                                                        [3,3])) / SQRT(6.0d0)
+COMPLEX*16, PARAMETER :: L_z(3,3)= TRANSPOSE(RESHAPE([c_zero, -imag, imag, &
+                                                        imag, c_zero, -imag, &
+                                                        -imag, imag, c_zero], &
+                                                        [3,3])) / SQRT(3.0d0)
+
+Hamiltonian = 0.0d0
+CALL COMPUTE_ORBITAL_MAGNETIC_COUPLING(B, Hamiltonian)
+
+OPEN(unit=9, file="../../OutputData/OrbitalMagnetic.dat", FORM="FORMATTED", ACTION="WRITE")
+DO i = 1, DIM
+  WRITE(9,'(24F8.2)') REAL(Hamiltonian(i, :))
+  WRITE(9,*)
+END DO
+WRITE(9,*)
+WRITE(9,*)
+DO i = 1, DIM
+  WRITE(9,'(24F8.2)') AIMAG(Hamiltonian(i, :))
+  WRITE(9,*)
+END DO
+CLOSE(9)
+
+DO i = 1, DIM
+  nambu_sign = (-1)**(INT(i - 1) / DIM_POSITIVE_K)
+  DO j = 1, DIM
+    IF ((MOD(i, ORBITALS) .NE. 0)) THEN
+      IF (MOD(i, ORBITALS) .EQ. 1) THEN
+        IF (j .EQ. i + 1) THEN
+          elem = muB * B(1) * L_x(1,2) * nambu_sign !B_x coupling
+          elem = elem + muB * B(2) * L_y(1,2) * nambu_sign !B_y coupling
+          elem = elem + muB * B(3) * L_z(1,2) * nambu_sign !B_z coupling
+          !Check
+          assert_real_equal(REAL(Hamiltonian(i, j)), REAL(elem))
+          assert_real_equal(AIMAG(Hamiltonian(i, j)), AIMAG(elem))
+        ELSE IF (j .EQ. i + 2) THEN
+          elem = muB * B(1) * L_x(1,3) * nambu_sign !B_x coupling
+          elem = elem + muB * B(2) * L_y(1,3) * nambu_sign !B_y coupling
+          elem = elem + muB * B(3) * L_z(1,3) * nambu_sign !B_z coupling
+          assert_real_equal(REAL(Hamiltonian(i, j)), REAL(elem))
+          assert_real_equal(AIMAG(Hamiltonian(i, j)), AIMAG(elem))
+        END IF
+      ELSE IF (MOD(i, ORBITALS .EQ. 2)) THEN
+        IF (j .EQ. i + 2) THEN
+          elem = muB * B(1) * L_x(2,3) * nambu_sign !B_x coupling
+          elem = elem + muB * B(2) * L_y(2,3) * nambu_sign !B_y coupling
+          elem = elem + muB * B(3) * L_z(2,3) * nambu_sign !B_z coupling
+          assert_real_equal(REAL(Hamiltonian(i, j)), REAL(elem))
+          assert_real_equal(AIMAG(Hamiltonian(i, j)), AIMAG(elem))
+        END IF
+      END IF
+    ELSE
+      assert_real_equal(REAL(Hamiltonian(i, j)), 0.0d0)
+      assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
+    END IF
+  END DO
+END DO
+end test
+
 
 end test_suite
