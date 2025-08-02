@@ -122,7 +122,7 @@ charge_max_error = 0.
 CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const)
 
 OPEN (unit=99, FILE="./OutputData/Convergence.dat", FORM="FORMATTED", ACTION="WRITE")
-WRITE (99, *) '# sc_iter, Re(Gamma), Im(Gamma), Re(Gamma_new), Im(Gamma_new), n, n_new, gamma_max_err, charge_max_err'
+WRITE (99, *) '# sc_iter, Re(Gamma), Im(Gamma), Re(Gamma_new), Im(Gamma_new), Re(Gamma_nnn), Im(Gamma_nnn), Re(Gamma_ne_nnn), Im(Gamma_new_nnn), n, n_new, gamma_max_err, charge_max_err'
 DO sc_iter = 1, max_sc_iter
   WRITE (log_string, '(a, I0)') "==== SC_ITER: ", sc_iter
   LOG_INFO(log_string)
@@ -170,8 +170,10 @@ DO sc_iter = 1, max_sc_iter
     EXIT
   END IF
 
-  WRITE (99, '(I0, 8E15.5)') sc_iter, REAL(Gamma_SC(1, 1, 1, 1, 1) / meV2au), AIMAG(Gamma_SC(1, 1, 1, 1, 1) / meV2au), &
+  WRITE (99, '(I0, 12E15.5)') sc_iter, REAL(Gamma_SC(1, 1, 1, 1, 1) / meV2au), AIMAG(Gamma_SC(1, 1, 1, 1, 1) / meV2au), &
   &                                 REAL(Gamma_SC_new(1, 1, 1, 1, 1) / meV2au), AIMAG(Gamma_SC_new(1, 1, 1, 1, 1) / meV2au), &
+  &                                 REAL(Gamma_SC(1, 4, 1, 1, 1) / meV2au), AIMAG(Gamma_SC(1, 4, 1, 1, 1) / meV2au), &
+  &                                 REAL(Gamma_SC_new(1, 4, 1, 1, 1) / meV2au), AIMAG(Gamma_SC_new(1, 4, 1, 1, 1) / meV2au), &
   &                                 Charge_dens(1, 1), Charge_dens_new(1, 1), gamma_max_error / meV2au, charge_max_error
   WRITE (log_string, '(a, E15.5)') "gamma_max_error [meV]: ", gamma_max_error / meV2au
   LOG_INFO(log_string)
