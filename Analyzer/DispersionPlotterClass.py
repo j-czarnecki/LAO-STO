@@ -258,6 +258,9 @@ class DispersionPlotter(DataReader):
             )
 
         if isSingle:
+            ax.yaxis.set_major_locator(ticker.MultipleLocator(0.25))
+            ax.xaxis.set_major_locator(ticker.MultipleLocator(0.25))
+
             plt.xlim(left=-eMax, right=eMax)
             plt.xlabel(r"E (meV)")
             plt.ylabel(r"DOS")
@@ -281,13 +284,13 @@ class DispersionPlotter(DataReader):
         fig = plt.figure(figsize=(8,10))
         #fig, ax = plt.subplots(figsize=(7, 5), dpi=400, sharex=True)
         cmap = plt.cm.viridis
-        norm = Normalize(0, vmax=max(colorParamList))
+        norm = Normalize(-60, vmax=max(colorParamList))
         axes = []
         for i, dir in enumerate(dosDirsList[::-1]):
             ax = fig.add_subplot(gs[i, 0])
             axes.append(ax)
             self.LoadDos(dir)
-            self.dosDataframe["DOS"] = self.dosDataframe["DOS"]
+            self.dosDataframe["E"] = self.dosDataframe["E"] * 1e3
             color = cmap(norm(colorParamList[dosDirsList.index(dir)]))
             self.plotDos(
                 eMax,
@@ -309,8 +312,9 @@ class DispersionPlotter(DataReader):
                 ax.set_xticks([])
                 ax.spines['bottom'].set_visible(False)
             else:
-                ax.set_xticks([])
-                ax.set_xlabel(r"E (a.u.)")
+                #ax.set_xticks([])
+                ax.xaxis.set_major_locator(ticker.MultipleLocator(250))
+                ax.set_xlabel(r"E ($\mu$eV)")
 
 
         sm = ScalarMappable(cmap=cmap, norm=norm)
@@ -328,11 +332,11 @@ class DispersionPlotter(DataReader):
         gs = gridspec.GridSpec(1, 1, figure=fig, left=0.22, right=0.65, top=1, bottom=0.05)
         ax = fig.add_subplot(gs[0,0])
         self.plotFirstBrillouinZoneBoundary()
-        norm = PowerNorm(gamma=1.2, vmin=0, vmax=self.superconductingGapDataframe.gap.max())
+        norm = PowerNorm(gamma=1.2, vmin=0, vmax=self.superconductingGapDataframe.gap.max()*1e3)
         scat = ax.scatter(
             self.superconductingGapDataframe.kx,
             self.superconductingGapDataframe.ky,
-            c=self.superconductingGapDataframe.gap,
+            c=self.superconductingGapDataframe.gap*1e3,
             s=0.5,
             cmap="inferno",
             norm=norm,
@@ -341,7 +345,8 @@ class DispersionPlotter(DataReader):
 
         cax = fig.add_axes([0.67, 0.22, 0.05, 0.6])  # [left, bottom, width 5% of figure width, height 75% of figure height]
         cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap='inferno'), cax=cax, orientation='vertical')
-        cbar.set_label(r"$\tilde{\Delta}$ (meV)")
+        cbar.set_label(r"$\tilde{\Delta}$ ($\mu$eV)")
+        cbar.set_ticks(ticker.MultipleLocator(150))
 
 
         ax.set_xlim(-2.5, 2.5)
@@ -480,6 +485,7 @@ class DispersionPlotter(DataReader):
 
                         for i, name in enumerate(columnNames):
                             axes[nRows - 1, i].set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
+                            axes[nRows - 1, i].set_xticks([-2, 0 , 2])
                             axes[0, i].set_title(f"{name}")
 
 
@@ -565,13 +571,13 @@ class DispersionPlotter(DataReader):
         plt.rcParams["font.serif"] = "Computer Modern Roman"
         plt.rcParams["font.sans-serif"] = "Computer Modern Sans serif"
         plt.rcParams["font.monospace"] = "Computer Modern Typewriter"
-        plt.rcParams["axes.titlesize"] = 30
-        plt.rcParams["axes.labelsize"] = 30
-        plt.rcParams["xtick.labelsize"] = 26
-        plt.rcParams["ytick.labelsize"] = 26
-        plt.rcParams["font.size"] = 26
-        plt.rcParams["legend.fontsize"] = 20
-        plt.rcParams["legend.title_fontsize"] = 24
+        plt.rcParams["axes.titlesize"] = 50
+        plt.rcParams["axes.labelsize"] = 50
+        plt.rcParams["xtick.labelsize"] = 40
+        plt.rcParams["ytick.labelsize"] = 40
+        plt.rcParams["font.size"] = 40
+        plt.rcParams["legend.fontsize"] = 34
+        plt.rcParams["legend.title_fontsize"] = 36
         # Optionally, add custom LaTeX preamble
         plt.rcParams["text.latex.preamble"] = (
             r"\usepackage{amsmath} \usepackage{amsfonts} \usepackage{amssymb}"
