@@ -157,6 +157,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
             secondXCallback = lambda *args, **kwargs: None
 
         # Set energy units and multipliers
+        yMultiplier = 1
         if yUnit == r"(meV)":
             yMultiplier = 1
         elif yUnit == r"($\mu$eV)":
@@ -209,8 +210,8 @@ class GammaAndFillingPlotter(SymmetryResolver):
                     labelpad=20,
                 )
                 # ax1.xaxis.set_major_locator(ticker.LinearLocator(5))
-                ax1.yaxis.set_major_locator(ticker.LinearLocator(5))
-                ax1.xaxis.set_major_locator(ticker.MultipleLocator(50))
+                ax1.yaxis.set_major_locator(ticker.LinearLocator(4))
+                ax1.xaxis.set_major_locator(ticker.MultipleLocator(60))
 
                 #for mu in (31, 79, 141):
                     #ax1.scatter(mu, 0.02, marker='v', s=75, color='deeppink', zorder=10, edgecolors='k', linewidth=1)
@@ -459,10 +460,12 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 label=format(secondParam, ".1f"),
             )
 
-        ax1.legend(title=r"$U$ (meV)", loc="upper right")
+        ax1.legend(title=r"$U$ (meV)", loc="best")
         ax1.set_xlabel(r"$\mu$ (meV)")
         ax1.set_ylabel(r"$n$ (10 \textsuperscript{-2})", labelpad=10)
-        ax1.xaxis.set_major_locator(ticker.MultipleLocator(100))
+        ax1.set_xlim(right=150)
+        ax1.set_ylim(top=16)
+        ax1.xaxis.set_major_locator(ticker.MultipleLocator(30))
         ax1.yaxis.set_major_locator(ticker.MultipleLocator(5))
         ax1.grid(True, linestyle=':')
         plt.draw()
@@ -472,10 +475,10 @@ class GammaAndFillingPlotter(SymmetryResolver):
         for tick in ax1_ticks:
             tick_labels.append(self.__calculateFillingPerCm2(tick / 100 * 12))
         # Plot secondary axis for occupation
-        ax2 = ax1.secondary_yaxis("right")
-        ax2.set_yticks(ax1_ticks)  # Use the same positions as `ef_plot`
-        ax2.set_yticklabels([f"{val:.1f}" for val in tick_labels])  # Map `n_total_plot` as tick labels
-        ax2.set_ylabel(r"$n$ (10 \textsuperscript{-14} cm\textsuperscript{-2})", labelpad=45, rotation=270)  # Customize units as needed
+        # ax2 = ax1.secondary_yaxis("right")
+        # ax2.set_yticks(ax1_ticks)  # Use the same positions as `ef_plot`
+        # ax2.set_yticklabels([f"{val:.1f}" for val in tick_labels])  # Map `n_total_plot` as tick labels
+        # ax2.set_ylabel(r"$n$ (10 \textsuperscript{-14} cm\textsuperscript{-2})", labelpad=45, rotation=270)  # Customize units as needed
 
 
         plt.savefig(f"../Plots/FillingFermiTotal.png")
