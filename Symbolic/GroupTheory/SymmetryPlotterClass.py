@@ -3,9 +3,8 @@ import numpy as np
 from sympy.vector import CoordSys3D
 import matplotlib.pyplot as plt
 from scipy.interpolate import griddata
-from matplotlib.colors import PowerNorm, Normalize
+from matplotlib.colors import TwoSlopeNorm, PowerNorm, Normalize
 from matplotlib.cm import ScalarMappable
-from matplotlib.colors import TwoSlopeNorm
 import matplotlib.gridspec as gridspec
 from matplotlib.patches import Polygon
 from IPython.display import display
@@ -14,6 +13,9 @@ import os
 from contextlib import contextmanager
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.patches import Polygon
+import colorcet as cc
+from matplotlib.colors import ListedColormap
+import re
 
 try:
     from IPython.utils.io import capture_output
@@ -73,7 +75,7 @@ class SymmetryPlotterClass:
       for v in irrepsEigenvectors[irrep]:
         if np.abs(v[0]) == 1:
           for i in range(v[1]):
-            rowCount += 1
+            rowCount += 2
       nRows[irrep] = rowCount
 
     with initPrinting(enablePrinting):
@@ -82,40 +84,48 @@ class SymmetryPlotterClass:
           nCols = nRows[irrep] // maxRows
           nRows[irrep] = maxRows
 
-        figRe, axesRe = plt.subplots(nRows[irrep], nCols, figsize=(nCols*4, nRows[irrep]*4), sharex=True, sharey=True)
-        figIm, axesIm = plt.subplots(nRows[irrep], nCols, figsize=(nCols*4, nRows[irrep]*4), sharex=True, sharey=True)
+        fig, axes = plt.subplots(nRows[irrep],
+                                 nCols,
+                                 figsize=(nCols*4, nRows[irrep]*4),
+                                 sharex=True,
+                                 sharey=True,
+                                 constrained_layout=False)
 
-        axesRe = np.atleast_1d(axesRe)
-        axesIm = np.atleast_1d(axesIm)
+        axes = np.atleast_1d(axes)
+        axes = axes.reshape((nRows[irrep], nCols))
+        print(axes.shape)
 
-        axesRe = axesRe.reshape((nRows[irrep], nCols))
-        axesIm = axesIm.reshape((nRows[irrep], nCols))
-        print(axesRe.shape)
-        row = 0
+        nIr = 0
         for col in range(nCols):
-          axesRe[nRows[irrep] - 1, col].set_xticks([-2, 0 , 2])
-          axesRe[nRows[irrep] - 1, col].set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
+          axes[nRows[irrep] - 1, col].set_xticks([-2, 0 , 2])
+          axes[nRows[irrep] - 1, col].set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
+          nIr += 1
+          for row in range(0, nRows[irrep], 2):
+            irLabel=''
+            match = re.search(r"\$(.*?)\$", irrep)
+            if match:
+              irLabel = match.group(1)
+            axes[row, col].set_title(rf"${irLabel}^{{({nIr})}}$", pad=10)
 
-          axesIm[nRows[irrep] - 1, col].set_xticks([-2, 0 , 2])
-          axesIm[nRows[irrep] - 1, col].set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
+        for row in range(nRows[irrep]):
+          axes[row, 0].set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
+          axes[row, 0].set_yticks([-2, 0 , 2])
 
+
+        row = 0
         for v in irrepsEigenvectors[irrep]:
           col = 0
           if np.abs(v[0]) == 1:
             for i in range(v[1]):
-              axesRe[row, 0].set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
-              axesRe[row, 0].set_yticks([-2, 0 , 2])
-              axesIm[row, 0].set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
-              axesIm[row, 0].set_yticks([-2, 0 , 2])
+              lastInRow = col == nCols - 1
+              print(lastInRow)
+              self.__getSingleBasisFunction(v[2][i], [axes[row + 1, col], axes[row, col]], neighbor, fig, lastInRow)
 
-              self.__getSingleBasisFunction(v[2][i], [axesRe[row, col], axesIm[row, col]], neighbor)
-
-              row += 1
+              row += 2
               col += row // maxRows
               row = row % maxRows
 
-        figRe.subplots_adjust(wspace=0, hspace=0, left=0, right=1, top=1, bottom=0)
-        figIm.subplots_adjust(wspace=0, hspace=0, left=0, right=1, top=1, bottom=0)
+        fig.subplots_adjust(wspace=0, hspace=0.1, left=0, right=1, top=1, bottom=0)
         plt.show()
 
   def plotOrbitalWeights(self):
@@ -232,7 +242,7 @@ class SymmetryPlotterClass:
       # -1 * (-sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(3, 2) * self.N.j),       # (√3/2, -3/2)
     ]
 
-  def __getSingleBasisFunction(self, eigenvec, axes, neighbor):
+  def __getSingleBasisFunction(self, eigenvec, axes, neighbor, fig, lastInRow):
     N = CoordSys3D('N')
     nOrbs = 3
     k_x, k_y, k_z = self.cartesianKSymbols
@@ -272,10 +282,10 @@ class SymmetryPlotterClass:
     display(orbBasisFunctions)
     print(latexOrbBasisFunctions)
 
-    self.__getZerosOfBasisFunction(orbKxKyBasisFunctions, axes)
+    self.__getZerosOfBasisFunction(orbKxKyBasisFunctions, axes, fig, lastInRow)
 
 
-  def __getZerosOfBasisFunction(self, orbBasisFunctions, axes):
+  def __getZerosOfBasisFunction(self, orbBasisFunctions, axes, fig, lastInRow):
     """
     Orbitals are stored in the following order:
     d_yz, d_zx, d_xy
@@ -292,26 +302,44 @@ class SymmetryPlotterClass:
     X, Y = self.kMesh
 
     Z = f(X, Y)
-    Z = Z / np.max(np.abs(Z)) #Normalize
-    norm = TwoSlopeNorm(vmin=-1, vcenter=0, vmax=1)
-    axRe, axIm = axes
+    axModule, axPhase = axes
 
+    zeroThreshold = 5e-3
     for part in ("real", "imag"):
       zPlot = np.zeros(Z.shape)
       if part == "real":
-        zPlot = np.real(Z)
-        self.__plotFirstBrillouinZoneBoundary(axRe)
-        axRe.pcolormesh(X, Y, zPlot, cmap='bwr', norm=norm)
-        axRe.contour(X, Y, zPlot, levels=[0], colors='black', linestyles='dotted', linewidths=0.5)
-        axRe.set_aspect("equal")
+        zPlot = np.abs(Z) / np.max(np.abs(Z))
+        self.__plotFirstBrillouinZoneBoundary(axModule)
+        colormesh = axModule.pcolormesh(X,
+                                        Y,
+                                        zPlot,
+                                        cmap="Greys",
+                                        norm=PowerNorm(gamma=0.5, vmin=0, vmax=1))
+        axModule.contour(X, Y, zPlot, levels=[-zeroThreshold, zeroThreshold], colors='magenta', linestyles='dotted', linewidths=0.5)
+        axModule.set_aspect("equal")
+        if lastInRow:
+          # Manual colorbar axis (left, bottom, width, height) in figure coords
+          cax = fig.add_axes([1.02, 0.03, 0.015, 0.42])  # adjust as needed
+          cbar = fig.colorbar(colormesh, cax=cax)
+          cbar.set_ticks([0, 0.25, 0.5, 1])
+          cbar.set_label(r"$|\Gamma|$")
+
       elif part == "imag":
-        zPlot = np.imag(Z)
-        self.__plotFirstBrillouinZoneBoundary(axIm)
-        axIm.pcolormesh(X, Y, zPlot, cmap='bwr', norm=norm)
-        axIm.contour(X, Y, zPlot, levels=[0], colors='black', linestyles='dotted', linewidths=0.5)
-        axIm.set_aspect("equal")
-
-
+        zPlot = np.angle(Z) / np.pi
+        self.__plotFirstBrillouinZoneBoundary(axPhase)
+        colormesh = axPhase.pcolormesh(X,
+                                       Y,
+                                       zPlot,
+                                       cmap=self.__shiftCmap(cc.cm.cyclic_tritanopic_cwrk_40_100_c20, -0.75),
+                                       norm=PowerNorm(gamma=1., vmin = -1, vmax = 1))
+        axPhase.contour(X, Y, zPlot, levels=[-zeroThreshold, zeroThreshold], colors='magenta', linestyles='dotted', linewidths=0.5)
+        axPhase.set_aspect("equal")
+        if lastInRow:
+          # Manual colorbar axis (left, bottom, width, height) in figure coords
+          cax = fig.add_axes([1.02, 0.55, 0.015, 0.42])  # adjust as needed
+          cbar = fig.colorbar(colormesh, cax=cax)
+          cbar.set_ticks([-1, -0.5, 0, 0.5, 1])
+          cbar.set_label(r"$\arg \left( \Gamma \right)$ ($\pi$)")
 
   def __plotFirstBrillouinZoneBoundary(self, ax = None):
     brillouinZoneVertices = np.zeros((7, 2))  # One more to close the polygon
@@ -446,3 +474,11 @@ class SymmetryPlotterClass:
     plt.rcParams["ytick.right"] = True
 
     plt.rcParams["axes.xmargin"] = 0.01
+
+  def __shiftCmap(self, cmap, fraction_shift=0.0, name='shifted'):
+    """Shift a colormap cyclically by `fraction_shift` (0.0 to 1.0)."""
+    N = 256
+    colors = cmap(np.linspace(0, 1, N))
+    shift = int(N * fraction_shift)
+    colors = np.roll(colors, shift=shift, axis=0)
+    return ListedColormap(colors, name=name)
