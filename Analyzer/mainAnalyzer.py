@@ -1,3 +1,26 @@
+# This file is part of LAO-STO.
+#
+# Copyright (C) 2025 Julian Czarnecki
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# If you use this code for scientific research, please cite:
+# J. Czarnecki et. al.,
+# "Superconducting gap symmetry of 2DEG at (111)-oriented LaAlO3/SrTiO3 interface",
+# arXiv:2508.05075 (2025).
+# https://arxiv.org/abs/2508.05075
+
 from DataReaderClass import *
 from DispersionPlotterClass import *
 from SymmetryResolverClass import *
@@ -20,7 +43,7 @@ def plotGammas():
     #eMin = -1480
     eMin = 0
     gammaAndFillingPlotter = GammaAndFillingPlotter(
-        runsPath=os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-E_Fermi_J_SC_NNN_T"),
+        runsPath=os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-B_planar_J_SC_NNN"),
         # runsPath=os.path.join(
         #     "/home", "jczarnecki", "LAO-STO-results", "LAO-STO-E_Fermi_J_SC_J_SC_NNN"
         # ),
@@ -34,23 +57,20 @@ def plotGammas():
     )
 
     gammaAndFillingPlotter.LoadFilling(loadUnfinished=True)
-    gammaAndFillingPlotter.LoadGamma(xKeywords=("e_fermi", "t", "j_sc_nnn"), loadUnfinished=True)
+    gammaAndFillingPlotter.LoadGamma(xKeywords=("b_phi", "b_magnitude"), loadUnfinished=True)
     gammaAndFillingPlotter.sortData()
     gammaAndFillingPlotter.CalculateSymmetryGamma()
     gammaAndFillingPlotter.getMaxvalSymmetrizedGamma()
-    # gammaAndFillingPlotter.plotGammasFermi(firstXLabel=r"$\mu$ (meV)",
-    #                                        neighborsToPlot=("next", ),
-    #                                        plotSecondX=False,
-    #                                        secondXLabel=r"$n$ (10\textsuperscript{14} cm\textsuperscript{-2})",
-    #                                        legendTitles=(r"$J_{nnn}$ (meV)",),
-    #                                        continuousColor=False,
-    #                                        firstXShift=eMin,
-    #                                        firstXMax=10,
-    #                                        yMax=100,
-    #                                        yUnit=r"($\mu$eV)")
+    gammaAndFillingPlotter.plotGammasTwoParam2d(firstXLabel=r"$\varphi$",
+                                                neighborsToPlot=("next", ),
+                                                plotSecondX=False,
+                                                secondXLabel=r"$n$ (10\textsuperscript{14} cm\textsuperscript{-2})",
+                                                legendTitles=(r"$|B|$ (T)",),
+                                                continuousColor=False,
+                                                yUnit=r"($\mu$eV)")
     #gammaAndFillingPlotter.plotFillingFermi()
-    gammaAndFillingPlotter.plotGammasThreeParamCmap(neighborsToPlot=("next",),
-                                                    secondXLabel=r"$n$ (10\textsuperscript{14} cm\textsuperscript{-2})",)
+    # gammaAndFillingPlotter.plotGammasThreeParamCmap(neighborsToPlot=("next",),
+    #                                                 secondXLabel=r"$n$ (10\textsuperscript{14} cm\textsuperscript{-2})",)
 
 
 def plotDispersions():

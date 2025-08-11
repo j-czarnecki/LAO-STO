@@ -1,3 +1,26 @@
+# This file is part of LAO-STO.
+#
+# Copyright (C) 2025 Julian Czarnecki
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# If you use this code for scientific research, please cite:
+# J. Czarnecki et. al.,
+# "Superconducting gap symmetry of 2DEG at (111)-oriented LaAlO3/SrTiO3 interface",
+# arXiv:2508.05075 (2025).
+# https://arxiv.org/abs/2508.05075
+
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import numpy as np
@@ -202,7 +225,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
 
                 band, spin, sublat, symmetry = key
 
-                ax1.set_ylim(bottom=0, top=1.02 * self.maxval if yMax == np.inf else yMax) # Guarantee a single scale for all plots
+                ax1.set_ylim(bottom=0, top=1.02 * self.maxval * yMultiplier if yMax == np.inf else yMax) # Guarantee a single scale for all plots
                 ax1.set_xlim(right=firstXMax if firstXMax != np.inf else max(firstXPlot))
                 ax1.set_xlabel(firstXLabel)
                 ax1.set_ylabel(

@@ -1,10 +1,32 @@
+!! This file is part of LAO-STO.
+!!
+!! Copyright (C) 2025 Julian Czarnecki
+!!
+!! This program is free software: you can redistribute it and/or modify
+!! it under the terms of the GNU General Public License as published by
+!! the Free Software Foundation, either version 3 of the License, or
+!! (at your option) any later version.
+!!
+!! This program is distributed in the hope that it will be useful,
+!! but WITHOUT ANY WARRANTY; without even the implied warranty of
+!! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!! GNU General Public License for more details.
+!!
+!! You should have received a copy of the GNU General Public License
+!! along with this program.  If not, see <https://www.gnu.org/licenses/>.
+!!
+!! If you use this code for scientific research, please cite:
+!! J. Czarnecki et. al.,
+!! "Superconducting gap symmetry of 2DEG at (111)-oriented LaAlO3/SrTiO3 interface",
+!! arXiv:2508.05075 (2025).
+!! https://arxiv.org/abs/2508.05075
+
 MODULE mod_hamiltonians
 USE mod_utilities
 USE mod_parameters
 USE mod_reader
 IMPLICIT NONE
 CONTAINS
-
 
 RECURSIVE SUBROUTINE COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian)
   !! Computes all terms that do not depend on k, including complex conjugate elements
@@ -17,7 +39,7 @@ RECURSIVE SUBROUTINE COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian)
   CALL COMPUTE_TETRAGONAL_STRAIN(Hamiltonian(:, :))
   CALL COMPUTE_FERMI_ENERGY(Hamiltonian(:, :))
   CALL COMPUTE_ZEEMAN(B_field, Hamiltonian(:, :))
-  CALL COMPUTE_ORBITAL_MAGNETIC_COUPLING(B_field, Hamiltonian(:,:))
+  CALL COMPUTE_ORBITAL_MAGNETIC_COUPLING(B_field, Hamiltonian(:, :))
   CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
 END SUBROUTINE COMPUTE_K_INDEPENDENT_TERMS
 
@@ -311,7 +333,7 @@ RECURSIVE SUBROUTINE COMPUTE_TETRAGONAL_STRAIN(Hamiltonian)
   INTEGER*4 :: nambu, spin, lat, row
   REAL*8 :: sign
 
-  DO nambu = 0,1
+  DO nambu = 0, 1
     sign = (-1)**nambu
     DO spin = 0, 1
       DO lat = 0, SUBLATTICES - 1
@@ -321,7 +343,6 @@ RECURSIVE SUBROUTINE COMPUTE_TETRAGONAL_STRAIN(Hamiltonian)
     END DO
   END DO
 END SUBROUTINE COMPUTE_TETRAGONAL_STRAIN
-
 
 SUBROUTINE COMPUTE_RASHBA_HOPPING(Hamiltonian, kx, ky)
   IMPLICIT NONE
@@ -583,18 +604,18 @@ RECURSIVE SUBROUTINE COMPUTE_ORBITAL_MAGNETIC_COUPLING(B, Hamiltonian)
   REAL*8 :: sign_nambu
   REAL*8, PARAMETER :: muB = 0.5
   COMPLEX*16, PARAMETER :: c_zero = (0.0d0, 0.0d0) ! So that compiler does not complain about type mismatch between 0 and imag
-  COMPLEX*16, PARAMETER :: L_x(3,3) = TRANSPOSE(RESHAPE([c_zero, c_zero, imag, &
-                                                         c_zero, c_zero, imag, &
-                                                         -imag, -imag, c_zero], &
-                                                         [3,3])) / SQRT(2.0d0)
-  COMPLEX*16, PARAMETER :: L_y(3,3) = TRANSPOSE(RESHAPE([c_zero, -2*imag, -imag, &
-                                                         2*imag, c_zero, imag, &
-                                                         imag, -imag, c_zero], &
-                                                         [3,3])) / SQRT(6.0d0)
-  COMPLEX*16, PARAMETER :: L_z(3,3)= TRANSPOSE(RESHAPE([c_zero, -imag, imag, &
-                                                         imag, c_zero, -imag, &
-                                                         -imag, imag, c_zero], &
-                                                         [3,3])) / SQRT(3.0d0)
+  COMPLEX*16, PARAMETER :: L_x(3, 3) = TRANSPOSE(RESHAPE([c_zero, c_zero, imag, &
+                                                          c_zero, c_zero, imag, &
+                                                          -imag, -imag, c_zero], &
+                                                         [3, 3])) / SQRT(2.0d0)
+  COMPLEX*16, PARAMETER :: L_y(3, 3) = TRANSPOSE(RESHAPE([c_zero, -2 * imag, -imag, &
+                                                          2 * imag, c_zero, imag, &
+                                                          imag, -imag, c_zero], &
+                                                         [3, 3])) / SQRT(6.0d0)
+  COMPLEX*16, PARAMETER :: L_z(3, 3) = TRANSPOSE(RESHAPE([c_zero, -imag, imag, &
+                                                          imag, c_zero, -imag, &
+                                                          -imag, imag, c_zero], &
+                                                         [3, 3])) / SQRT(3.0d0)
 
   DO nambu = 0, 1
     sign_nambu = (-1)**nambu

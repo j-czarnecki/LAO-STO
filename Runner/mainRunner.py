@@ -1,3 +1,26 @@
+# This file is part of LAO-STO.
+#
+# Copyright (C) 2025 Julian Czarnecki
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# If you use this code for scientific research, please cite:
+# J. Czarnecki et. al.,
+# "Superconducting gap symmetry of 2DEG at (111)-oriented LaAlO3/SrTiO3 interface",
+# arXiv:2508.05075 (2025).
+# https://arxiv.org/abs/2508.05075
+
 from RunnerClass import *
 import re
 import numpy as np
@@ -83,7 +106,7 @@ def runTemperatureDependence():
 
 def configureAndRunPostprocessing():
     runner = Runner()
-    pathToRuns = os.path.join(SCRATCH_PATH, "STO-SC", "LAO-STO-E_Fermi_J_SC")
+    pathToRuns = os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-B_planar_J_SC_NNN")
     # Adding '' at the end to terminate path with /
     directories = [
         os.path.join(pathToRuns, dir, "")
@@ -96,7 +119,7 @@ def configureAndRunPostprocessing():
     enable_sc = ("sc_gap_calculation", "enable_sc_gap_calc", True)
     enable_chern = ("chern_number_calculation", "enable_chern_number_calc", False)
     enable_dos = ("dos_calculation", "enable_dos_calc", False)
-    enable_gamma_k = ("gamma_k_calculation", "enable_gamma_k_calc", True )
+    enable_gamma_k = ("gamma_k_calculation", "enable_gamma_k_calc", False)
     for dir in directories:
         nmlDirectorySC = ("sc_gap_calculation", "path_to_run_dir_sc_gap", dir)
         nmlDirectoryChern = (
@@ -107,7 +130,9 @@ def configureAndRunPostprocessing():
         nmlDirectoryDos = ("dos_calculation", "path_to_run_dir_dos", dir)
         nmlDirectoryGammaK = ("gamma_k_calculation", "path_to_run_dir_gamma_k", dir)
         runner.run_slurm_postprocessing(
-            dir, [enable_sc, nmlDirectorySC, enable_gamma_k, nmlDirectoryGammaK], False
+            dir,
+            [enable_sc, nmlDirectorySC],
+            machine="default"
         )
 
 
@@ -117,11 +142,12 @@ def configureAndRunSc():
     #Fermi energy
     nml_name = "physical_params"
     param_name = "E_Fermi"
-    Ef_min = -0.05e3
+    Ef_min = -0.06e3
     Ef_max = 0.0e3
-    Ef_steps = 1
+    Ef_steps = 2
     dE = abs(Ef_max - Ef_min) / Ef_steps
     Fermi_table = [(nml_name, param_name, Ef_min + i * dE) for i in range(Ef_steps + 1)]
+    #Fermi_table = [(nml_name, param_name, -0.06e3)]
 
     # # J_SC
     # nml_name = "physical_params"
@@ -142,18 +168,18 @@ def configureAndRunSc():
     #B_field
     nml_name = "physical_params"
     param_name = "b_magnitude"
-    B_min = 1
-    B_max = 3
+    B_min = 3
+    B_max = 9
     B_steps = 2
     dB = abs(B_max - B_min) / B_steps
     B_table = [(nml_name, param_name, B_min + i * dB) for i in range(B_steps + 1)]
-    B_table = [(nml_name, param_name, 2)]
+    #B_table = [(nml_name, param_name, 6)]
 
     #Phi
     param_name = "b_phi"
-    phi_min = 0
-    phi_max = 90
-    phi_steps = 18
+    phi_min = 180
+    phi_max = 360
+    phi_steps = 36
     dphi = abs(phi_max - phi_min) / phi_steps
     phi_table = [(nml_name, param_name, phi_min + i * dphi) for i in range(phi_steps + 1)]
 
@@ -167,9 +193,12 @@ def configureAndRunSc():
     # dJ = abs(J_max - J_min) / J_steps
     # J_table = [(nml_name, param_name, J_min + i * dJ) for i in range(J_steps + 1)]
 
-    for phi in phi_table:
-        for Ef in Fermi_table:
-            for B in B_table:
+    #for phi in phi_table:
+    for Ef in Fermi_table:
+        for B in B_table:
+            if int(B[2]) == 6 and int(Ef[2]) == -60:
+                    continue
+            for phi in phi_table:
                 runner.run_slurm_param_value(
                     paramValuePairs=[
                         Ef,
@@ -183,7 +212,7 @@ def configureAndRunSc():
                         #Subband_param,
                         #Subband_energies_param,
                     ],
-                    runsDir="KTO-SC/KTO-B_planar_J_SC",
+                    runsDir="KTO-SC/KTO-B_planar_J_SC_NNN",
                     material="KTO",
                     machine="default",
                 )

@@ -1,3 +1,26 @@
+# This file is part of LAO-STO.
+#
+# Copyright (C) 2025 Julian Czarnecki
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# If you use this code for scientific research, please cite:
+# J. Czarnecki et. al.,
+# "Superconducting gap symmetry of 2DEG at (111)-oriented LaAlO3/SrTiO3 interface",
+# arXiv:2508.05075 (2025).
+# https://arxiv.org/abs/2508.05075
+
 import f90nml
 import textwrap
 from collections import OrderedDict
@@ -15,7 +38,7 @@ class RunnerConfig:
                 ##### Partition name
                 #SBATCH -p cpu
                 ##### Name of job in queuing system
-                #SBATCH --job-name=KTO-phi
+                #SBATCH --job-name=KTO-B_planar
                 #SBATCH --output=\"output.out\"    # Path to the standard output and error files relative to the working directory
                 """
                 ),
@@ -86,13 +109,13 @@ class RunnerConfig:
                 ("t_Rashba", 0.000e3),
                 ("lambda_SOC", 0.01e3),
                 ("delta_trigonal", -0.005e3),
-                ("zeta_tetragonal", 0.0),
+                ("zeta_tetragonal", 0.0e3),
                 ("orb_affected_tetragonal", 1),
                 ("v", 0.0e3),
                 ("V_pdp", 0.028e3),
                 ("V_pds", -0.065e3),
-                ("J_SC", 0.35e3),
-                ("J_SC_PRIME", 0.035e3),
+                ("J_SC", 0.0e3),
+                ("J_SC_PRIME", 0.0e3),
                 ("J_SC_NNN", 0.0e3),
                 ("J_SC_PRIME_NNN", 0.0e3),
                 ("U_HUB", 0.0e3),
@@ -115,16 +138,16 @@ class RunnerConfig:
                 ("max_sc_iter", 50),
                 ("sc_alpha", 0.2),
                 ("sc_alpha_adapt", 1.),
-                ("gamma_eps_convergence", 1e-3),
-                ("charge_eps_convergence", 1e-3),
+                ("gamma_eps_convergence", 1e-4),
+                ("charge_eps_convergence", 1e-4),
             ])),
             ("romberg_integration", OrderedDict([
-                ("romb_eps_x", 1e-3),
+                ("romb_eps_x", 5e-4),
                 ("interpolation_deg_x", 3),
-                ("max_grid_refinements_x", 10),
-                ("romb_eps_y", 1e-3),
+                ("max_grid_refinements_x", 11),
+                ("romb_eps_y", 5e-4),
                 ("interpolation_deg_y", 3),
-                ("max_grid_refinements_y", 10),
+                ("max_grid_refinements_y", 11),
             ])),
           ])
 
@@ -133,8 +156,8 @@ class RunnerConfig:
                 ("enable_sc_gap_calc", False),
                 ("path_to_run_dir_sc_gap", ""),
                 ("dE_sc_gap", 1e-3),
-                ("Nk_points_sc_gap", 4000),
-                ("Nk_points_sc_gap_refined", 4),
+                ("Nk_points_sc_gap", 8000),
+                ("Nk_points_sc_gap_refined", 20),
             ])),
             ("chern_number_calculation", OrderedDict([
                 ("enable_chern_number_calc", False),
@@ -162,6 +185,12 @@ class RunnerConfig:
                 ("enable_gamma_k_calc", False),
                 ("path_to_run_dir_gamma_k", "/home/pwojcik/LAO-STO/"),
                 ("Nk_points_gamma_k", 700),
+            ])),
+            ("projections_calculation", OrderedDict([
+                ("enable_projections_calc", False),
+                ("path_to_run_dir_projections", "/home/pwojcik/LAO-STO/"),
+                ("Nr_points_projections", 50),
+                ("Nphi_points_projections", 50),
             ])),
         ])
 

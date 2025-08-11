@@ -1,6 +1,6 @@
 &sc_gap_calculation
     enable_sc_gap_calc = .FALSE.,
-    path_to_run_dir_sc_gap = "/home/czarnecki/SCRATCH/STO-SC/LAO-STO-E_Fermi_J_SC_NNN/RUN_E_Fermi_-964.0_J_SC_NNN_75.0/",
+    path_to_run_dir_sc_gap = "/home/czarnecki/SCRATCH/KTO-SC/KTO-E_Fermi_J_SC_NNN/RUN_E_Fermi_-60.0_J_SC_NNN_350.0/",
     dE_sc_gap = 1e-3,
     Nk_points_sc_gap = 8000,
     Nk_points_sc_gap_refined = 20 /
@@ -11,25 +11,25 @@
     Nk_points_chern_number = 1000 /
 
 &dispersion_relation_calculation
-    enable_dispersion_relation_calc = .TRUE.,
+    enable_dispersion_relation_calc = .FALSE.,
     path_to_run_dir_dispersion_relation = "/home/czarnecki/LAO-STO/",
     include_sc_in_dispersion = .FALSE.,
-    Nk_points_dispersion_relation = 200 /
+    Nk_points_dispersion_relation = 300 /
 
 &dos_calculation
     enable_dos_calc = .FALSE.,
-    path_to_run_dir_dos = "/home/czarnecki/SCRATCH/STO-SC/LAO-STO-E_Fermi_J_SC/RUN_E_Fermi_-9.0_J_SC_NNN_75.0/",
-    E_DOS_min = -0.2,
-    E_DOS_max = 0.2,
-    dE0 = 1e-4,
-    zeta_DOS = 5e-4,
+    path_to_run_dir_dos = "/home/czarnecki/SCRATCH/KTO-SC/KTO-E_Fermi_J_SC_NNN/RUN_E_Fermi_-36.0_J_SC_NNN_350.0/",
+    E_DOS_min = -0.7,
+    E_DOS_max = 0.7,
+    dE0 = 1e-3,
+    zeta_DOS = 5e-3,
     include_sc_in_dos = .TRUE.,
     Nk_points_dos = 1000,
     Nk_points_dos_refined = 30 /
 
 &gamma_k_calculation
     enable_gamma_k_calc = .FALSE.,
-    path_to_run_dir_gamma_k = "/home/czarnecki/SCRATCH/STO-SC/LAO-STO-E_Fermi_J_SC/RUN_E_Fermi_-912.0_J_SC_110.0/",
+    path_to_run_dir_gamma_k = "/home/czarnecki/SCRATCH/KTO-SC/KTO-E_Fermi_J_SC_NNN/RUN_E_Fermi_-60.0_J_SC_NNN_350.0/",
     Nk_points_gamma_k = 200 /
 
 &projections_calculation

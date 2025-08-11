@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use this code in your research, please cite our paper:"
+authors:
+  - family-names: Czarnecki
+    given-names: Julian
+  - family-names: Zegrodnik
+    given-names: Michal
+  - family-names: Wojcik
+    given-names: Pawel
+title: "Superconducting gap symmetry of 2DEG at (111)-oriented LaAlO3/SrTiO3 interface"
+doi: 10.48550/arXiv.2508.05075
+url: https://arxiv.org/abs/2508.05075
+date-released: 2025-08-08
+version: 1.0.0

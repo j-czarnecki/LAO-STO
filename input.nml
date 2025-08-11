@@ -1,56 +1,56 @@
 &discretization
     k1_steps = 100
     k2_steps = 100
-    sublattices = 3
+    sublattices = 2
     subbands = 1
 /
 
 &physical_params
-    t = 0.0
-    t_d = 650.0
-    t_i = 50.0
-    t_rashba = 4.0
-    lambda_soc = 265.0
-    delta_trigonal = -10.0
+    t = 0.
+    t_d = 500.0
+    t_i = 40.0
+    t_rashba = 0.0
+    lambda_soc = 10.0
+    delta_trigonal = -5.0
     zeta_tetragonal = 0.0
     orb_affected_tetragonal = 1
-    v = 0.0
+    v = 200.0
     v_pdp = 28.0
     v_pds = -65.0
-    j_sc = 100.0
-    j_sc_prime = 10.0
-    j_sc_nnn = 300.0
-    j_sc_prime_nnn = 30.0
+    j_sc = 0.0
+    j_sc_prime = 0.0
+    j_sc_nnn = 0.0
+    j_sc_prime_nnn = 0.0
     u_hub = 0.0
     v_hub = 0.0
-    e_fermi = 0
-    v_layer = 1943.0, 1943.0, 1943.0
+    e_fermi = 0.0
+    v_layer = 0.0, 0.0
     subband_energies = 0.0
-    B_magnitude = 2.0,
+    B_magnitude = 0.0,
     B_theta = 90.0,
     B_phi = 0.0
 /
 
 &self_consistency
     read_gamma_from_file = .false.
-    path_to_gamma_start = '/home/jczarnecki/LAO-STO/OutputData/Gamma_SC_final.dat'
+    path_to_gamma_start = '/home/czarnecki/SCRATCH/KTO-SC/KTO-E_Fermi_J_SC_NNN/RUN_E_Fermi_-56.0_J_SC_NNN_350.0/OutputData/Gamma_SC_final.dat'
     read_charge_from_file = .false.
-    path_to_charge_start = ''
+    path_to_charge_start = '/home/czarnecki/SCRATCH/KTO-SC/KTO-E_Fermi_J_SC_NNN/RUN_E_Fermi_-56.0_J_SC_NNN_350.0/OutputData/Charge_dens_final.dat'
     gamma_start = 1.0
     gamma_nnn_start = 1.0
     charge_start = 0.1
     max_sc_iter = 30
     sc_alpha = 0.2
     sc_alpha_adapt = 1.0
-    gamma_eps_convergence = 0.01
-    charge_eps_convergence = 0.01
+    gamma_eps_convergence = 0.0001
+    charge_eps_convergence = 0.0001
 /
 
 &romberg_integration
-    romb_eps_x = 0.01
+    romb_eps_x = 0.0005
     interpolation_deg_x = 3
-    max_grid_refinements_x = 10
-    romb_eps_y = 0.01
+    max_grid_refinements_x = 11
+    romb_eps_y = 0.0005
     interpolation_deg_y = 3
-    max_grid_refinements_y = 10
+    max_grid_refinements_y = 11
 /

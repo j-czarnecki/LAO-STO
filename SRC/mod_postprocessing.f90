@@ -1,3 +1,26 @@
+!! This file is part of LAO-STO.
+!!
+!! Copyright (C) 2025 Julian Czarnecki
+!!
+!! This program is free software: you can redistribute it and/or modify
+!! it under the terms of the GNU General Public License as published by
+!! the Free Software Foundation, either version 3 of the License, or
+!! (at your option) any later version.
+!!
+!! This program is distributed in the hope that it will be useful,
+!! but WITHOUT ANY WARRANTY; without even the implied warranty of
+!! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!! GNU General Public License for more details.
+!!
+!! You should have received a copy of the GNU General Public License
+!! along with this program.  If not, see <https://www.gnu.org/licenses/>.
+!!
+!! If you use this code for scientific research, please cite:
+!! J. Czarnecki et. al.,
+!! "Superconducting gap symmetry of 2DEG at (111)-oriented LaAlO3/SrTiO3 interface",
+!! arXiv:2508.05075 (2025).
+!! https://arxiv.org/abs/2508.05075
+
 #include "macros_def.f90"
 MODULE mod_postprocessing
 USE mod_hamiltonians
@@ -1039,8 +1062,8 @@ SUBROUTINE CALCULATE_PROJECTIONS(input_path, n_r_points, n_phi_points)
   CALL GET_SAFE_CHARGE_DENS(Charge_dens, input_path)
 
   Gamma_SC = 0.0d0
-  Gamma_SC(:,:,1,:,:) = 1*meV2au
-  Gamma_SC(:,:,2,:,:) = -1*meV2au
+  Gamma_SC(:, :, 1, :, :) = 1 * meV2au
+  Gamma_SC(:, :, 2, :, :) = -1 * meV2au
 
   CALL GET_REAL_SPACE_PROJECTIONS(Projections_real_space, Gamma_SC)
   DO n = 1, N_PROJECTIONS
