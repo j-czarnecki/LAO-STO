@@ -27,11 +27,11 @@ SRC_DIR = SRC
 OBJ_DIR = OBJ
 MOD_DIR = MOD
 
-
-ifeq ($(READ_OLD), TRUE)
-READ_OLD_FLAG = -DREAD_OLD
-else
-READ_OLD_FLAG =
+ifeq ($(READ_NO_TRIPLET), TRUE)
+READ_OLD_FLAG = -DREAD_NO_TRIPLET
+endif
+ifeq ($(READ_NO_BAND), TRUE)
+READ_OLD_FLAG = -DREAD_NO_BAND
 endif
 
 # the command shell
@@ -41,6 +41,7 @@ CC = gcc
 CXX = g++
 LIB_OPENMP = -qopenmp -qmkl
 F90FLAGS = -Ofast -fpp -g -ipo $(LIB_OPENMP) -module $(MOD_DIR) $(READ_OLD_FLAG)
+F90_DEBUG_FLAGS = -O0 -g -fpp -DDEBUG -module $(MOD_DIR) -debug all -fpe0 -fstack-protector -traceback -check all -ftrapuv -heap-arrays $(LIB_OPENMP) $(READ_OLD_FLAG)
 LIBS = -llapack -lblas
 LIBS_MKL = -I${MKLROOT}/include \
 					 -I/opt/intel/mkl/include \
@@ -51,36 +52,34 @@ LIBS_MKL = -I${MKLROOT}/include \
            -Wl,--end-group \
            -lpthread -lm -ldl #-lgomp
 
-
 .PHONY: all  ares_all  ares_post gnu tsan debug clean test post post_debug analyze
-
 
 ####### Full-performance build (default)
 OBJS = 	$(OBJ_DIR)/main.o \
-				$(OBJ_DIR)/mod_hamiltonians.o \
-				$(OBJ_DIR)/mod_parameters.o \
-				$(OBJ_DIR)/mod_utilities.o \
-				$(OBJ_DIR)/mod_writers.o \
-				$(OBJ_DIR)/mod_reader.o \
-				$(OBJ_DIR)/mod_broydenV2.o \
-				$(OBJ_DIR)/mod_local_integrand.o \
-				$(OBJ_DIR)/mod_integrate.o \
-				$(OBJ_DIR)/mod_types.o \
-				$(OBJ_DIR)/mod_self_consistency.o \
-				$(OBJ_DIR)/mod_logger.o
+				$(OBJ_DIR)/hamiltonians.o \
+				$(OBJ_DIR)/parameters.o \
+				$(OBJ_DIR)/utilities.o \
+				$(OBJ_DIR)/writers.o \
+				$(OBJ_DIR)/reader.o \
+				$(OBJ_DIR)/broydenV2.o \
+				$(OBJ_DIR)/local_integrand.o \
+				$(OBJ_DIR)/integrate.o \
+				$(OBJ_DIR)/types.o \
+				$(OBJ_DIR)/self_consistency.o \
+				$(OBJ_DIR)/logger.o
 
 ###### Plotting dispersion relation, calculating DOS and Chern number
 POSTPROCESSING_OBJS = 	$(OBJ_DIR)/main_postprocessing.o \
-						$(OBJ_DIR)/mod_postprocessing.o \
-						$(OBJ_DIR)/mod_hamiltonians.o \
-						$(OBJ_DIR)/mod_parameters.o \
-						$(OBJ_DIR)/mod_utilities.o \
-						$(OBJ_DIR)/mod_writers.o \
-						$(OBJ_DIR)/mod_reader.o \
-						$(OBJ_DIR)/mod_local_integrand.o \
-						$(OBJ_DIR)/mod_types.o \
-						$(OBJ_DIR)/mod_self_consistency.o \
-						$(OBJ_DIR)/mod_logger.o
+						$(OBJ_DIR)/postprocessing.o \
+						$(OBJ_DIR)/hamiltonians.o \
+						$(OBJ_DIR)/parameters.o \
+						$(OBJ_DIR)/utilities.o \
+						$(OBJ_DIR)/writers.o \
+						$(OBJ_DIR)/reader.o \
+						$(OBJ_DIR)/local_integrand.o \
+						$(OBJ_DIR)/types.o \
+						$(OBJ_DIR)/self_consistency.o \
+						$(OBJ_DIR)/logger.o
 
 # Superconductivity calculation target
 $(TARGET): $(OBJS)
@@ -134,7 +133,7 @@ post_tsan: $(POSTPROCESSING_TARGET)
 test:
 	mkdir -p $(SRC_DIR)/test/$(MOD_DIR)
 	cp SRC/*.f90 SRC/test/
-	@export FC="$(F90)" && export CC="$(CC)" && export CXX="$(CXX)" && export FSFLAG=-I && export FCFLAGS="$(F90FLAGS)" && cd $(SRC_DIR)/test && funit
+	@export FC="$(F90)" && export CC="$(CC)" && export CXX="$(CXX)" && export FSFLAG=-I && export FCFLAGS="$(F90_DEBUG_FLAGS)" && cd $(SRC_DIR)/test && funit
 	cd ../../
 
 analyze:
@@ -166,69 +165,77 @@ clean:
 
 
 ########### Dependencies
-$(OBJ_DIR)/main.o:	$(OBJ_DIR)/mod_hamiltonians.o \
-										$(OBJ_DIR)/mod_parameters.o \
-										$(OBJ_DIR)/mod_utilities.o \
-										$(OBJ_DIR)/mod_writers.o \
-										$(OBJ_DIR)/mod_reader.o \
-										$(OBJ_DIR)/mod_broydenV2.o \
-										$(OBJ_DIR)/mod_local_integrand.o \
-										$(OBJ_DIR)/mod_integrate.o \
-										$(OBJ_DIR)/mod_self_consistency.o \
-										$(OBJ_DIR)/mod_logger.o
+$(OBJ_DIR)/main.o: $(OBJ_DIR)/hamiltonians.o \
+									 $(OBJ_DIR)/parameters.o \
+									 $(OBJ_DIR)/utilities.o \
+									 $(OBJ_DIR)/writers.o \
+									 $(OBJ_DIR)/reader.o \
+									 $(OBJ_DIR)/broydenV2.o \
+									 $(OBJ_DIR)/local_integrand.o \
+									 $(OBJ_DIR)/integrate.o \
+									 $(OBJ_DIR)/self_consistency.o \
+									 $(OBJ_DIR)/logger.o \
+									 $(OBJ_DIR)/types.o
 
-$(OBJ_DIR)/main_postprocessing.o: 	$(OBJ_DIR)/mod_hamiltonians.o \
-																		$(OBJ_DIR)/mod_parameters.o \
-																		$(OBJ_DIR)/mod_utilities.o \
-																		$(OBJ_DIR)/mod_writers.o \
-																		$(OBJ_DIR)/mod_reader.o \
-																		$(OBJ_DIR)/mod_local_integrand.o \
-																		$(OBJ_DIR)/mod_postprocessing.o \
-																		$(OBJ_DIR)/mod_logger.o
+$(OBJ_DIR)/main_postprocessing.o: $(OBJ_DIR)/hamiltonians.o \
+																  $(OBJ_DIR)/parameters.o \
+																  $(OBJ_DIR)/utilities.o \
+																  $(OBJ_DIR)/writers.o \
+																  $(OBJ_DIR)/reader.o \
+																  $(OBJ_DIR)/local_integrand.o \
+																  $(OBJ_DIR)/postprocessing.o \
+																  $(OBJ_DIR)/logger.o
 
-$(OBJ_DIR)/chern.o: 		$(OBJ_DIR)/mod_hamiltonians.o \
-												$(OBJ_DIR)/mod_parameters.o \
-												$(OBJ_DIR)/mod_utilities.o \
-												$(OBJ_DIR)/mod_writers.o \
-												$(OBJ_DIR)/mod_reader.o \
-												$(OBJ_DIR)/mod_local_integrand.o
+$(OBJ_DIR)/chern.o: $(OBJ_DIR)/hamiltonians.o \
+									  $(OBJ_DIR)/parameters.o \
+									  $(OBJ_DIR)/utilities.o \
+									  $(OBJ_DIR)/writers.o \
+									  $(OBJ_DIR)/reader.o \
+									  $(OBJ_DIR)/local_integrand.o
 
-$(OBJ_DIR)/mod_utilities.o: $(OBJ_DIR)/mod_parameters.o \
-														$(OBJ_DIR)/mod_reader.o
+$(OBJ_DIR)/utilities.o: $(OBJ_DIR)/parameters.o \
+												$(OBJ_DIR)/reader.o
 
-$(OBJ_DIR)/mod_parameters.o:
+$(OBJ_DIR)/parameters.o:
 
-$(OBJ_DIR)/mod_hamiltonians.o:	$(OBJ_DIR)/mod_utilities.o \
-								$(OBJ_DIR)/mod_parameters.o \
-								$(OBJ_DIR)/mod_reader.o
+$(OBJ_DIR)/types.o: $(OBJ_DIR)/parameters.o
 
-$(OBJ_DIR)/mod_writers.o: $(OBJ_DIR)/mod_parameters.o \
-						  $(OBJ_DIR)/mod_reader.o
+$(OBJ_DIR)/hamiltonians.o: $(OBJ_DIR)/utilities.o \
+								           $(OBJ_DIR)/parameters.o \
+								           $(OBJ_DIR)/reader.o \
+								           $(OBJ_DIR)/types.o
 
-$(OBJ_DIR)/mod_reader.o: $(OBJ_DIR)/mod_parameters.o \
-						 $(OBJ_DIR)/mod_logger.o
+$(OBJ_DIR)/writers.o: $(OBJ_DIR)/parameters.o \
+						          $(OBJ_DIR)/reader.o \
+						          $(OBJ_DIR)/types.o
 
-$(OBJ_DIR)/mod_local_integrand.o: 	$(OBJ_DIR)/mod_parameters.o \
-										$(OBJ_DIR)/mod_utilities.o \
-										$(OBJ_DIR)/mod_hamiltonians.o \
-										$(OBJ_DIR)/mod_writers.o
+$(OBJ_DIR)/reader.o: $(OBJ_DIR)/parameters.o \
+						         $(OBJ_DIR)/logger.o \
+						         $(OBJ_DIR)/types.o
 
-$(OBJ_DIR)/mod_integrate.o: $(OBJ_DIR)/mod_parameters.o \
-							$(OBJ_DIR)/mod_local_integrand.o \
-							$(OBJ_DIR)/mod_logger.o
+$(OBJ_DIR)/local_integrand.o: $(OBJ_DIR)/parameters.o \
+										          $(OBJ_DIR)/utilities.o \
+										          $(OBJ_DIR)/hamiltonians.o \
+										          $(OBJ_DIR)/writers.o \
+										          $(OBJ_DIR)/types.o
 
-$(OBJ_DIR)/mod_postprocessing.o: 	$(OBJ_DIR)/mod_hamiltonians.o \
-									$(OBJ_DIR)/mod_parameters.o \
-									$(OBJ_DIR)/mod_utilities.o \
-									$(OBJ_DIR)/mod_writers.o \
-									$(OBJ_DIR)/mod_reader.o \
-									$(OBJ_DIR)/mod_local_integrand.o \
-									$(OBJ_DIR)/mod_self_consistency.o \
-									$(OBJ_DIR)/mod_logger.o
+$(OBJ_DIR)/integrate.o: $(OBJ_DIR)/parameters.o \
+							          $(OBJ_DIR)/local_integrand.o \
+							          $(OBJ_DIR)/logger.o \
+							          $(OBJ_DIR)/types.o
 
-$(OBJ_DIR)/mod_self_consistency.o: $(OBJ_DIR)/mod_parameters.o \
-																	 $(OBJ_DIR)/mod_reader.o \
-																	 $(OBJ_DIR)/mod_logger.o
+$(OBJ_DIR)/postprocessing.o: 	$(OBJ_DIR)/hamiltonians.o \
+									            $(OBJ_DIR)/parameters.o \
+									            $(OBJ_DIR)/utilities.o \
+									            $(OBJ_DIR)/writers.o \
+									            $(OBJ_DIR)/reader.o \
+									            $(OBJ_DIR)/local_integrand.o \
+									            $(OBJ_DIR)/self_consistency.o \
+									            $(OBJ_DIR)/logger.o \
+									            $(OBJ_DIR)/types.o
 
+$(OBJ_DIR)/self_consistency.o: $(OBJ_DIR)/parameters.o \
+															 $(OBJ_DIR)/reader.o \
+															 $(OBJ_DIR)/logger.o
 
-$(OBJ_DIR)/mod_logger.o:
+$(OBJ_DIR)/logger.o:

@@ -106,7 +106,7 @@ def runTemperatureDependence():
 
 def configureAndRunPostprocessing():
     runner = Runner()
-    pathToRuns = os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-E_Fermi_J_SC")
+    pathToRuns = os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-E_Fermi_J_SC_NNN")
     # Adding '' at the end to terminate path with /
     # directories = [
     #     os.path.join(pathToRuns, dir, "")
@@ -114,8 +114,8 @@ def configureAndRunPostprocessing():
     #     if re.match("RUN.*", dir)
     # ]
     directories = [
-        os.path.join(pathToRuns, f"RUN_E_Fermi_{ef}.0_J_SC_375.0", "")
-        for ef in [20, 40, 60]]
+        os.path.join(pathToRuns, f"RUN_E_Fermi_{ef}.0_J_SC_NNN_350.0", "")
+        for ef in [-80, -72, -60, -52, -40, -32, -20, -12, 0]]
 
     enable_sc = ("sc_gap_calculation", "enable_sc_gap_calc", True)
     enable_chern = ("chern_number_calculation", "enable_chern_number_calc", False)
@@ -132,7 +132,7 @@ def configureAndRunPostprocessing():
         nmlDirectoryGammaK = ("gamma_k_calculation", "path_to_run_dir_gamma_k", dir)
         runner.runSlurmPostprocessing(
             dir,
-            [enable_sc, nmlDirectorySC],
+            [enable_sc, nmlDirectorySC, enable_dos, nmlDirectoryDos],
             machine="default"
         )
 
@@ -149,22 +149,6 @@ def configureAndRunSc():
     dE = abs(Ef_max - Ef_min) / Ef_steps
     Fermi_table = [(nml_name, param_name, Ef_min + i * dE) for i in range(Ef_steps + 1)]
     #Fermi_table = [(nml_name, param_name, -0.06e3)]
-
-    # # J_SC
-    # nml_name = "physical_params"
-    # param_name = "J_SC"
-    # J_min = 0.170e3
-    # J_max = 0.170e3
-    # J_steps = 1
-    # dJ = abs(J_max - J_min) / J_steps
-    # J_table = [(nml_name, param_name, J_min + i * dJ) for i in range(J_steps)]
-
-    # # U_V
-    # nml_name = "physical_params"
-    # param_name = "U_HUB"
-    # U_hub_val = 300.0
-    # U_nml = (nml_name, param_name, U_hub_val)
-    # V_nml = (nml_name, "V_HUB", U_hub_val)
 
     #B_field
     nml_name = "physical_params"
@@ -184,15 +168,10 @@ def configureAndRunSc():
     dphi = abs(phi_max - phi_min) / phi_steps
     phi_table = [(nml_name, param_name, phi_min + i * dphi) for i in range(phi_steps + 1)]
 
-    # #J_SC_NNN
-    # nml_name = "physical_params"
-    # param_name = "J_SC_NNN"
-    # #J_NNN = (nml_name, param_name, 0.3e3)
-    # J_min = 0.25e3
-    # J_max = 0.35e3
-    # J_steps = 2
-    # dJ = abs(J_max - J_min) / J_steps
-    # J_table = [(nml_name, param_name, J_min + i * dJ) for i in range(J_steps + 1)]
+    jNearest = {("S", "S"): -350.0 * 2,}
+    inputJNearest = runner.createJTensorTable(jNearest)
+    print(inputJNearest)
+
 
     #for phi in phi_table:
     for Ef in Fermi_table:
@@ -291,7 +270,7 @@ def runMockedOutputPostprocessing():
 def main():
     #runTemperatureDependence()
     #configureAndRunSc()
-    configureAndRunPostprocessing()
+    #configureAndRunPostprocessing()
     #runDosFitting()
     #runMockedOutputPostprocessing()
 

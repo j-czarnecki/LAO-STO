@@ -77,29 +77,32 @@ class OutputMocker:
     symmetriesWeightsDict (dict[str, dict[str, float]]): Dictionary specifying weights of symmetries for nearest and next-nearest neighbors.
     """
 
-    fortFormat = ff.FortranRecordWriter("(5I5, 2E15.5)")
+    fortFormat = ff.FortranRecordWriter("(6I5, 2E15.5)")
     with open(os.path.join(self.outputPath, "OutputData", "Gamma_SC_final.dat"), "w") as f:
       print(" #band spin neighbour lattice orbital Re(Gamma) Im(Gamma)", file=f)
       for band in range(self.nBands):
-        for spin in range(self.nSpins):
-          spinSign = (-1)**(spin) #Assuming spin singlet
-          symGammaNearest = self.__createFlatSymmetryGamma(symmetriesWeightsDict["nearest"], "nearest") * gammaAmplitudeDict["nearest"] * spinSign
-          symGammaNext = self.__createFlatSymmetryGamma(symmetriesWeightsDict["next"], "next") * gammaAmplitudeDict["next"] * spinSign
-          for neigh in range(self.nNeighbors + self.nNextNeighbors):
-            maxLat = self.layerCouplings if neigh <= self.nNeighbors else self.nSublats
-            for lat in range(maxLat):
-              for orb in range(self.nOrbs):
-                #Nearest neighbors
-                if neigh < self.nNeighbors:
-                  gammaIdx = self.__getGammaIdx(orb, lat, neigh, "nearest")
-                  line = fortFormat.write([band + 1, spin + 1, neigh + 1, lat + 1, orb + 1, symGammaNearest[gammaIdx].real, symGammaNearest[gammaIdx].imag])
-                #Next-nearest neighbors
-                else:
-                  gammaIdx = self.__getGammaIdx(orb, lat, neigh - self.nNeighbors, "next") #Enumerate next-nearest neighbors from 0 to 6 for index getter
-                  line = fortFormat.write([band + 1, spin + 1, neigh + 1, lat + 1, orb + 1, symGammaNext[gammaIdx].real, symGammaNext[gammaIdx].imag])
-                print(line, file=f)
-            print(" ", file=f)
-            print(" ", file=f)
+        for spin1 in range(self.nSpins):
+          for spin2 in range(self.nSpins):
+            if spin1 == spin2:
+              continue
+            spinSign = (-1)**(spin1) #Assuming spin singlet
+            symGammaNearest = self.__createFlatSymmetryGamma(symmetriesWeightsDict["nearest"], "nearest") * gammaAmplitudeDict["nearest"] * spinSign
+            symGammaNext = self.__createFlatSymmetryGamma(symmetriesWeightsDict["next"], "next") * gammaAmplitudeDict["next"] * spinSign
+            for neigh in range(self.nNeighbors + self.nNextNeighbors):
+              maxLat = self.layerCouplings if neigh <= self.nNeighbors else self.nSublats
+              for lat in range(maxLat):
+                for orb in range(self.nOrbs):
+                  #Nearest neighbors
+                  if neigh < self.nNeighbors:
+                    gammaIdx = self.__getGammaIdx(orb, lat, neigh, "nearest")
+                    line = fortFormat.write([band + 1, spin1 + 1, spin2 + 1, neigh + 1, lat + 1, orb + 1, symGammaNearest[gammaIdx].real, symGammaNearest[gammaIdx].imag])
+                  #Next-nearest neighbors
+                  else:
+                    gammaIdx = self.__getGammaIdx(orb, lat, neigh - self.nNeighbors, "next") #Enumerate next-nearest neighbors from 0 to 6 for index getter
+                    line = fortFormat.write([band + 1, spin1 + 1, spin2 + 1, neigh + 1, lat + 1, orb + 1, symGammaNext[gammaIdx].real, symGammaNext[gammaIdx].imag])
+                  print(line, file=f)
+              print(" ", file=f)
+              print(" ", file=f)
 
   def __createFlatSymmetryGamma(self, symmetriesWeightsDict: dict[str, float], neighborsType: str = "nearest") -> np.ndarray:
     """

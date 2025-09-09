@@ -77,15 +77,11 @@ class DataReader:
             6: {"kx": [], "ky": [], "gap": []},
         }
         self.colnamesGamma: list[str] = (
-            ["spin", "neighbor", "sublat", "orbital", "gammaR", "gammaIm"]
-            if subbands == 0
-            else ["band", "spin", "neighbor", "sublat", "orbital", "gammaR", "gammaIm"]
+            ["band", "spin1", "spin2", "neighbor", "sublat", "orbital", "gammaR", "gammaIm"]
         )
 
         self.colnamesCharge: list[str] = (
-            ["spin", "sublat", "orbital", "filling"]
-            if subbands == 0
-            else ["band", "spin", "sublat", "orbital", "filling"]
+            ["band", "spin", "sublat", "orbital", "filling"]
         )
 
     """ ---------------------------------------------------------------------------------- """
@@ -341,7 +337,7 @@ class DataReader:
                 self.gamma[key].append(np.nan)
             return
 
-        for row in range(len(pandasFile.spin)):
+        for row in range(len(pandasFile["spin1"])):
             # Key is everything apart from Gamma values (two last columns)
             dictKey = tuple(
                 int(x) for x in pandasFile.loc[row, self.colnamesGamma[:-2]]

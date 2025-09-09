@@ -25,7 +25,7 @@
 ! This file contains macros definitions used in the code
 ! It should be included in every file that uses those macros
 ! via #include "macros_def.f90"
-! It makes use of logger functions defined in mod_logger.f90
+! It makes use of logger functions defined in logger.f90
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 ! Debug traces only if the DEBUG flag is active

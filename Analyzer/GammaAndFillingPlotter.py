@@ -62,7 +62,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
         self.eMinimal = eMinimal
         self.material = material
         self.a_tilde = self.__getMaterialsLatticeConstant(self.material)
-        self.symmetryKeys: dict[str, list[tuple[int, int, int, str]]]= {"nearest": [], "next": []}
+        self.symmetryKeys: dict[str, list[tuple[int, int, int, int, str]]]= {"nearest": [], "next": []}
         self.orbitalNameMapping = list[str]
         self.spinSymbolsMapping = list[str]
         self.latticeNameMapping = list[str]
@@ -223,18 +223,18 @@ class GammaAndFillingPlotter(SymmetryResolver):
                     else:
                         ax1.plot(firstXPlot, gammaYPlot, label=secondParam)
 
-                band, spin, sublat, symmetry = key
+                band, spin1, spin2, sublat, symmetry = key
 
                 ax1.set_ylim(bottom=0, top=1.02 * self.maxval * yMultiplier if yMax == np.inf else yMax) # Guarantee a single scale for all plots
                 ax1.set_xlim(right=firstXMax if firstXMax != np.inf else max(firstXPlot))
                 ax1.set_xlabel(firstXLabel)
                 ax1.set_ylabel(
-                    rf"{gammaLabelsCallbacks[nNeighborhood](sublat, symmetry, spin)}" + yUnit,
+                    rf"{gammaLabelsCallbacks[nNeighborhood](sublat, symmetry, spin1, spin2)}" + yUnit,
                     labelpad=20,
                 )
                 # ax1.xaxis.set_major_locator(ticker.LinearLocator(5))
                 ax1.yaxis.set_major_locator(ticker.LinearLocator(4))
-                ax1.xaxis.set_major_locator(ticker.MultipleLocator(60))
+                ax1.xaxis.set_major_locator(ticker.MultipleLocator(5))
 
                 #for mu in (31, 79, 141):
                     #ax1.scatter(mu, 0.02, marker='v', s=75, color='deeppink', zorder=10, edgecolors='k', linewidth=1)
@@ -265,7 +265,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
                     ax2.set_xlabel(fr"{secondXLabel}", labelpad=16)
                     #ax2.set_xlabel(fr"{secondXLabel} (10 \textsuperscript{{-2}})", labelpad=16)
                 plt.savefig(
-                    f"../Plots/Gamma2d_{gammaNeighorhoodLabels[nNeighborhood]}_band{band}_spin{spin}_lat{sublat}_{symmetry}.png"
+                    f"../Plots/Gamma2d_{gammaNeighorhoodLabels[nNeighborhood]}_band{band}_spin{spin1}_spin2{spin2}_lat{sublat}_{symmetry}.png"
                 )
                 plt.close()
 
@@ -419,7 +419,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
                     )
 
                     #Setting labels
-                    band, spin, sublat, symmetry = key
+                    band, spin1, spin2, sublat, symmetry = key
                     ax1.set_xlabel(firstXLabel)
                     ax1.set_ylabel(rf"T {yUnit}")
                     ax1.set_xlim(right=firstXMax if firstXMax != np.inf else max(xPlot))
@@ -428,7 +428,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
 
                     colorbar = fig.colorbar(colormesh, ax=ax1)
                     colorbar.set_label(
-                        rf"{gammaLabelsCallbacks[nNeighborhood](sublat, symmetry, spin)}" + yUnit,
+                        rf"{gammaLabelsCallbacks[nNeighborhood](sublat, symmetry, spin1, spin2)}" + colorUnit,
                     )
 
                     # Getting second X axis
@@ -451,7 +451,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
 
                     # Saving figure
                     plt.savefig(
-                        f"../Plots/GammaCmap_{gammaNeighorhoodLabels[nNeighborhood]}_{z}_band{band}_spin{spin}_lat{sublat}_{symmetry}.png"
+                        f"../Plots/GammaCmap_{gammaNeighorhoodLabels[nNeighborhood]}_{z}_band{band}_spin1{spin1}_spin2{spin2}_lat{sublat}_{symmetry}.png"
                     )
                     plt.close()
 
@@ -514,21 +514,23 @@ class GammaAndFillingPlotter(SymmetryResolver):
     def __initializeSymmetryKeys(self):
         # Nearest neighbors
         for band in range(1, max(1, self.subbands) + 1):
-            for spin in range(1, 3):
-                for sublat in range(1, self.layerCouplings + 1):
-                    for symmetry in self.projector.getSymmetryNames():
-                        self.symmetryKeys["nearest"].append(
-                            (band, spin, sublat, symmetry)
-                        )
+            for spin1 in range(1, 3):
+                for spin2 in range(1, 3):
+                    for sublat in range(1, self.layerCouplings + 1):
+                        for symmetry in self.projector.getSymmetryNames():
+                            self.symmetryKeys["nearest"].append(
+                                (band, spin1, spin2, sublat, symmetry)
+                            )
 
         # Next-to-nearest neighbors
         for band in range(1, max(1, self.subbands) + 1):
-            for spin in range(1, 3):
-                for sublat in range(1, self.sublattices + 1):
-                    for symmetry in self.projector.getSymmetryNames():
-                        self.symmetryKeys["next"].append(
-                            (band, spin, sublat, symmetry)
-                        )
+            for spin1 in range(1, 3):
+                for spin2 in range(1, 3):
+                    for sublat in range(1, self.sublattices + 1):
+                        for symmetry in self.projector.getSymmetryNames():
+                            self.symmetryKeys["next"].append(
+                                (band, spin1, spin2, sublat, symmetry)
+                            )
 
     def __initializeMapping(self):
         self.orbitalNameMapping = ["yz", "zx", "xy"]
@@ -595,12 +597,12 @@ class GammaAndFillingPlotter(SymmetryResolver):
         plt.rcParams["axes.prop_cycle"] = plt.cycler(color=self.palette)
 
     def __getNearestNeighborGammaLabel(
-        self, sublat: int, symmetry: str, spin: int
+        self, sublat: int, symmetry: str, spin1: int, spin2: int
     ) -> str:
         return rf"$\Gamma_{{\alpha \overline{{\alpha}}}}^{{{symmetry}}}$"
 
     def __getNextNearestNeighborGammaLabel(
-        self, sublat: int, symmetry: str, spin: int
+        self, sublat: int, symmetry: str, spin1: int, spin2: int
     ) -> str:
         return rf"$\Gamma_{{\alpha \alpha}}^{{{symmetry}}}$"
 

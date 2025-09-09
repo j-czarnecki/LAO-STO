@@ -41,7 +41,7 @@ class Runner(RunnerConfig):
         RunnerConfig.__init__(self)
 
     def runSlurmParamValue(
-        self, paramValuePairs: list[tuple[str, str, float]], runsDir: str, material: str, machine: str = "default"
+        self, paramValuePairs: list[tuple[str, str, float|list[float]]], runsDir: str, material: str, machine: str = "default"
     ):
         """
         Sets all parameters given in key-value pairs.
@@ -213,7 +213,49 @@ class Runner(RunnerConfig):
         subprocess.run(["sbatch", "job.sh"])
         os.chdir(runnerCwd)
 
-    def __createRunDirStructure(self, runsDir: str, paramValuePairs: list[tuple[str, str, float]]) -> str:
+    def createJTensorTable(self, pairingEnergySingletTripletBasis: dict[tuple[str, str], float]) -> list[float]:
+        nSpins = 2
+        vTensorSingletTriplet = np.zeros((nSpins * nSpins, nSpins * nSpins))
+        vTensorUpDown = np.zeros((nSpins * nSpins, nSpins * nSpins))
+        v4DArray = np.zeros((nSpins, nSpins, nSpins, nSpins))
+        uInverse = np.array([[0,0,1,0],
+                             [1/np.sqrt(2), 1/np.sqrt(2), 0, 0],
+                             [-1/np.sqrt(2), 1/np.sqrt(2), 0, 0],
+                             [0,0,0,1]])
+        tensorSingletTripletIndexMapping: dict[str, int] = {
+            "S": 0,
+            "T0": 1,
+            "T+": 2,
+            "T-": 3,
+        }
+        tensorUpDownTo4DArrayMapping: dict[int, tuple[int, int]] = {
+            0 : (0,0),
+            1 : (0,1),
+            2 : (1,0),
+            3 : (1,1),
+        }
+        for key in pairingEnergySingletTripletBasis:
+            row = tensorSingletTripletIndexMapping[key[0]]
+            col = tensorSingletTripletIndexMapping[key[1]]
+            if (col < row):
+                raise Exception("Only upper-triangle of V-tensor should be specified")
+            vTensorSingletTriplet[row][col] = pairingEnergySingletTripletBasis[key]
+
+        indecesLowerTriangle = np.tril_indices(nSpins * nSpins, -1)
+        vTensorSingletTriplet[indecesLowerTriangle] = np.conjugate(vTensorSingletTriplet.T[indecesLowerTriangle])
+
+        vTensorUpDown = np.matmul(uInverse, np.matmul(vTensorSingletTriplet, np.transpose(uInverse)))
+
+        for i in range(nSpins * nSpins):
+            for j in range(nSpins * nSpins):
+                spin1, spin2 = tensorUpDownTo4DArrayMapping[i]
+                spin3, spin4 = tensorUpDownTo4DArrayMapping[j]
+                v4DArray[spin1][spin2][spin3][spin4] = vTensorUpDown[i][j]
+
+        return v4DArray.flatten(order='F').tolist()
+
+
+    def __createRunDirStructure(self, runsDir: str, paramValuePairs: list[tuple[str, str, float | list[float]]]) -> str:
         pathToAppend = os.path.join(SCRATCH_PATH, runsDir)
         os.makedirs(pathToAppend, exist_ok=True)
         pathToAppend = os.path.join(pathToAppend, "RUN")

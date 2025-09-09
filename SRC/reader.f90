@@ -23,11 +23,17 @@
 
 #include "macros_def.f90"
 
-MODULE mod_reader
-USE mod_parameters
-USE mod_logger
+MODULE reader
+USE types
+USE parameters
+USE logger
 IMPLICIT NONE
 SAVE
+PRIVATE
+
+! Exposed functions
+PUBLIC :: GET_INPUT, GET_POSTPROCESSING_INPUT, SET_HAMILTONIAN_PARAMS
+PUBLIC :: GET_SAFE_GAMMA_SC, GET_GAMMA_SC, GET_SAFE_CHARGE_DENS, GET_CHARGE_DENS
 
 !Default values, overwritten in get_input
 !Discretization
@@ -56,16 +62,16 @@ INTEGER*4 :: orb_affected_tetragonal = 1
 REAL*8 :: v = 0.
 REAL*8 :: V_pdp = 0.
 REAL*8 :: V_pds = 0.
-REAL*8 :: J_SC = 0.
-REAL*8 :: J_SC_PRIME = 0.
-REAL*8 :: J_SC_NNN = 0.
-REAL*8 :: J_SC_PRIME_NNN = 0.
+REAL*8 :: J_SC_tensor(SPINS, SPINS, SPINS, SPINS) = 0.0d0
+REAL*8 :: nearest_interorb_multiplier = 0.0d0
+REAL*8 :: J_SC_NNN_tensor(SPINS, SPINS, SPINS, SPINS) = 0.0d0
+REAL*8 :: next_interorb_multiplier = 0.0d0
 REAL*8 :: U_HUB = 0.
 REAL*8 :: V_HUB = 0.
 REAL*8 :: E_Fermi = 0.
 REAL*8, ALLOCATABLE :: V_layer(:)
 REAL*8, ALLOCATABLE :: Subband_energies(:)
-REAL*8 :: g_factor = 0
+REAL*8 :: g_factor = 0.
 REAL*8 :: B_magnitude = 0 !! Magnitude of magnetic field [T]
 REAL*8 :: B_theta = 0 !! Angle of magnetic field defined with respect to Z axis [deg]
 REAL*8 :: B_phi = 0 !! Angle of magnetic field defined with respect to X axis [deg]
@@ -138,30 +144,30 @@ CHARACTER(1000) :: path_to_run_dir_projections = ""
 INTEGER*4 :: Nr_points_projections
 INTEGER*4 :: Nphi_points_projections
 
-NAMELIST /physical_params/  &
-& T,                        &
-& t_D,                      &
-& t_I,                      &
-& t_Rashba,                 &
-& lambda_SOC,               &
-& delta_trigonal,           &
-& zeta_tetragonal,          &
-& orb_affected_tetragonal,  &
-& v,                        &
-& V_pdp,                    &
-& V_pds,                    &
-& J_SC,                     &
-& J_SC_PRIME,               &
-& J_SC_NNN,                 &
-& J_SC_PRIME_NNN,           &
-& U_HUB,                    &
-& V_HUB,                    &
-& E_Fermi,                  &
-& V_layer,                  &
-& Subband_energies,         &
-& g_factor,                 &
-& B_magnitude,              &
-& B_theta,                  &
+NAMELIST /physical_params/     &
+& T,                           &
+& t_D,                         &
+& t_I,                         &
+& t_Rashba,                    &
+& lambda_SOC,                  &
+& delta_trigonal,              &
+& zeta_tetragonal,             &
+& orb_affected_tetragonal,     &
+& v,                           &
+& V_pdp,                       &
+& V_pds,                       &
+& J_SC_tensor,                 &
+& nearest_interorb_multiplier, &
+& J_SC_NNN_tensor,             &
+& next_interorb_multiplier,    &
+& U_HUB,                       &
+& V_HUB,                       &
+& E_Fermi,                     &
+& V_layer,                     &
+& Subband_energies,            &
+& g_factor,                    &
+& B_magnitude,                 &
+& B_theta,                     &
 & B_phi
 
 NAMELIST /discretization/ &
@@ -233,10 +239,11 @@ NAMELIST /projections_calculation/ &
 & Nphi_points_projections
 
 CONTAINS
-SUBROUTINE GET_INPUT(nmlfile)
+SUBROUTINE GET_INPUT(nmlfile, sc_input)
   IMPLICIT NONE
-  CHARACTER(LEN=*), INTENT(IN) :: nmlfile
-  INTEGER*4 :: i
+  CHARACTER(LEN=*), INTENT(IN) :: nmlfile !! Path to .nml file
+  TYPE(sc_input_params_t), INTENT(OUT) :: sc_input !! Structure to be initialized with input parameters
+  INTEGER*4 :: i, j, k, l
   INTEGER*4 :: io_status
 
   OPEN (unit=9, FILE=nmlfile, FORM="FORMATTED", ACTION="READ", STATUS="OLD")
@@ -253,20 +260,29 @@ SUBROUTINE GET_INPUT(nmlfile)
 
   IF ((k1_steps .LE. 0) .OR. (k2_steps .LE. 0)) STOP "k_steps must be > 0"
   IF (SUBLATTICES .LE. 0) STOP "SUBLATTICES must be > 0"
-  CALL SET_HAMILTONIAN_PARAMS()
-  WRITE (log_string, '(6(A, I0))') " SUBLATTICES: ", SUBLATTICES,&
-                                & " SUBBANDS: ", SUBBANDS,&
-                                & " ORBITALS: ", ORBITALS, &
-                                & " TBA_DIM: ", TBA_DIM, &
-                                & " DIM_POSITIVE_K: ", DIM_POSITIVE_K, &
-                                & " DIM: ", DIM
+  CALL SET_HAMILTONIAN_PARAMS(SUBLATTICES, SUBBANDS, sc_input % discretization)
+  WRITE (log_string, '(7(A, I0))') " SUBLATTICES: ", sc_input % discretization % SUBLATTICES,&
+                                & " SUBBANDS: ", sc_input % discretization % SUBBANDS,&
+                                & " ORBITALS: ", sc_input % discretization % ORBITALS, &
+                                & " TBA_DIM: ", sc_input % discretization % derived % TBA_DIM, &
+                                & " DIM_POSITIVE_K: ", sc_input % discretization % derived % DIM_POSITIVE_K, &
+                                & " DIM: ", sc_input % discretization % derived % DIM, &
+                                & " LAYER_COUPLINGS: ", sc_input % discretization % derived % LAYER_COUPLINGS
   LOG_INFO(log_string)
 
+  !Write it to sc_input
+  sc_input % discretization % k1_steps = k1_steps
+  sc_input % discretization % k2_steps = k2_steps
+  sc_input % discretization % derived % dr_k = R_K_MAX / k1_steps
+  sc_input % discretization % derived % dphi_k = (PI / 3.0d0) / k2_steps !Slicing every hexagon's triangle into the same number of phi steps
+
   !This is crucial
+  ALLOCATE (sc_input % physical % subband_params % V_layer(SUBLATTICES))
+  ALLOCATE (sc_input % physical % subband_params % Subband_energies(SUBBANDS))
   ALLOCATE (V_layer(SUBLATTICES))
   ALLOCATE (Subband_energies(SUBBANDS))
-  V_layer = 0.0d0
-  Subband_energies = 0.0d0
+  sc_input % physical % subband_params % V_layer = 0.0d0
+  sc_input % physical % subband_params % Subband_energies = 0.0d0
 
   !TODO: WRITE BETTER CHECKS!!!!!!!!!!!!!!!!!!
   REWIND (9)
@@ -277,7 +293,7 @@ SUBROUTINE GET_INPUT(nmlfile)
     STOP "Error reading physical_params"
   END IF
 
-  WRITE (log_string, '(22(A, E15.5))') "T: ", T,&
+  WRITE (log_string, '(18(A, E15.5))') "T: ", T,&
                                    & " t_D: ", t_D,&
                                    & " t_I: ", t_I,&
                                    & " t_Rashba: ", t_Rashba,&
@@ -288,10 +304,6 @@ SUBROUTINE GET_INPUT(nmlfile)
                                    & " v: ", v,&
                                    & " V_pdp: ", V_pdp,&
                                    & " V_pds: ", V_pds,&
-                                   & " J_SC: ", J_SC,&
-                                   & " J_SC_PRIME: ", J_SC_PRIME,&
-                                   & " J_SC_NNN: ", J_SC_NNN,&
-                                   & " J_SC_PRIME_NNN: ", J_SC_PRIME_NNN,&
                                    & " U_HUB: ", U_HUB,&
                                    & " V_HUB: ", V_HUB,&
                                    & " E_Fermi: ", E_Fermi,&
@@ -299,17 +311,24 @@ SUBROUTINE GET_INPUT(nmlfile)
                                    & " B_magnitude: ", B_magnitude,&
                                    & " B_theta: ", B_theta,&
                                    & " B_phi: ", B_phi
-
-  B_field(1) = COSD(B_phi) * SIND(B_theta) * B_magnitude
-  B_field(2) = SIND(B_phi) * SIND(B_theta) * B_magnitude
-  B_field(3) = COSD(B_theta) * B_magnitude
-
   LOG_INFO(log_string)
+
+  sc_input % physical % external % T = T
+  sc_input % physical % external % B_field(1) = COSD(B_phi) * SIND(B_theta) * B_magnitude * T2au
+  sc_input % physical % external % B_field(2) = SIND(B_phi) * SIND(B_theta) * B_magnitude * T2au
+  sc_input % physical % external % B_field(3) = COSD(B_theta) * B_magnitude * T2au
+
   WRITE (log_string, *) "V_layer: ", (V_layer(i), i=1, SUBLATTICES)
   LOG_INFO(log_string)
   WRITE (log_string, *) "Subband_energies: ", (Subband_energies(i), i=1, SUBBANDS)
   LOG_INFO(log_string)
-  WRITE (log_string, '(A, 3E15.5)') "B_field: ", (B_field(i), i=1, 3)
+  WRITE (log_string, '(A, 3E15.5)') "B_field: ", (sc_input % physical % external % B_field(i) / T2au, i=1, 3)
+  LOG_INFO(log_string)
+
+  WRITE (log_string, '(A, 16("(",4I3,"):", E15.5, 2X))') 'J_SC_tensor: ', ((((i, j, k, l, J_SC_tensor(i, j, k, l), i=1, SPINS), j=1, SPINS), k=1, SPINS), l=1, SPINS)
+  LOG_INFO(log_string)
+
+  WRITE (log_string, '(A, 16("(",4I3,"):", E15.5, 2X))') 'J_SC_NNN_tensor: ', ((((i, j, k, l, J_SC_NNN_tensor(i, j, k, l), i=1, SPINS), j=1, SPINS), k=1, SPINS), l=1, SPINS)
   LOG_INFO(log_string)
 
   !Check input data
@@ -317,25 +336,27 @@ SUBROUTINE GET_INPUT(nmlfile)
   IF (B_magnitude < 0) STOP "B_magnitude must be >= 0!"
 
   !Change to atomic units
-  t_D = t_D * meV2au
-  t_I = t_I * meV2au
-  t_Rashba = t_Rashba * meV2au
-  lambda_SOC = lambda_SOC * meV2au
-  delta_trigonal = delta_trigonal * meV2au
-  zeta_tetragonal = zeta_tetragonal * meV2au
-  v = v * meV2au
-  V_pdp = V_pdp * meV2au
-  V_pds = V_pds * meV2au
-  J_SC = J_SC * meV2au
-  J_SC_PRIME = J_SC_PRIME * meV2au
-  J_SC_NNN = J_SC_NNN * meV2au
-  J_SC_PRIME_NNN = J_SC_PRIME_NNN * meV2au
-  U_HUB = U_HUB * meV2au
-  V_HUB = V_HUB * meV2au
-  E_Fermi = E_Fermi * meV2au
-  V_layer = V_layer * meV2au
-  Subband_energies = Subband_energies * meV2au
-  B_field = B_field * T2au
+  sc_input % physical % subband_params % t_D = t_D * meV2au
+  sc_input % physical % subband_params % t_I = t_I * meV2au
+  sc_input % physical % subband_params % t_Rashba = t_Rashba * meV2au
+  sc_input % physical % subband_params % lambda_SOC = lambda_SOC * meV2au
+  sc_input % physical % subband_params % delta_trigonal = delta_trigonal * meV2au
+  sc_input % physical % subband_params % zeta_tetragonal = zeta_tetragonal * meV2au
+  sc_input % physical % subband_params % orb_affected_tetragonal = orb_affected_tetragonal
+  sc_input % physical % subband_params % v = v * meV2au
+  sc_input % physical % subband_params % V_pdp = V_pdp * meV2au
+  sc_input % physical % subband_params % V_pds = V_pds * meV2au
+  sc_input % physical % subband_params % J_SC_tensor = J_SC_tensor * meV2au
+  sc_input % physical % subband_params % nearest_interorb_multiplier = nearest_interorb_multiplier
+  sc_input % physical % subband_params % J_SC_NNN_tensor = J_SC_NNN_tensor * meV2au
+  sc_input % physical % subband_params % next_interorb_multiplier = next_interorb_multiplier
+  sc_input % physical % subband_params % U_HUB = U_HUB * meV2au
+  sc_input % physical % subband_params % V_HUB = V_HUB * meV2au
+  sc_input % physical % subband_params % E_Fermi = E_Fermi * meV2au
+  sc_input % physical % subband_params % V_layer = V_layer * meV2au
+  sc_input % physical % subband_params % Subband_energies = Subband_energies * meV2au
+  sc_input % physical % subband_params % g_factor = g_factor
+  sc_input % physical % subband_params % eta_p = sc_input % physical % subband_params % v * SQRT(3.) / 3.905 * nm2au
 
   REWIND (9)
   READ (9, NML=self_consistency, IOSTAT=io_status)
@@ -370,14 +391,18 @@ SUBROUTINE GET_INPUT(nmlfile)
   IF (gamma_eps_convergence .LE. 0) STOP "gamma_eps_convergence must be > 0"
   IF (charge_eps_convergence .LE. 0) STOP "charge_eps_convergence must be > 0"
 
-  gamma_start = gamma_start * meV2au
-  gamma_nnn_start = gamma_nnn_start * meV2au
-  gamma_eps_convergence = gamma_eps_convergence * meV2au
-  !Calculating derived values
-  dr_k = R_K_MAX / k1_steps
-  dphi_k = (PI / 3.0d0) / k2_steps  !Slicing every hexagon's triangle into the same number of phi steps
-  !domega = ABS(dk1 * dk2 * SIN(2 * PI / 3.)) / (SIN(2 * PI / 3.) * K1_MAX * K2_MAX)
-  eta_p = v * SQRT(3.) / 3.905 * nm2au
+  sc_input % self_consistency % read_gamma_from_file = read_gamma_from_file
+  sc_input % self_consistency % path_to_gamma_start = path_to_gamma_start
+  sc_input % self_consistency % read_charge_from_file = read_charge_from_file
+  sc_input % self_consistency % path_to_charge_start = path_to_charge_start
+  sc_input % self_consistency % gamma_start = gamma_start * meV2au
+  sc_input % self_consistency % gamma_nnn_start = gamma_nnn_start * meV2au
+  sc_input % self_consistency % charge_start = charge_start
+  sc_input % self_consistency % max_sc_iter = max_sc_iter
+  sc_input % self_consistency % sc_alpha = sc_alpha
+  sc_input % self_consistency % sc_alpha_adapt = sc_alpha_adapt
+  sc_input % self_consistency % gamma_eps_convergence = gamma_eps_convergence * meV2au
+  sc_input % self_consistency % charge_eps_convergence = charge_eps_convergence
 
   REWIND (9)
   READ (9, NML=romberg_integration, IOSTAT=io_status)
@@ -402,13 +427,23 @@ SUBROUTINE GET_INPUT(nmlfile)
   IF (interpolation_deg_y .LE. 0) STOP "interpolation_deg_y must be > 0"
   IF (max_grid_refinements_y .LE. 0) STOP "max_grid_refinements_y must be > 0"
 
+  sc_input % romberg % romb_eps_x = romb_eps_x
+  sc_input % romberg % interpolation_deg_x = interpolation_deg_x
+  sc_input % romberg % max_grid_refinements_x = max_grid_refinements_x
+  sc_input % romberg % romb_eps_y = romb_eps_y
+  sc_input % romberg % interpolation_deg_y = interpolation_deg_y
+  sc_input % romberg % max_grid_refinements_y = max_grid_refinements_y
+
   CLOSE (9)
+  DEALLOCATE (V_layer)
+  DEALLOCATE (Subband_energies)
 
 END SUBROUTINE GET_INPUT
 
-SUBROUTINE GET_POSTPROCESSING_INPUT(nmlfile)
+SUBROUTINE GET_POSTPROCESSING_INPUT(nmlfile, post_input)
   IMPLICIT NONE
-  CHARACTER(LEN=*), INTENT(IN) :: nmlfile
+  TYPE(post_input_params_t) :: post_input
+  CHARACTER(LEN=*), INTENT(IN) :: nmlfile !! Path to .nml file
 
   OPEN (unit=9, FILE=nmlfile, FORM="FORMATTED", ACTION="READ", STATUS="OLD")
   READ (9, NML=sc_gap_calculation)
@@ -417,19 +452,32 @@ SUBROUTINE GET_POSTPROCESSING_INPUT(nmlfile)
     IF (path_to_run_dir_sc_gap == "") STOP "path_to_run_dir_sc_gap must not be empty"
     IF (dE_sc_gap .LE. 0) STOP "dE_sc_gap must be > 0"
 
-    dE_sc_gap = dE_sc_gap * meV2au
+    post_input % sc_gap % enable = enable_sc_gap_calc
+    post_input % sc_gap % path = path_to_run_dir_sc_gap
+    post_input % sc_gap % Nk_points = Nk_points_sc_gap
+    post_input % sc_gap % Nk_points_refined = Nk_points_sc_gap_refined
+    post_input % sc_gap % dE = dE_sc_gap * meV2au
   END IF
 
   READ (9, NML=chern_number_calculation)
   IF (enable_chern_number_calc) THEN
     IF (Nk_points_chern_number .LE. 0) STOP "Nk_points_chern_number must be > 0"
     IF (path_to_run_dir_chern_number == "") STOP "path_to_run_dir_chern_number must not be empty"
+
+    post_input % chern % enable = enable_chern_number_calc
+    post_input % chern % path = path_to_run_dir_chern_number
+    post_input % chern % Nk_points = Nk_points_chern_number
   END IF
 
   READ (9, NML=dispersion_relation_calculation)
   IF (enable_dispersion_relation_calc) THEN
     IF (Nk_points_dispersion_relation .LE. 0) STOP "Nk_points_dispersion_relation must be > 0"
     IF (path_to_run_dir_dispersion_relation == "") STOP "path_to_run_dir_dispersion_relation must not be empty"
+
+    post_input % dispersion % enable = enable_dispersion_relation_calc
+    post_input % dispersion % path = path_to_run_dir_dispersion_relation
+    post_input % dispersion % include_sc = include_sc_in_dispersion
+    post_input % dispersion % Nk_points = Nk_points_dispersion_relation
   END IF
 
   READ (9, NML=dos_calculation)
@@ -440,16 +488,27 @@ SUBROUTINE GET_POSTPROCESSING_INPUT(nmlfile)
     IF (zeta_DOS .LE. 0) STOP "zeta_DOS must be > 0"
     IF (Nk_points_dos .LE. 0) STOP "Nk_points_dos must be > 0"
     IF (Nk_points_dos_refined .LT. 0) STOP "Nk_points_dos_refined must be >= 0"
-    E_DOS_min = E_DOS_min * meV2au
-    E_DOS_max = E_DOS_max * meV2au
-    zeta_DOS = zeta_DOS * meV2au
-    dE0 = dE0 * meV2au
+
+    post_input % dos % enable = enable_dos_calc
+    post_input % dos % path = path_to_run_dir_dos
+    post_input % dos % include_sc = include_sc_in_dos
+    post_input % dos % Nk_points = Nk_points_dos
+    post_input % dos % Nk_points_refined = Nk_points_dos_refined
+
+    post_input % dos % E_min = E_DOS_min * meV2au
+    post_input % dos % E_max = E_DOS_max * meV2au
+    post_input % dos % dE0 = dE0 * meV2au
+    post_input % dos % zeta_DOS = zeta_DOS * meV2au
   END IF
 
   READ (9, NML=gamma_k_calculation)
   IF (enable_gamma_k_calc) THEN
     IF (Nk_points_gamma_k .LE. 0) STOP "Nk_points_gamma_k must be > 0"
     IF (path_to_run_dir_gamma_k == "") STOP "path_to_run_dir_gamma_k must not be empty"
+
+    post_input % gamma_k % enable = enable_gamma_k_calc
+    post_input % gamma_k % path = path_to_run_dir_gamma_k
+    post_input % gamma_k % Nk_points = Nk_points_gamma_k
   END IF
 
   READ (9, NML=projections_calculation)
@@ -457,16 +516,27 @@ SUBROUTINE GET_POSTPROCESSING_INPUT(nmlfile)
     IF (Nr_points_projections .LE. 0) STOP "Nr_points_projections must be > 0"
     IF (Nphi_points_projections .LE. 0) STOP "Nphi_points_projections must be > 0"
     IF (path_to_run_dir_projections == "") STOP "path_to_run_dir_projections must not be empty"
+
+    post_input % projections % enable = enable_projections_calc
+    post_input % projections % path = path_to_run_dir_projections
+    post_input % projections % Nr_points = Nr_points_projections
+    post_input % projections % Nphi_points = Nphi_points_projections
   END IF
 
   CLOSE (9)
 
 END SUBROUTINE GET_POSTPROCESSING_INPUT
 
-SUBROUTINE GET_SAFE_GAMMA_SC(Gamma_SC, input_path)
+SUBROUTINE GET_SAFE_GAMMA_SC(Gamma_SC, input_path, discretization)
   !! This subroutine tries to read the Gamma_SC file from self-consistent simulation, checking for final result first,
   !! then checking the latest iteration file, and logging an error if neither is found.
-  COMPLEX*16, INTENT(OUT) :: Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, 2, LAYER_COUPLINGS, SUBBANDS) !! Gamma array to be filled
+  TYPE(discretization_t), INTENT(IN) :: discretization
+  COMPLEX*16, INTENT(OUT) :: Gamma_SC(discretization % ORBITALS, &
+                                     & N_ALL_NEIGHBOURS, &
+                                     & SPINS, &
+                                     & SPINS, &
+                                     & discretization % derived % LAYER_COUPLINGS, &
+                                     & discretization % SUBBANDS) !! Gamma array to be filled
   CHARACTER(LEN=*), INTENT(IN) :: input_path !! input path in which to look for the Gamma file
   LOGICAL :: file_exists !! whether the file exists or not
 
@@ -474,12 +544,12 @@ SUBROUTINE GET_SAFE_GAMMA_SC(Gamma_SC, input_path)
   !Check the convergent simulation first
   INQUIRE (FILE=TRIM(input_path)//"OutputData/Gamma_SC_final.dat", EXIST=file_exists)
   IF (file_exists) THEN
-    CALL GET_GAMMA_SC(Gamma_SC, TRIM(input_path)//"OutputData/Gamma_SC_final.dat")
+    CALL GET_GAMMA_SC(Gamma_SC, TRIM(input_path)//"OutputData/Gamma_SC_final.dat", discretization)
   ELSE
     !Check the non-convergent simulation latest iteration
     INQUIRE (FILE=TRIM(input_path)//"OutputData/Gamma_SC_iter.dat", EXIST=file_exists)
     IF (file_exists) THEN
-      CALL GET_GAMMA_SC(Gamma_SC, TRIM(input_path)//"OutputData/Gamma_SC_iter.dat")
+      CALL GET_GAMMA_SC(Gamma_SC, TRIM(input_path)//"OutputData/Gamma_SC_iter.dat", discretization)
     ELSE
       !No other file could have been produced, no Gamma file found
       WRITE (log_string, *) "No Gamma file found"
@@ -489,35 +559,45 @@ SUBROUTINE GET_SAFE_GAMMA_SC(Gamma_SC, input_path)
 
 END SUBROUTINE GET_SAFE_GAMMA_SC
 
-SUBROUTINE GET_GAMMA_SC(Gamma_SC, path)
+SUBROUTINE GET_GAMMA_SC(Gamma_SC, path, discretization)
   !! This subroutine reads the Gamma_SC file from self-consistent simulation at given path.
   !! User should check if the file exists before calling this subroutine
   CHARACTER(LEN=*), INTENT(IN) :: path !! path from which to read Gamma file
-  COMPLEX*16, INTENT(OUT) :: Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, 2, LAYER_COUPLINGS, SUBBANDS) !! Gamma to be filled
-  INTEGER*4 :: n, lat, orb, spin, band
-  INTEGER*4 :: n_read, lat_read, orb_read, spin_read, band_read
+  TYPE(discretization_t), INTENT(IN) :: discretization
+  COMPLEX*16, INTENT(OUT) :: Gamma_SC(discretization % ORBITALS, &
+                                      & N_ALL_NEIGHBOURS, &
+                                      & SPINS, &
+                                      & SPINS, &
+                                      & discretization % derived % LAYER_COUPLINGS, &
+                                      & discretization % SUBBANDS) !! Gamma to be filled
+  INTEGER*4 :: n, lat, orb, spin1, spin2, band
+  INTEGER*4 :: n_read, lat_read, orb_read, spin1_read, spin2_read, band_read
   REAL*8 :: Gamma_re, Gamma_im
   CHARACTER(LEN=20) :: output_format
 
-#ifndef READ_OLD
+#ifdef READ_NO_BAND
+  output_format = '(4I5, 2E15.5)'
+#elif defined(READ_NO_TRIPLET)
   output_format = '(5I5, 2E15.5)'
 #else
-  output_format = '(4I5, 2E15.5)'
+  output_format = '(6I5, 2E15.5)'
 #endif
 
+! Read older versions of simulations
+#if defined(READ_NO_BAND) || defined(READ_NO_TRIPLET)
   OPEN (unit=9, FILE=path, FORM="FORMATTED", ACTION="READ", STATUS="OLD")
   READ (9, *)
-  DO band = 1, SUBBANDS
-    DO spin = 1, 2
+  DO band = 1, discretization % SUBBANDS
+    DO spin = 1, SPINS
       DO n = 1, N_NEIGHBOURS
-        DO lat = 1, LAYER_COUPLINGS
-          DO orb = 1, ORBITALS
-#ifndef READ_OLD
+        DO lat = 1, discretization % derived % LAYER_COUPLINGS
+          DO orb = 1, discretization % ORBITALS
+#ifdef READ_NO_TRIPLET
             READ (9, output_format) band_read, spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
-            Gamma_SC(orb_read, n_read, spin_read, lat_read, band_read) = DCMPLX(Gamma_re, Gamma_im) * meV2au
-#else
+            Gamma_SC(orb_read, n_read, spin_read, MOD(spin_read, SPINS) + 1, lat_read, band_read) = DCMPLX(Gamma_re, Gamma_im) * meV2au
+#elif defined(READ_NO_BAND)
             READ (9, output_format) spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
-            Gamma_SC(orb_read, n_read, spin_read, lat_read, band) = DCMPLX(Gamma_re, Gamma_im) * meV2au
+            Gamma_SC(orb_read, n_read, spin_read, MOD(spin_read, SPINS) + 1, lat_read, band) = DCMPLX(Gamma_re, Gamma_im) * meV2au
 #endif
           END DO
         END DO
@@ -525,14 +605,14 @@ SUBROUTINE GET_GAMMA_SC(Gamma_SC, path)
         READ (9, *)
       END DO
       DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
-        DO lat = 1, SUBLATTICES
-          DO orb = 1, ORBITALS
-#ifndef READ_OLD
+        DO lat = 1, discretization % SUBLATTICES
+          DO orb = 1, discretization % ORBITALS
+#ifdef READ_NO_TRIPLET
             READ (9, output_format) band_read, spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
-            Gamma_SC(orb_read, n_read, spin_read, lat_read, band_read) = DCMPLX(Gamma_re, Gamma_im) * meV2au
-#else
+            Gamma_SC(orb_read, n_read, spin_read, MOD(spin_read, SPINS) + 1, lat_read, band_read) = DCMPLX(Gamma_re, Gamma_im) * meV2au
+#elif defined(READ_NO_BAND)
             READ (9, output_format) spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
-            Gamma_SC(orb_read, n_read, spin_read, lat_read, band) = DCMPLX(Gamma_re, Gamma_im) * meV2au
+            Gamma_SC(orb_read, n_read, spin_read, MOD(spin_read, SPINS) + 1, lat_read, band) = DCMPLX(Gamma_re, Gamma_im) * meV2au
 #endif
           END DO
         END DO
@@ -543,22 +623,57 @@ SUBROUTINE GET_GAMMA_SC(Gamma_SC, path)
   END DO
   CLOSE (9)
 
+! Read newest version of simulation, supporting bands and triplet pairing
+#else
+  OPEN (unit=9, FILE=path, FORM="FORMATTED", ACTION="READ", STATUS="OLD")
+  READ (9, *)
+  DO band = 1, discretization % SUBBANDS
+    DO spin1 = 1, SPINS
+      DO spin2 = 1, SPINS
+        DO n = 1, N_NEIGHBOURS
+          DO lat = 1, discretization % derived % LAYER_COUPLINGS
+            DO orb = 1, discretization % ORBITALS
+              READ (9, output_format) band_read, spin1_read, spin2_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
+              Gamma_SC(orb_read, n_read, spin1_read, spin2_read, lat_read, band_read) = DCMPLX(Gamma_re, Gamma_im) * meV2au
+            END DO
+          END DO
+          READ (9, *)
+          READ (9, *)
+        END DO
+        DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
+          DO lat = 1, discretization % SUBLATTICES
+            DO orb = 1, discretization % ORBITALS
+              READ (9, output_format) band_read, spin1_read, spin2_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
+              Gamma_SC(orb_read, n_read, spin1_read, spin2_read, lat_read, band_read) = DCMPLX(Gamma_re, Gamma_im) * meV2au
+            END DO
+          END DO
+          READ (9, *)
+          READ (9, *)
+        END DO
+      END DO
+    END DO
+  END DO
+  CLOSE (9)
+! End older-newest versioning ifdef
+#endif
+
 END SUBROUTINE GET_GAMMA_SC
 
-SUBROUTINE GET_SAFE_CHARGE_DENS(Charge_dens, input_path)
+SUBROUTINE GET_SAFE_CHARGE_DENS(Charge_dens, input_path, discretization)
   !! This subroutine tries to read the Chargen_dens file from self-consistent simulation, checking for final result first,
   !! then checking the latest iteration file, and logging an error if neither is found.
-  REAL*8, INTENT(OUT) :: Charge_dens(DIM_POSITIVE_K, SUBBANDS) !! Charge density to be filled
+  TYPE(discretization_t), INTENT(IN) :: discretization
+  REAL*8, INTENT(OUT) :: Charge_dens(discretization % derived % DIM_POSITIVE_K, discretization % SUBBANDS) !! Charge density to be filled
   CHARACTER(LEN=*), INTENT(IN) :: input_path !! Input path in which to look for Charge file
   LOGICAL :: file_exists !! Whether the file exists or not
   !Read charges
   INQUIRE (FILE=TRIM(input_path)//"OutputData/Charge_dens_final.dat", EXIST=file_exists)
   IF (file_exists) THEN
-    CALL GET_CHARGE_DENS(Charge_dens, TRIM(input_path)//"OutputData/Charge_dens_final.dat")
+    CALL GET_CHARGE_DENS(Charge_dens, TRIM(input_path)//"OutputData/Charge_dens_final.dat", discretization)
   ELSE
     INQUIRE (FILE=TRIM(input_path)//"OutputData/Charge_dens_iter.dat", EXIST=file_exists)
     IF (file_exists) THEN
-      CALL GET_CHARGE_DENS(Charge_dens, TRIM(input_path)//"OutputData/Charge_dens_iter.dat")
+      CALL GET_CHARGE_DENS(Charge_dens, TRIM(input_path)//"OutputData/Charge_dens_iter.dat", discretization)
     ELSE
       WRITE (log_string, *) "No charge density file found"
       LOG_ERROR(log_string)
@@ -566,10 +681,11 @@ SUBROUTINE GET_SAFE_CHARGE_DENS(Charge_dens, input_path)
   END IF
 END SUBROUTINE GET_SAFE_CHARGE_DENS
 
-SUBROUTINE GET_CHARGE_DENS(Charge_dens, path)
+SUBROUTINE GET_CHARGE_DENS(Charge_dens, path, discretization)
   !! Read a file containing the charge density from given path. Whether file exists has to be checked before.
+  TYPE(discretization_t), INTENT(IN) :: discretization
   CHARACTER(LEN=*), INTENT(IN) :: path !! Path to file
-  REAL*8, INTENT(OUT) :: Charge_dens(DIM_POSITIVE_K, SUBBANDS) !! Charge density to be filled
+  REAL*8, INTENT(OUT) :: Charge_dens(discretization % derived % DIM_POSITIVE_K, discretization % SUBBANDS) !! Charge density to be filled
   INTEGER*4 :: spin, lat, orb, n, band, band_read
   CHARACTER(LEN=20) :: output_format
 
@@ -581,8 +697,8 @@ SUBROUTINE GET_CHARGE_DENS(Charge_dens, path)
 
   OPEN (unit=9, FILE=path, FORM="FORMATTED", ACTION="READ", STATUS="OLD")
   READ (9, *)
-  DO band = 1, SUBBANDS
-    DO n = 1, DIM_POSITIVE_K
+  DO band = 1, discretization % SUBBANDS
+    DO n = 1, discretization % derived % DIM_POSITIVE_K
 #ifndef READ_OLD
       READ (9, output_format) band_read, spin, lat, orb, Charge_dens(n, band)
 #else
@@ -595,14 +711,21 @@ SUBROUTINE GET_CHARGE_DENS(Charge_dens, path)
 
 END SUBROUTINE GET_CHARGE_DENS
 
-SUBROUTINE SET_HAMILTONIAN_PARAMS()
+SUBROUTINE SET_HAMILTONIAN_PARAMS(sublats, n_subbands, discretization)
     !! This subroutine sets global variables that define dimension of hamiltonian in calculation
     !! SUBLATTICES should have been set beffore at reading input.nml
-  ORBITALS = 3
-  TBA_DIM = ORBITALS * SUBLATTICES
-  DIM_POSITIVE_K = TBA_DIM * 2  !Hamiltonian for positive k i.e half of the Nambu space, *2 due to spin
-  DIM = DIM_POSITIVE_K * 2    !*2 to transform to Nambu Space.
-  LAYER_COUPLINGS = 2 * (SUBLATTICES - 1)
+  INTEGER*4, INTENT(IN) :: sublats
+  INTEGER*4, INTENT(IN) :: n_subbands
+  TYPE(discretization_t), INTENT(INOUT) :: discretization
+
+  discretization % SUBLATTICES = sublats
+  discretization % SUBBANDS = n_subbands
+  discretization % ORBITALS = 3
+
+  discretization % derived % TBA_DIM = discretization % ORBITALS * sublats
+  discretization % derived % DIM_POSITIVE_K = discretization % derived % TBA_DIM * 2  !Hamiltonian for positive k i.e half of the Nambu space, *2 due to spin
+  discretization % derived % DIM = discretization % derived % DIM_POSITIVE_K * 2    !*2 to transform to Nambu Space.
+  discretization % derived % LAYER_COUPLINGS = 2 * (sublats - 1)
 END SUBROUTINE
 
-END MODULE mod_reader
+END MODULE reader

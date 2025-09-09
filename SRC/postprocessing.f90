@@ -22,26 +22,30 @@
 !! https://arxiv.org/abs/2508.05075
 
 #include "macros_def.f90"
-MODULE mod_postprocessing
-USE mod_hamiltonians
-USE mod_parameters
-USE mod_utilities
-USE mod_writers
-USE mod_reader
-USE mod_local_integrand
-USE mod_self_consistency
-USE mod_logger
+MODULE postprocessing
+USE hamiltonians
+USE parameters
+USE utilities
+USE writers
+USE reader
+USE local_integrand
+USE self_consistency
+USE logger
+USE types
 IMPLICIT NONE
 CONTAINS
 
-SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_points, N_refs, inputPath)
+SUBROUTINE CALCULATE_DOS(dos_params)
+  TYPE(post_dos_t), INTENT(IN) :: dos_params
 
   !DOS calculation
-  REAL*8, INTENT(IN) :: E_DOS_min, E_DOS_max, dE0
-  REAL*8, INTENT(IN) :: zeta_DOS
-  INTEGER*4, INTENT(IN) :: Nk_points, N_refs
-  LOGICAL, INTENT(IN) :: include_sc
-  CHARACTER(LEN=*), INTENT(IN) :: inputPath
+  ! REAL*8, INTENT(IN) :: E_DOS_min, E_DOS_max, dE0
+  ! REAL*8, INTENT(IN) :: zeta_DOS
+  ! INTEGER*4, INTENT(IN) :: Nk_points, N_refs
+  ! LOGICAL, INTENT(IN) :: include_sc
+  ! CHARACTER(LEN=*), INTENT(IN) :: inputPath
+
+  TYPE(sc_input_params_t) :: sc_input
 
   REAL*8 :: E0
   INTEGER*4 :: DOS_steps
@@ -50,7 +54,7 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_poi
   COMPLEX*16, ALLOCATABLE :: Hamiltonian(:, :), Hamiltonian_const(:, :), Hamiltonian_const_band(:, :), U_transformation(:, :)
   REAL*8, ALLOCATABLE :: Energies(:)
 
-  COMPLEX*16, ALLOCATABLE :: Gamma_SC(:, :, :, :, :)
+  COMPLEX*16, ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :)
   REAL*8, ALLOCATABLE :: Charge_dens(:, :)
 
   REAL*8, ALLOCATABLE :: DOS(:), DOS_local(:)
@@ -67,34 +71,42 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_poi
 
   LOGICAL :: fileExists
 
-  CALL GET_INPUT(TRIM(inputPath)//"input.nml")
+  CALL GET_INPUT(TRIM(dos_params % path)//"input.nml", sc_input)
 
-  DOS_steps = INT((E_DOS_max - E_DOS_min) / dE0)
-  dk1 = K1_MAX / Nk_points
-  dk2 = K2_MAX / Nk_points
+  DOS_steps = INT((dos_params % E_max - dos_params % E_min) / dos_params % dE0)
+  dk1 = K1_MAX / dos_params % Nk_points
+  dk2 = K2_MAX / dos_params % Nk_points
 
-  dk1_ref = dk1 / (N_refs + 1)
-  dk2_ref = dk2 / (N_refs + 1)
+  dk1_ref = dk1 / (dos_params % Nk_points_refined + 1)
+  dk2_ref = dk2 / (dos_params % Nk_points_refined + 1)
 
-  !If superconductivity is to be included, we add Nambu space to the Hamiltonian and double the size.
-  IF (include_sc) THEN
-    hamiltonian_dim = DIM
-    sc_multiplier = 0.5
-  ELSE
-    hamiltonian_dim = DIM_POSITIVE_K
-    sc_multiplier = 1.0
-  END IF
+  ASSOCIATE (SUBLATTICES => sc_input % discretization % SUBLATTICES, &
+         & SUBBANDS => sc_input % discretization % SUBBANDS, &
+         & ORBITALS => sc_input % discretization % ORBITALS, &
+         & TBA_DIM => sc_input % discretization % derived % TBA_DIM, &
+         & DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+         & DIM => sc_input % discretization % derived % DIM, &
+         & LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS)
 
-  ALLOCATE (Hamiltonian(DIM, DIM))
-  ALLOCATE (Hamiltonian_const(DIM, DIM))
-  ALLOCATE (Hamiltonian_const_band(DIM, DIM))
-  ALLOCATE (U_transformation(hamiltonian_dim, hamiltonian_dim))
-  ALLOCATE (Energies(hamiltonian_dim))
-  ALLOCATE (Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, 2, LAYER_COUPLINGS, SUBBANDS))
-  ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
-  ALLOCATE (DOS(0:DOS_steps))
-  ALLOCATE (DOS_local(0:DOS_steps))
+    !If superconductivity is to be included, we add Nambu space to the Hamiltonian and double the size.
+    IF (dos_params % include_sc) THEN
+      hamiltonian_dim = DIM
+      sc_multiplier = 0.5
+    ELSE
+      hamiltonian_dim = DIM_POSITIVE_K
+      sc_multiplier = 1.0
+    END IF
 
+    ALLOCATE (Hamiltonian(DIM, DIM))
+    ALLOCATE (Hamiltonian_const(DIM, DIM))
+    ALLOCATE (Hamiltonian_const_band(DIM, DIM))
+    ALLOCATE (U_transformation(hamiltonian_dim, hamiltonian_dim))
+    ALLOCATE (Energies(hamiltonian_dim))
+    ALLOCATE (Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, LAYER_COUPLINGS, SUBBANDS))
+    ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
+    ALLOCATE (DOS(0:DOS_steps))
+    ALLOCATE (DOS_local(0:DOS_steps))
+  END ASSOCIATE
   Hamiltonian = DCMPLX(0., 0.)
   Hamiltonian_const = DCMPLX(0., 0.)
   Energies = 0.
@@ -102,33 +114,21 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_poi
   Charge_dens = 0.
   DOS = 0.0d0
   DOS_local = 0.0d0
-  INQUIRE (FILE=TRIM(inputPath)//"OutputData/Charge_dens_final.dat", EXIST=fileExists)
-  IF (fileExists) THEN
-    CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
-  ELSE
-    CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
-  END IF
 
-  IF (include_sc) THEN
-    !Then we should also read Gamma_SC
-    INQUIRE (FILE=TRIM(inputPath)//"OutputData/Gamma_SC_final.dat", EXIST=fileExists)
-    IF (fileExists) THEN
-      CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_final.dat")
-    ELSE
-      CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
-    END IF
-  END IF
+  CALL GET_SAFE_CHARGE_DENS(Charge_dens, dos_params % path, sc_input % discretization)
+
+  IF (dos_params % include_sc) CALL GET_SAFE_GAMMA_SC(Gamma_SC, dos_params % path, sc_input % discretization)
 
   !Computing k-independent terms
-  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const)
+  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const, sc_input % discretization, sc_input % physical)
 
-  DO band = 1, SUBBANDS
+  DO band = 1, sc_input % discretization % SUBBANDS
     WRITE (log_string, *) "Band: ", band
     LOG_INFO(log_string)
 
     !Adapt potential of given subband (energy difference due to quantization)
     Hamiltonian_const_band = Hamiltonian_const
-    CALL COMPUTE_SUBBAND_POTENTIAL(Hamiltonian_const_band, band)
+    CALL COMPUTE_SUBBAND_POTENTIAL(Hamiltonian_const_band, band, sc_input % physical % subband_params % Subband_energies, sc_input % discretization)
 
     WRITE (log_string, *) "Calculating energies and integrating DOS..."
     LOG_INFO(log_string)
@@ -136,51 +136,58 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_poi
     DOS_local = 0.0d0 !Initialize DOS_local for each thread!
     points_within_energy_range_local = 0
     !$omp do collapse(2)
-    DO i = -Nk_points / 2, Nk_points / 2
-      DO j = -Nk_points / 2, Nk_points / 2
+    DO i = -dos_params % Nk_points / 2, dos_params % Nk_points / 2
+      DO j = -dos_params % Nk_points / 2, dos_params % Nk_points / 2
         k1 = i * dk1
         k2 = j * dk2
 
         kx = 2.*PI / (SQRT(3.0d0)) * k1
         ky = -2.*PI / 3.*k1 + 4.*PI / 3.*k2
         Hamiltonian(:, :) = DCMPLX(0., 0.)
-        CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian(:, :), kx, ky)
-        CALL COMPUTE_HUBBARD(Hamiltonian(:, :), Charge_dens(:, band))
-        CALL COMPUTE_SC(Hamiltonian(:, :), kx, ky, Gamma_SC(:, :, :, :, band))
-        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
+        CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
+        CALL COMPUTE_HUBBARD(Hamiltonian, &
+                            & Charge_dens(:, band), &
+                            & sc_input % physical % subband_params % U_HUB, &
+                            & sc_input % physical % subband_params % V_HUB, &
+                            & sc_input % discretization)
+        CALL COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC(:, :, :, :, :, band), sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM) !This is not needed, since ZHEEV takes only upper triangle
 
-        Hamiltonian(:, :) = sc_multiplier * (Hamiltonian_const_band + Hamiltonian) !Should by multiplied by 0.5 if in Nambu space
+        Hamiltonian = sc_multiplier * (Hamiltonian_const_band + Hamiltonian) !Should by multiplied by 0.5 if in Nambu space
 
         CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:hamiltonian_dim, :hamiltonian_dim), Energies(:), U_transformation(:, :), hamiltonian_dim)
 
         ! If lowest energy is beyond the range we are calculating the DOS for, skip
         ! This might be changed if magnetic field is to be introduced
-        IF (MINVAL(ABS(Energies)) > E_DOS_max) CYCLE
+        IF (MINVAL(ABS(Energies)) > dos_params % E_max) CYCLE
         points_within_energy_range_local = points_within_energy_range_local + 1
 
         !Update DOS for current thread.
         DO n = 0, DOS_steps
-          E0 = E_DOS_min + n * dE0
+          E0 = dos_params % E_min + n * dos_params % dE0
           DO k = 1, hamiltonian_dim
-            DOS_local(n) = DOS_local(n) + dirac_delta(Energies(k), E0, zeta_DOS)
+            DOS_local(n) = DOS_local(n) + dirac_delta(Energies(k), E0, dos_params % zeta_DOS)
           END DO
         END DO
 
         !Add a grid refinement here, if lowest energy is in [E_DOS_min, E_DOS_max]
         !Center of the cell
-        IF (i .lt. Nk_points / 2 .AND. j .lt. Nk_points / 2) THEN
-          DO i_ref = 1, N_refs
-            DO j_ref = 1, N_refs
+        IF (i .lt. dos_params % Nk_points / 2 .AND. j .lt. dos_params % Nk_points / 2) THEN
+          DO i_ref = 1, dos_params % Nk_points_refined
+            DO j_ref = 1, dos_params % Nk_points_refined
               k1 = i * dk1 + i_ref * dk1_ref
               k2 = j * dk2 + j_ref * dk2_ref
               kx = 2.*PI / (SQRT(3.0d0)) * k1
               ky = -2.*PI / 3.*k1 + 4.*PI / 3.*k2
               Hamiltonian(:, :) = DCMPLX(0., 0.)
-              CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian(:, :), kx, ky)
-              CALL COMPUTE_HUBBARD(Hamiltonian(:, :), Charge_dens(:, band))
-              CALL COMPUTE_SC(Hamiltonian(:, :), kx, ky, Gamma_SC(:, :, :, :, band))
-
-              CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
+              CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
+              CALL COMPUTE_HUBBARD(Hamiltonian, &
+                                  & Charge_dens(:, band), &
+                                  & sc_input % physical % subband_params % U_HUB, &
+                                  & sc_input % physical % subband_params % V_HUB, &
+                                  & sc_input % discretization)
+              CALL COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC(:, :, :, :, :, band), sc_input % discretization)
+              CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM) !This is not needed, since ZHEEV takes only upper triangle
 
               Hamiltonian(:, :) = sc_multiplier * (Hamiltonian_const_band + Hamiltonian) !Should by multiplied by 0.5 if in Nambu space
 
@@ -188,9 +195,9 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_poi
 
               !Update DOS for current thread.
               DO n = 0, DOS_steps
-                E0 = E_DOS_min + n * dE0
+                E0 = dos_params % E_min + n * dos_params % dE0
                 DO k = 1, hamiltonian_dim
-                  DOS_local(n) = DOS_local(n) + dirac_delta(Energies(k), E0, zeta_DOS)
+                  DOS_local(n) = DOS_local(n) + dirac_delta(Energies(k), E0, dos_params % zeta_DOS)
                 END DO
               END DO
 
@@ -198,19 +205,22 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_poi
           END DO
         END IF
 
-        IF ((i .lt. Nk_points / 2 .AND. j .lt. Nk_points / 2) .OR. (i .eq. Nk_points / 2)) THEN
+        IF ((i .lt. dos_params % Nk_points / 2 .AND. j .lt. dos_params % Nk_points / 2) .OR. (i .eq. dos_params % Nk_points / 2)) THEN
           !Left edge without corner
-          DO j_ref = 1, N_refs
+          DO j_ref = 1, dos_params % Nk_points_refined
             k1 = i * dk1
             k2 = j * dk2 + j_ref * dk2_ref
             kx = 2.*PI / (SQRT(3.0d0)) * k1
             ky = -2.*PI / 3.*k1 + 4.*PI / 3.*k2
             Hamiltonian(:, :) = DCMPLX(0., 0.)
-            CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian(:, :), kx, ky)
-            CALL COMPUTE_HUBBARD(Hamiltonian(:, :), Charge_dens(:, band))
-            CALL COMPUTE_SC(Hamiltonian(:, :), kx, ky, Gamma_SC(:, :, :, :, band))
-
-            CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
+            CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
+            CALL COMPUTE_HUBBARD(Hamiltonian, &
+                                & Charge_dens(:, band), &
+                                & sc_input % physical % subband_params % U_HUB, &
+                                & sc_input % physical % subband_params % V_HUB, &
+                                & sc_input % discretization)
+            CALL COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC(:, :, :, :, :, band), sc_input % discretization)
+            CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM) !This is not needed, since ZHEEV takes only upper triangle
 
             Hamiltonian(:, :) = sc_multiplier * (Hamiltonian_const_band + Hamiltonian) !Should by multiplied by 0.5 if in Nambu space
 
@@ -218,28 +228,31 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_poi
 
             !Update DOS for current thread.
             DO n = 0, DOS_steps
-              E0 = E_DOS_min + n * dE0
+              E0 = dos_params % E_min + n * dos_params % dE0
               DO k = 1, hamiltonian_dim
-                DOS_local(n) = DOS_local(n) + dirac_delta(Energies(k), E0, zeta_DOS)
+                DOS_local(n) = DOS_local(n) + dirac_delta(Energies(k), E0, dos_params % zeta_DOS)
               END DO
             END DO
 
           END DO
         END IF
 
-        IF ((i .lt. Nk_points / 2 .AND. j .lt. Nk_points / 2) .OR. (j .eq. Nk_points / 2)) THEN
+        IF ((i .lt. dos_params % Nk_points / 2 .AND. j .lt. dos_params % Nk_points / 2) .OR. (j .eq. dos_params % Nk_points / 2)) THEN
           !Bottom edge without corner
-          DO i_ref = 1, N_refs
+          DO i_ref = 1, dos_params % Nk_points_refined
             k1 = i * dk1 + i_ref * dk1_ref
             k2 = j * dk2
             kx = 2.*PI / (SQRT(3.0d0)) * k1
             ky = -2.*PI / 3.*k1 + 4.*PI / 3.*k2
             Hamiltonian(:, :) = DCMPLX(0., 0.)
-            CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian(:, :), kx, ky)
-            CALL COMPUTE_HUBBARD(Hamiltonian(:, :), Charge_dens(:, band))
-            CALL COMPUTE_SC(Hamiltonian(:, :), kx, ky, Gamma_SC(:, :, :, :, band))
-
-            CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
+            CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
+            CALL COMPUTE_HUBBARD(Hamiltonian, &
+                                & Charge_dens(:, band), &
+                                & sc_input % physical % subband_params % U_HUB, &
+                                & sc_input % physical % subband_params % V_HUB, &
+                                & sc_input % discretization)
+            CALL COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC(:, :, :, :, :, band), sc_input % discretization)
+            CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM) !This is not needed, since ZHEEV takes only upper triangle
 
             Hamiltonian(:, :) = sc_multiplier * (Hamiltonian_const_band + Hamiltonian) !Should by multiplied by 0.5 if in Nambu space
 
@@ -247,9 +260,9 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_poi
 
             !Update DOS for current thread.
             DO n = 0, DOS_steps
-              E0 = E_DOS_min + n * dE0
+              E0 = dos_params % E_min + n * dos_params % dE0
               DO k = 1, hamiltonian_dim
-                DOS_local(n) = DOS_local(n) + dirac_delta(Energies(k), E0, zeta_DOS)
+                DOS_local(n) = DOS_local(n) + dirac_delta(Energies(k), E0, dos_params % zeta_DOS)
               END DO
             END DO
 
@@ -273,17 +286,17 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_poi
   ! Normalize the DOS
   IF (MAXVAL(DOS) .NE. 0.0d0) DOS = DOS / MAXVAL(DOS)
 
-  WRITE (log_string, *) "Included points: ", points_within_energy_range, "out of ", Nk_points**2
+  WRITE (log_string, *) "Included points: ", points_within_energy_range, "out of ", dos_params % Nk_points**2
   LOG_INFO(log_string)
 
   WRITE (log_string, *) "Writing DOS to file"
   LOG_INFO(log_string)
 
   output_format = '(2E15.5)'
-  OPEN (unit=9, FILE=TRIM(inputPath)//"OutputData/DOS.dat", FORM="FORMATTED", ACTION="WRITE")
+  OPEN (unit=9, FILE=TRIM(dos_params % path)//"OutputData/DOS.dat", FORM="FORMATTED", ACTION="WRITE")
   WRITE (9, '(A)') "#E[meV] DOS[a.u]"
   DO n = 0, DOS_steps
-    E0 = E_DOS_min + n * dE0
+    E0 = dos_params % E_min + n * dos_params % dE0
     WRITE (9, output_format) E0 / meV2au, DOS(n)
   END DO
   CLOSE (9)
@@ -297,24 +310,27 @@ SUBROUTINE CALCULATE_DOS(E_DOS_min, E_DOS_max, dE0, zeta_DOS, include_sc, Nk_poi
   DEALLOCATE (Charge_dens)
   DEALLOCATE (DOS)
   DEALLOCATE (DOS_local)
-  IF (ALLOCATED(V_layer)) DEALLOCATE (V_layer)
-  IF (ALLOCATED(Subband_energies)) DEALLOCATE (Subband_energies) !Deallocate global variable
+  IF (ALLOCATED(sc_input % physical % subband_params % V_layer)) DEALLOCATE (sc_input % physical % subband_params % V_layer)
+  IF (ALLOCATED(sc_input % physical % subband_params % Subband_energies)) DEALLOCATE (sc_input % physical % subband_params % Subband_energies) !Deallocate global variable
 
 END SUBROUTINE CALCULATE_DOS
 
-SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
-    !! Calculates dispersion relation in the first Brillouin zone.
-    !! Takes physical parameters from input.nml from a directory specified by inputPath.
-  CHARACTER(LEN=*), INTENT(IN) :: inputPath
-  INTEGER*4, INTENT(IN) :: Nk_points
-  LOGICAL, INTENT(IN) :: include_sc
+SUBROUTINE CALCULATE_DISPERSION(dispersion)
+  !! Calculates dispersion relation in the first Brillouin zone.
+  !! Takes physical parameters from input.nml from a directory specified by inputPath.
+  TYPE(post_dispersion_relation_t), INTENT(INOUT) :: dispersion
+  ! CHARACTER(LEN=*), INTENT(IN) :: inputPath
+  ! INTEGER*4, INTENT(IN) :: Nk_points
+  ! LOGICAL, INTENT(IN) :: include_sc
+
+  TYPE(sc_input_params_t) :: sc_input
   CHARACTER(LEN=20) :: output_format
 
   COMPLEX*16, ALLOCATABLE :: Hamiltonian(:, :), Hamiltonian_const(:, :), Hamiltonian_const_band(:, :), U_transformation(:, :)
   REAL*8, ALLOCATABLE :: Energies(:, :, :)
   REAL*8, ALLOCATABLE :: Probability(:, :, :, :) ! |Psi^2|
 
-  COMPLEX*16, ALLOCATABLE :: Gamma_SC(:, :, :, :, :)
+  COMPLEX*16, ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :)
   REAL*8, ALLOCATABLE :: Charge_dens(:, :)
 
   REAL*8 :: k1, k2, kx, ky, dkx, dky
@@ -334,14 +350,14 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
   brillouinZoneVertices(:, 1) = (/4.*PI / (3 * SQRT(3.0d0)), 2.*PI / (3 * SQRT(3.0d0)), -2.*PI / (3 * SQRT(3.0d0)), -4.*PI / (3 * SQRT(3.0d0)), -2.*PI / (3 * SQRT(3.0d0)), 2.*PI / (3 * SQRT(3.0d0))/)
   brillouinZoneVertices(:, 2) = (/0.0d0, -2.*PI / 3.0d0, -2.*PI / 3.0d0, 0.0d0, 2.*PI / 3.0d0, 2.*PI / 3.0d0/)
 
-  CALL GET_INPUT(TRIM(inputPath)//"input.nml")
+  CALL GET_INPUT(TRIM(dispersion % path)//"input.nml", sc_input)
 
   !If superconductivity is to be included, we add Nambu space to the Hamiltonian and double the size.
-  IF (include_sc) THEN
-    hamiltonian_dim = DIM
+  IF (dispersion % include_sc) THEN
+    hamiltonian_dim = sc_input % discretization % derived % DIM
     sc_multiplier = 0.5d0
   ELSE
-    hamiltonian_dim = DIM_POSITIVE_K
+    hamiltonian_dim = sc_input % discretization % derived % DIM_POSITIVE_K
     sc_multiplier = 1.0d0
   END IF
 
@@ -355,23 +371,32 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
   electron_contribution = 0.
   hole_contribution = 0.
 
-  dkx = KX_MAX / Nk_points
-  dky = KY_MAX / Nk_points
+  dkx = KX_MAX / dispersion % Nk_points
+  dky = KY_MAX / dispersion % Nk_points
 
-  kx_steps = INT(Nk_points)
-  ky_steps = INT(Nk_points)
+  kx_steps = INT(dispersion % Nk_points)
+  ky_steps = INT(dispersion % Nk_points)
 
-  WRITE (output_format, '(A, I0, A)') '(I5, ', 10 + SUBLATTICES, 'E15.5)'
+  ASSOCIATE (SUBLATTICES => sc_input % discretization % SUBLATTICES, &
+        & SUBBANDS => sc_input % discretization % SUBBANDS, &
+        & ORBITALS => sc_input % discretization % ORBITALS, &
+        & TBA_DIM => sc_input % discretization % derived % TBA_DIM, &
+        & DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+        & DIM => sc_input % discretization % derived % DIM, &
+        & LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS)
 
-  ALLOCATE (Hamiltonian(DIM, DIM))
-  ALLOCATE (Hamiltonian_const(DIM, DIM))
-  ALLOCATE (Hamiltonian_const_band(DIM, DIM))
-  ALLOCATE (U_transformation(hamiltonian_dim, hamiltonian_dim))
-  ALLOCATE (Probability(-kx_steps:kx_steps, -ky_steps:ky_steps, hamiltonian_dim, hamiltonian_dim))
-  ALLOCATE (Energies(-kx_steps:kx_steps, -ky_steps:ky_steps, hamiltonian_dim))
-  ALLOCATE (Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, 2, LAYER_COUPLINGS, SUBBANDS))
-  ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
-  ALLOCATE (Lat_contributions(SUBLATTICES))
+    WRITE (output_format, '(A, I0, A)') '(I5, ', 10 + SUBLATTICES, 'E15.5)'
+
+    ALLOCATE (Hamiltonian(DIM, DIM))
+    ALLOCATE (Hamiltonian_const(DIM, DIM))
+    ALLOCATE (Hamiltonian_const_band(DIM, DIM))
+    ALLOCATE (U_transformation(hamiltonian_dim, hamiltonian_dim))
+    ALLOCATE (Probability(-kx_steps:kx_steps, -ky_steps:ky_steps, hamiltonian_dim, hamiltonian_dim))
+    ALLOCATE (Energies(-kx_steps:kx_steps, -ky_steps:ky_steps, hamiltonian_dim))
+    ALLOCATE (Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, LAYER_COUPLINGS, SUBBANDS))
+    ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
+    ALLOCATE (Lat_contributions(SUBLATTICES))
+  END ASSOCIATE
 
   Hamiltonian(:, :) = DCMPLX(0., 0.)
   Hamiltonian_const(:, :) = DCMPLX(0., 0.)
@@ -380,38 +405,28 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
   Gamma_SC = DCMPLX(0., 0.) * meV2au
   Charge_dens = 0.
 
-  IF ((U_HUB .NE. 0.0) .OR. (V_HUB .NE. 0.0)) THEN
-    INQUIRE (FILE=TRIM(inputPath)//"OutputData/Charge_dens_final.dat", EXIST=fileExists)
-    IF (fileExists) THEN
-      CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
-    ELSE
-      CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
-    END IF
+  IF ((sc_input % physical % subband_params % U_HUB .NE. 0.0) .OR. &
+     & (sc_input % physical % subband_params % V_HUB .NE. 0.0)) THEN
+    CALL GET_SAFE_CHARGE_DENS(Charge_dens, dispersion % path, sc_input % discretization)
   END IF
 
-  IF (include_sc) THEN
-    !Then we should also read Gamma_SC
-    INQUIRE (FILE=TRIM(inputPath)//"OutputData/Gamma_SC__final.dat", EXIST=fileExists)
-    IF (fileExists) THEN
-      CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_final.dat")
-    ELSE
-      CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
-    END IF
+  IF (dispersion % include_sc) THEN
+    CALL GET_SAFE_GAMMA_SC(Gamma_SC, dispersion % path, sc_input % discretization)
   END IF
 
   !Computing k-independent terms
-  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const)
+  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const, sc_input % discretization, sc_input % physical)
 
-  OPEN (unit=9, FILE=TRIM(inputPath)//"OutputData/Energies.dat", FORM="FORMATTED", ACTION="WRITE")
+  OPEN (unit=9, FILE=TRIM(dispersion % path)//"OutputData/Energies.dat", FORM="FORMATTED", ACTION="WRITE")
   WRITE (9, '(A)') "#N kx[1/a] ky[1/a] Energy[meV] P(yz) P(zx) P(xy) P(lat1) P(lat2) ... P(latN) P(s_up) P(s_down) P(electron) P(hole)"
 
-  DO band = 1, SUBBANDS
+  DO band = 1, sc_input % discretization % SUBBANDS
     WRITE (log_string, *) "Band: ", band
     LOG_INFO(log_string)
 
     !Adapt potential of given subband (energy difference due to quantization)
     Hamiltonian_const_band = Hamiltonian_const
-    CALL COMPUTE_SUBBAND_POTENTIAL(Hamiltonian_const_band, band)
+    CALL COMPUTE_SUBBAND_POTENTIAL(Hamiltonian_const_band, band, sc_input % physical % subband_params % Subband_energies, sc_input % discretization)
 
     !$omp parallel private(kx, ky, Hamiltonian)
     !$omp do
@@ -422,11 +437,15 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
         IF (is_inside_polygon(brillouinZoneVertices, 6, kx, ky)) THEN
 
           Hamiltonian(:, :) = DCMPLX(0., 0.)
-          CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky)
-          CALL COMPUTE_HUBBARD(Hamiltonian(:, :), Charge_dens)
-          CALL COMPUTE_SC(Hamiltonian(:, :), kx, ky, Gamma_SC)
-          CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
-          Hamiltonian(:, :) = sc_multiplier * (Hamiltonian_const_band(:, :) + Hamiltonian(:, :)) !Should by multiplied by 0.5 if in Nambu space
+          CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
+          CALL COMPUTE_HUBBARD(Hamiltonian, &
+                              & Charge_dens(:, band), &
+                              & sc_input % physical % subband_params % U_HUB, &
+                              & sc_input % physical % subband_params % V_HUB, &
+                              & sc_input % discretization)
+          CALL COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC(:, :, :, :, :, band), sc_input % discretization)
+          CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM) !This is not needed, since ZHEEV takes only upper triangle
+          Hamiltonian = sc_multiplier * (Hamiltonian_const_band + Hamiltonian) !Should by multiplied by 0.5 if in Nambu space
 
           !CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:DIM_POSITIVE_K,:DIM_POSITIVE_K), Energies(i,j,:), U_transformation(:,:), DIM_POSITIVE_K)
           !Probability(i,j,:,:) = ABS(U_transformation)**2
@@ -451,7 +470,7 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
             yz_contribution = 0.
             zx_contribution = 0.
             xy_contribution = 0.
-            DO n = 1, hamiltonian_dim, ORBITALS
+            DO n = 1, hamiltonian_dim, sc_input % discretization % ORBITALS
               yz_contribution = yz_contribution + Probability(i, j, n, l)
               zx_contribution = zx_contribution + Probability(i, j, n + 1, l)
               xy_contribution = xy_contribution + Probability(i, j, n + 2, l)
@@ -461,12 +480,14 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
             lat1_contribution = 0.
             lat2_contribution = 0.
             Lat_contributions(:) = 0.
-            DO m = 0, SUBLATTICES - 1
+            DO m = 0, sc_input % discretization % SUBLATTICES - 1
               DO spin = 0, 1
-                DO n = 1, ORBITALS
-                  Lat_contributions(m + 1) = Lat_contributions(m + 1) + Probability(i, j, spin * TBA_DIM + m * ORBITALS + n, l)
-                  IF (include_sc) THEN
-                    Lat_contributions(m + 1) = Lat_contributions(m + 1) + Probability(i, j, DIM_POSITIVE_K + spin * TBA_DIM + m * ORBITALS + n, l)
+                DO n = 1, sc_input % discretization % ORBITALS
+                  Lat_contributions(m + 1) = Lat_contributions(m + 1) + &
+                  & Probability(i, j, spin * sc_input % discretization % derived % TBA_DIM + m * sc_input % discretization % ORBITALS + n, l)
+                  IF (dispersion % include_sc) THEN
+                    Lat_contributions(m + 1) = Lat_contributions(m + 1) + &
+                    & Probability(i, j, sc_input % discretization % derived % DIM_POSITIVE_K + spin * sc_input % discretization % derived % TBA_DIM + m * sc_input % discretization % ORBITALS + n, l)
                   END IF
                 END DO
               END DO
@@ -475,21 +496,21 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
             !Distinguishing spin contributions
             spin_up_contribution = 0.
             spin_down_contribution = 0.
-            DO n = 1, TBA_DIM
+            DO n = 1, sc_input % discretization % derived % TBA_DIM
               spin_up_contribution = spin_up_contribution + Probability(i, j, n, l)
-              spin_down_contribution = spin_down_contribution + Probability(i, j, TBA_DIM + n, l)
-              IF (include_sc) THEN
-                spin_up_contribution = spin_up_contribution + Probability(i, j, DIM_POSITIVE_K + n, l)
-                spin_down_contribution = spin_down_contribution + Probability(i, j, DIM_POSITIVE_K + TBA_DIM + n, l)
+              spin_down_contribution = spin_down_contribution + Probability(i, j, sc_input % discretization % derived % TBA_DIM + n, l)
+              IF (dispersion % include_sc) THEN
+                spin_up_contribution = spin_up_contribution + Probability(i, j, sc_input % discretization % derived % DIM_POSITIVE_K + n, l)
+                spin_down_contribution = spin_down_contribution + Probability(i, j, sc_input % discretization % derived % DIM_POSITIVE_K + sc_input % discretization % derived % TBA_DIM + n, l)
               END IF
             END DO
 
             electron_contribution = 0.
             hole_contribution = 0.
-            IF (include_sc) THEN
-              DO n = 1, DIM_POSITIVE_K
+            IF (dispersion % include_sc) THEN
+              DO n = 1, sc_input % discretization % derived % DIM_POSITIVE_K
                 electron_contribution = electron_contribution + Probability(i, j, n, l)
-                hole_contribution = hole_contribution + Probability(i, j, DIM_POSITIVE_K + n, l)
+                hole_contribution = hole_contribution + Probability(i, j, sc_input % discretization % derived % DIM_POSITIVE_K + n, l)
               END DO
             ELSE
               electron_contribution = 1.
@@ -498,7 +519,7 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
 
             WRITE (9, output_format) band * hamiltonian_dim + l, kx, ky, Energies(i, j, l) / meV2au, &
             & yz_contribution, zx_contribution, xy_contribution, &
-            & (Lat_contributions(lat), lat=1, SUBLATTICES), &
+            & (Lat_contributions(lat), lat=1, sc_input % discretization % SUBLATTICES), &
             & spin_up_contribution, spin_down_contribution, &
             & electron_contribution, hole_contribution
           END IF
@@ -518,20 +539,23 @@ SUBROUTINE CALCULATE_DISPERSION(inputPath, Nk_points, include_sc)
   DEALLOCATE (Gamma_SC)
   DEALLOCATE (Charge_dens)
   DEALLOCATE (Lat_contributions)
-  IF (ALLOCATED(V_layer)) DEALLOCATE (V_layer)
-  IF (ALLOCATED(Subband_energies)) DEALLOCATE (Subband_energies) !Deallocate global variable
+  IF (ALLOCATED(sc_input % physical % subband_params % V_layer)) DEALLOCATE (sc_input % physical % subband_params % V_layer)
+  IF (ALLOCATED(sc_input % physical % subband_params % Subband_energies)) DEALLOCATE (sc_input % physical % subband_params % Subband_energies) !Deallocate global variable
 
 END SUBROUTINE CALCULATE_DISPERSION
 
-SUBROUTINE CALCULATE_CHERN_PARAMS(Nk1, Nk2, inputPath)
-    !! Calculates Chern Params, based on https://arxiv.org/abs/cond-mat/0503172
-  INTEGER*4, INTENT(IN) :: Nk1 !! Number of divisions along k1
-  INTEGER*4, INTENT(IN) :: Nk2 !! Number of divisions along k2
+SUBROUTINE CALCULATE_CHERN_PARAMS(chern)
+  !! Calculates Chern Params, based on https://arxiv.org/abs/cond-mat/0503172
+  !! Not adapted to multiband systems
+  TYPE(post_chern_number_t), INTENT(IN) :: chern
+  ! INTEGER*4, INTENT(IN) :: Nk1 !! Number of divisions along k1
+  ! INTEGER*4, INTENT(IN) :: Nk2 !! Number of divisions along k2
   !INTEGER*4, INTENT(IN) :: HamDim !! DImension of the hamiltonian to be diagonalized (e.g. 4 for simple hellical, 24 for LAO-STO)
-  CHARACTER(LEN=*) :: inputPath
-
+  !CHARACTER(LEN=*) :: inputPath
+  TYPE(sc_input_params_t) :: sc_input
   COMPLEX*16, ALLOCATABLE :: Psi(:, :, :, :)
-  COMPLEX*16 :: U1_chern(DIM / 2, DIM / 2), U2_chern(DIM / 2, DIM / 2), U3_chern(DIM / 2, DIM / 2), U4_chern(DIM / 2, DIM / 2)
+  COMPLEX*16, ALLOCATABLE :: U1_chern(:, :), U2_chern(:, :), U3_chern(:, :), U4_chern(:, :)
+  !COMPLEX*16 :: U1_chern(DIM / 2, DIM / 2), U2_chern(DIM / 2, DIM / 2), U3_chern(DIM / 2, DIM / 2), U4_chern(DIM / 2, DIM / 2)
   INTEGER*4 :: i, j, a, b, m, n
   REAL*8 :: potChem
   REAL*8 :: Bfield(3)
@@ -539,7 +563,16 @@ SUBROUTINE CALCULATE_CHERN_PARAMS(Nk1, Nk2, inputPath)
 
   COMPLEX*16 :: f_12, det1, det2, det3, det4
 
-  ALLOCATE (Psi(-Nk1 / 2:Nk1 / 2, 2, DIM, DIM))
+  CALL GET_INPUT(TRIM(chern % path)//"input.nml", sc_input)
+
+  ASSOCIATE (DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+            & DIM => sc_input % discretization % derived % DIM)
+    ALLOCATE (Psi(-chern % Nk_points / 2:chern % Nk_points / 2, 2, DIM, DIM))
+    ALLOCATE (U1_chern(DIM_POSITIVE_K, DIM_POSITIVE_K))
+    ALLOCATE (U2_chern(DIM_POSITIVE_K, DIM_POSITIVE_K))
+    ALLOCATE (U3_chern(DIM_POSITIVE_K, DIM_POSITIVE_K))
+    ALLOCATE (U4_chern(DIM_POSITIVE_K, DIM_POSITIVE_K))
+  END ASSOCIATE
   i = 0
   j = 0
   a = 0
@@ -556,7 +589,7 @@ SUBROUTINE CALCULATE_CHERN_PARAMS(Nk1, Nk2, inputPath)
   !PRINT*, "Nk1/2", Nk1/2
   f_12 = DCMPLX(0., 0.)
   !Calculate Chern numbers
-  DO j = -Nk2 / 2, Nk2 / 2 - 1
+  DO j = -chern % Nk_points / 2, chern % Nk_points / 2 - 1
     !This is for memory optimization. I dont have to keep all values of Psi over Brillouin Zone.
     !Instead I need values for current row and one row above:
     ! j = 0
@@ -581,22 +614,22 @@ SUBROUTINE CALCULATE_CHERN_PARAMS(Nk1, Nk2, inputPath)
     ! ******************************** <- this I can forget
     !It could be improved to keep Nk1 + 1 values, but for now I hope it is not necessary
     IF (j .EQ. 0) THEN
-      DO n = -Nk1 / 2, Nk1 / 2
-        CALL LAO_STO_CHERN_ENERGIES(Nk1, Nk2, n, j, inputPath, Psi(n, 1, :, :)) !First row
-        CALL LAO_STO_CHERN_ENERGIES(Nk1, Nk2, n, j + 1, inputPath, Psi(n, 2, :, :)) !Second row
+      DO n = -chern % Nk_points / 2, chern % Nk_points / 2
+        CALL LAO_STO_CHERN_ENERGIES(chern % Nk_points, chern % Nk_points, n, j, chern % path, sc_input, Psi(n, 1, :, :)) !First row
+        CALL LAO_STO_CHERN_ENERGIES(chern % Nk_points, chern % Nk_points, n, j + 1, chern % path, sc_input, Psi(n, 2, :, :)) !Second row
 
         !CALL HELLICAL_TEST_CHERN(potChem, Bfield, Nk1, Nk2, n , j, Psi(n,1,:,:))
         !CALL HELLICAL_TEST_CHERN(potChem, Bfield, Nk1, Nk2, n , j + 1, Psi(n,2,:,:))
       END DO
     ELSE
       Psi(:, 1, :, :) = Psi(:, 2, :, :)
-      DO n = -Nk1 / 2, Nk1 / 2
-        CALL LAO_STO_CHERN_ENERGIES(Nk1, Nk2, n, j + 1, inputPath, Psi(n, 2, :, :)) !Next row
+      DO n = -chern % Nk_points / 2, chern % Nk_points / 2
+        CALL LAO_STO_CHERN_ENERGIES(chern % Nk_points, chern % Nk_points, n, j + 1, chern % path, sc_input, Psi(n, 2, :, :)) !Next row
         !CALL HELLICAL_TEST_CHERN(potChem, Bfield, Nk1, Nk2, n , j+1, Psi(n,2,:,:)) !Next row
       END DO
     END IF
 
-    DO i = -Nk1 / 2, Nk1 / 2 - 1
+    DO i = -chern % Nk_points / 2, chern % Nk_points / 2 - 1
       !PRINT*, i, j
       !Calculate U matrices for chern numbers
       U1_chern = DCMPLX(0.0, 0.)
@@ -604,8 +637,8 @@ SUBROUTINE CALCULATE_CHERN_PARAMS(Nk1, Nk2, inputPath)
       U3_chern = DCMPLX(0.0, 0.)
       U4_chern = DCMPLX(0.0, 0.)
 
-      DO a = 1, DIM / 2
-        DO b = 1, DIM / 2
+      DO a = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+        DO b = 1, sc_input % discretization % derived % DIM_POSITIVE_K
           U1_chern(a, b) = SUM(CONJG(Psi(i, 1, :, a)) * Psi(i + 1, 1, :, b))
           U2_chern(a, b) = SUM(CONJG(Psi(i + 1, 1, :, a)) * Psi(i + 1, 2, :, b))
           U3_chern(a, b) = SUM(CONJG(Psi(i + 1, 2, :, a)) * Psi(i, 2, :, b))
@@ -613,22 +646,22 @@ SUBROUTINE CALCULATE_CHERN_PARAMS(Nk1, Nk2, inputPath)
         END DO
       END DO
 
-      det1 = det(U1_chern(:, :), DIM / 2)
+      det1 = det(U1_chern(:, :), sc_input % discretization % derived % DIM_POSITIVE_K)
       IF (det1 .ne. 0.) THEN
         det1 = det1 / ABS(det1)
       END IF
 
-      det2 = det(U2_chern(:, :), DIM / 2)
+      det2 = det(U2_chern(:, :), sc_input % discretization % derived % DIM_POSITIVE_K)
       IF (det2 .ne. 0.) THEN
         det2 = det2 / ABS(det2)
       END IF
 
-      det3 = det(U3_chern(:, :), DIM / 2)
+      det3 = det(U3_chern(:, :), sc_input % discretization % derived % DIM_POSITIVE_K)
       IF (det3 .ne. 0.) THEN
         det3 = det3 / ABS(det3)
       END IF
 
-      det4 = det(U4_chern(:, :), DIM / 2)
+      det4 = det(U4_chern(:, :), sc_input % discretization % derived % DIM_POSITIVE_K)
       IF (det4 .ne. 0.) THEN
         det4 = det4 / ABS(det4)
       END IF
@@ -639,26 +672,34 @@ SUBROUTINE CALCULATE_CHERN_PARAMS(Nk1, Nk2, inputPath)
     END DO
   END DO
 
-  OPEN (unit=9, FILE=TRIM(inputPath)//"OutputData/ChernNumber.dat", FORM="FORMATTED", ACTION="WRITE")
+  OPEN (unit=9, FILE=TRIM(chern % path)//"OutputData/ChernNumber.dat", FORM="FORMATTED", ACTION="WRITE")
   WRITE (9, *) f_12 / (2 * PI)
   CLOSE (9)
   !PRINT*, "Chern number is ", f_12/(2*PI)
 
   DEALLOCATE (Psi)
+  DEALLOCATE (U1_chern)
+  DEALLOCATE (U2_chern)
+  DEALLOCATE (U3_chern)
+  DEALLOCATE (U4_chern)
+  IF (ALLOCATED(sc_input % physical % subband_params % V_layer)) DEALLOCATE (sc_input % physical % subband_params % V_layer)
+  IF (ALLOCATED(sc_input % physical % subband_params % Subband_energies)) DEALLOCATE (sc_input % physical % subband_params % Subband_energies) !Deallocate global variable
 
 END SUBROUTINE CALCULATE_CHERN_PARAMS
 
-SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
+SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(gap)
 
-  CHARACTER(LEN=*), INTENT(IN) :: inputPath !! This should be a path to folder where input.nml resides
-  REAL*8, INTENT(IN) :: dE
-  INTEGER*4, INTENT(IN) :: nBrillouinPoints
+  TYPE(post_sc_gap_t) :: gap
+  ! CHARACTER(LEN=*), INTENT(IN) :: inputPath !! This should be a path to folder where input.nml resides
+  ! REAL*8, INTENT(IN) :: dE
+  ! INTEGER*4, INTENT(IN) :: nBrillouinPoints
+  TYPE(sc_input_params_t) :: sc_input
   CHARACTER(LEN=20) :: output_format
 
   COMPLEX*16, ALLOCATABLE :: Hamiltonian(:, :), Hamiltonian_const(:, :), Hamiltonian_const_band(:, :)
   REAL*8, ALLOCATABLE :: Energies(:)
 
-  COMPLEX*16, ALLOCATABLE :: Gamma_SC(:, :, :, :, :)
+  COMPLEX*16, ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :)
   REAL*8, ALLOCATABLE :: Charge_dens(:, :)
 
   INTEGER*1, ALLOCATABLE :: IsFermiSurface(:, :) !! This indicates whether given (kx,ky) point is at Fermi surface
@@ -678,24 +719,31 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
   brillouinZoneVertices(:, 1) = (/4.*PI / (3 * SQRT(3.0d0)), 2.*PI / (3 * SQRT(3.0d0)), -2.*PI / (3 * SQRT(3.0d0)), -4.*PI / (3 * SQRT(3.0d0)), -2.*PI / (3 * SQRT(3.0d0)), 2.*PI / (3 * SQRT(3.0d0))/)
   brillouinZoneVertices(:, 2) = (/0.0d0, -2.*PI / 3.0d0, -2.*PI / 3.0d0, 0.0d0, 2.*PI / 3.0d0, 2.*PI / 3.0d0/)
 
-  dkx = KX_MAX / nBrillouinPoints
-  dky = KY_MAX / nBrillouinPoints
+  dkx = KX_MAX / gap % Nk_points
+  dky = KY_MAX / gap % Nk_points
 
-  kx_steps = INT(nBrillouinPoints)
-  ky_steps = INT(nBrillouinPoints)
+  kx_steps = INT(gap % Nk_points)
+  ky_steps = INT(gap % Nk_points)
 
   !Get parameters from simulation
-  CALL GET_INPUT(TRIM(inputPath)//"input.nml")
+  CALL GET_INPUT(TRIM(gap % path)//"input.nml", sc_input)
+  ASSOCIATE (SUBLATTICES => sc_input % discretization % SUBLATTICES, &
+         & SUBBANDS => sc_input % discretization % SUBBANDS, &
+         & ORBITALS => sc_input % discretization % ORBITALS, &
+         & TBA_DIM => sc_input % discretization % derived % TBA_DIM, &
+         & DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+         & DIM => sc_input % discretization % derived % DIM, &
+         & LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS)
 
-  ALLOCATE (Hamiltonian(DIM, DIM))
-  ALLOCATE (Hamiltonian_const(DIM, DIM))
-  ALLOCATE (Hamiltonian_const_band(DIM, DIM))
-  ALLOCATE (Energies(DIM))
-  ALLOCATE (IsFermiSurface(-kx_steps:kx_steps, -ky_steps:ky_steps))
-  ALLOCATE (OrbitalAtFermiSurface(-kx_steps:kx_steps, -ky_steps:ky_steps))
-  ALLOCATE (Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, 2, LAYER_COUPLINGS, SUBBANDS))
-  ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
-
+    ALLOCATE (Hamiltonian(DIM, DIM))
+    ALLOCATE (Hamiltonian_const(DIM, DIM))
+    ALLOCATE (Hamiltonian_const_band(DIM, DIM))
+    ALLOCATE (Energies(DIM))
+    ALLOCATE (IsFermiSurface(-kx_steps:kx_steps, -ky_steps:ky_steps))
+    ALLOCATE (OrbitalAtFermiSurface(-kx_steps:kx_steps, -ky_steps:ky_steps))
+    ALLOCATE (Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, LAYER_COUPLINGS, SUBBANDS))
+    ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
+  END ASSOCIATE
   Hamiltonian(:, :) = DCMPLX(0., 0.)
   Hamiltonian_const(:, :) = DCMPLX(0., 0.)
   Energies(:) = 0.
@@ -705,25 +753,15 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
   output_format = '(3E15.5, I10)'
 
   !Calculation of superconducting gap
-  INQUIRE (FILE=TRIM(inputPath)//"OutputData/Gamma_SC_final.dat", EXIST=fileExists)
-  IF (fileExists) THEN
-    CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_final.dat")
-  ELSE
-    CALL GET_GAMMA_SC(Gamma_SC, TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
-  END IF
+  CALL GET_SAFE_GAMMA_SC(Gamma_SC, gap % path, sc_input % discretization)
 
-  INQUIRE (FILE=TRIM(inputPath)//"OutputData/Charge_dens_final.dat", EXIST=fileExists)
-  IF (fileExists) THEN
-    CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
-  ELSE
-    CALL GET_CHARGE_DENS(Charge_dens, TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
-  END IF
+  CALL GET_SAFE_CHARGE_DENS(Charge_dens, gap % path, sc_input % discretization)
   !Computing k-independent terms
-  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const)
+  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const, sc_input % discretization, sc_input % physical)
 
-  OPEN (unit=9, FILE=TRIM(inputPath)//"OutputData/SuperconductingGap.dat", FORM="FORMATTED", ACTION="WRITE")
+  OPEN (unit=9, FILE=TRIM(gap % path)//"OutputData/SuperconductingGap.dat", FORM="FORMATTED", ACTION="WRITE")
   WRITE (9, *) '#kx[1/a] ky[1/a] gap_SC[meV] N_orbital'
-  DO band = 1, SUBBANDS
+  DO band = 1, sc_input % discretization % SUBBANDS
     WRITE (log_string, *) "Band: ", band
     LOG_INFO(log_string)
 
@@ -731,7 +769,7 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
     OrbitalAtFermiSurface(:, :) = 0
 
     Hamiltonian_const_band = Hamiltonian_const
-    CALL COMPUTE_SUBBAND_POTENTIAL(Hamiltonian_const_band, band)
+    CALL COMPUTE_SUBBAND_POTENTIAL(Hamiltonian_const_band, band, sc_input % physical % subband_params % Subband_energies, sc_input % discretization)
 
     !Dispersion relation in a normal state
     !$omp parallel private(kx, ky, Hamiltonian, Energies)
@@ -745,21 +783,25 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
 
           Hamiltonian(:, :) = DCMPLX(0., 0.)
           Energies(:) = 0.
-          CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian(:, :), kx, ky)
-          CALL COMPUTE_HUBBARD(Hamiltonian(:, :), Charge_dens(:, band))
-          !CALL COMPUTE_SC(Hamiltonian(:,:), kx, ky, Gamma_SC(:,:,:,:))
+          CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
+          CALL COMPUTE_HUBBARD(Hamiltonian, &
+                              & Charge_dens(:, band), &
+                              & sc_input % physical % subband_params % U_HUB, &
+                              & sc_input % physical % subband_params % V_HUB, &
+                              & sc_input % discretization)
+          CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM) !This is not needed, since ZHEEV takes only upper triangle
 
-          CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
+          Hamiltonian = Hamiltonian_const_band + Hamiltonian !Should by multiplied by 0.5 if in Nambu space
 
-          Hamiltonian(:, :) = Hamiltonian_const_band(:, :) + Hamiltonian(:, :) !Should by multiplied by 0.5 if in Nambu space
-
-          CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:DIM_POSITIVE_K, :DIM_POSITIVE_K), Energies(:DIM_POSITIVE_K), DIM_POSITIVE_K)
+          CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:sc_input % discretization % derived % DIM_POSITIVE_K, &
+                                    & :sc_input % discretization % derived % DIM_POSITIVE_K), &
+                                    & Energies(:sc_input % discretization % derived % DIM_POSITIVE_K), sc_input % discretization % derived % DIM_POSITIVE_K)
           !CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:DIM_POSITIVE_K, :DIM_POSITIVE_K), Energies(:DIM_POSITIVE_K), U_transformation(:DIM_POSITIVE_K, :DIM_POSITIVE_K), DIM_POSITIVE_K)
 
           !Check whether current wavevector is in the Fermi surface
-          IF (MINVAL(ABS(Energies(:DIM_POSITIVE_K))) < dE) THEN
+          IF (MINVAL(ABS(Energies(:sc_input % discretization % derived % DIM_POSITIVE_K))) < gap % dE) THEN
             IsFermiSurface(i, j) = 1
-            OrbitalAtFermiSurface(i, j) = (band - 1) * DIM_POSITIVE_K + MINLOC(ABS(Energies(:DIM_POSITIVE_K)), 1)
+            OrbitalAtFermiSurface(i, j) = (band - 1) * sc_input % discretization % derived % DIM_POSITIVE_K + MINLOC(ABS(Energies(:sc_input % discretization % derived % DIM_POSITIVE_K)), 1)
           END IF
         END IF
       END DO
@@ -780,24 +822,21 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
 
           Hamiltonian(:, :) = DCMPLX(0., 0.)
           Energies(:) = 0.
-          CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian(:, :), kx, ky)
-          CALL COMPUTE_HUBBARD(Hamiltonian(:, :), Charge_dens(:, band))
-          CALL COMPUTE_SC(Hamiltonian(:, :), kx, ky, Gamma_SC(:, :, :, :, band))
-          ! DO n = 1, DIM_POSITIVE_K
-          !     IF (n .le. DIM_POSITIVE_K - ORBITALS) THEN
-          !         Hamiltonian(n, ORBITALS + DIM_POSITIVE_K + n) = 20 * meV2au
-          !     END IF
-          !     IF (n .ge. ORBITALS) THEN
-          !         Hamiltonian(n, DIM_POSITIVE_K + n - ORBITALS) = 20 * meV2au
-          !     END IF
-          ! END DO
-          CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
+          CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
+          CALL COMPUTE_HUBBARD(Hamiltonian, &
+                              & Charge_dens(:, band), &
+                              & sc_input % physical % subband_params % U_HUB, &
+                              & sc_input % physical % subband_params % V_HUB, &
+                              & sc_input % discretization)
+          CALL COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC(:, :, :, :, :, band), sc_input % discretization)
+          CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM) !This is not needed, since ZHEEV takes only upper triangle
 
-          Hamiltonian(:, :) = 0.5 * (Hamiltonian_const_band(:, :) + Hamiltonian(:, :)) !Should by multiplied by 0.5 if in Nambu space
+          Hamiltonian = 0.5 * (Hamiltonian_const_band + Hamiltonian) !Should by multiplied by 0.5 if in Nambu space
 
-          CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:, :), Energies(:), DIM)
+          CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:, :), Energies(:), sc_input % discretization % derived % DIM)
           !Write superconducting gap
-          WRITE (9, output_format) kx, ky, ABS(Energies(DIM_POSITIVE_K) - Energies(DIM_POSITIVE_K + 1)) / meV2au, OrbitalAtFermiSurface(i, j)
+          WRITE (9, output_format) kx, ky, ABS(Energies(sc_input % discretization % derived % DIM_POSITIVE_K) - &
+          & Energies(sc_input % discretization % derived % DIM_POSITIVE_K + 1)) / meV2au, OrbitalAtFermiSurface(i, j)
         END IF
       END DO
     END DO
@@ -806,30 +845,32 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(inputPath, dE, nBrillouinPoints)
   END DO
   CLOSE (9)
 
-  IF (ALLOCATED(V_layer)) DEALLOCATE (V_layer)
-  IF (ALLOCATED(Subband_energies)) DEALLOCATE (Subband_energies) !Deallocate global variable
+  IF (ALLOCATED(sc_input % physical % subband_params % V_layer)) DEALLOCATE (sc_input % physical % subband_params % V_layer)
+  IF (ALLOCATED(sc_input % physical % subband_params % Subband_energies)) DEALLOCATE (sc_input % physical % subband_params % Subband_energies) !Deallocate global variable
 
 END SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP
 
-SUBROUTINE CALCULATE_GAMMA_K(input_path, n_brillouin_points)
-  CHARACTER(LEN=*), INTENT(IN) :: input_path !! This should be a path to folder where input.nml resides
-  INTEGER*4, INTENT(IN) :: n_brillouin_points !! Number of steps taken in k-space.
-                                                !! Integration is over interval -KX_MAX < ----- n_brillouin_points ----- 0 ----- n_brillouin_points ----- > KX_MAX
-                                                !! So effectively 2N + 1 steps are taken in each direction
+SUBROUTINE CALCULATE_GAMMA_K(gamma)
+  TYPE(post_gamma_k_t), INTENT(IN) :: gamma
+  TYPE(sc_input_params_t) :: sc_input
+  ! CHARACTER(LEN=*), INTENT(IN) :: input_path !! This should be a path to folder where input.nml resides
+  ! INTEGER*4, INTENT(IN) :: n_brillouin_points !! Number of steps taken in k-space.
+  !                                               !! Integration is over interval -KX_MAX < ----- n_brillouin_points ----- 0 ----- n_brillouin_points ----- > KX_MAX
+  !                                               !! So effectively 2N + 1 steps are taken in each direction
 
   COMPLEX*16, ALLOCATABLE :: Hamiltonian_const(:, :) !! k-indepndent and band-independent part of the Hamiltonian
   COMPLEX*16, ALLOCATABLE :: Hamiltonian_const_band(:, :) !! k-independent, band-dependent Hamiltonian
   COMPLEX*16, ALLOCATABLE :: Hamiltonian_dummy(:, :) !! This is only used to get matrix elements gamma that show up in the Hamiltonian
-  COMPLEX*16, ALLOCATABLE :: Gamma_SC(:, :, :, :, :) !! Supercondicting pairings read from a simulation
-  COMPLEX*16, ALLOCATABLE :: Gamma_K(:, :, :, :, :) !! Superconducting pairing, determined at given k point
+  COMPLEX*16, ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :) !! Supercondicting pairings read from a simulation
+  COMPLEX*16, ALLOCATABLE :: Gamma_K(:, :, :, :, :, :) !! Superconducting pairing, determined at given k point
   REAL*8, ALLOCATABLE :: Charge_dens(:, :) !! Charge density read from a simulation
-  COMPLEX*16, ALLOCATABLE :: Delta_local(:, :, :, :, :) !! Delta (pairing amplitudes) for given k point, integrand
+  COMPLEX*16, ALLOCATABLE :: Delta_local(:, :, :, :, :, :) !! Delta (pairing amplitudes) for given k point, integrand
   REAL*8, ALLOCATABLE :: Charge_dens_local(:, :) !! Charge density for given k point, integrand
 
   REAL*8 :: k1, k2, kx, ky, dkx, dky
   INTEGER*4 :: i, j, n, m, band
   INTEGER*4 :: kx_steps, ky_steps
-  INTEGER*4 :: orb, neigh, spin, layer, lat, file_count
+  INTEGER*4 :: orb, neigh, spin1, spin2, layer, lat, file_count
   INTEGER*4 :: orb_prime, band_prime
   INTEGER*4 :: row, col, row_inverse, col_inverse, row_nnn, col_nnn
   INTEGER*4 :: gamma_lat_index, gamma_spin_index
@@ -837,7 +878,7 @@ SUBROUTINE CALCULATE_GAMMA_K(input_path, n_brillouin_points)
   COMPLEX*16 :: gamma_nn_12, gamma_nn_21, gamma_nnn
 
   CHARACTER(LEN=200) :: filename
-  COMPLEX*16, ALLOCATABLE :: File_unit_mapping(:, :, :, :)
+  COMPLEX*16, ALLOCATABLE :: File_unit_mapping(:, :, :, :, :)
 
   LOGICAL :: file_exists
 
@@ -846,53 +887,63 @@ SUBROUTINE CALCULATE_GAMMA_K(input_path, n_brillouin_points)
   Brillouin_zone_vertices(:, 1) = (/4.*PI / (3 * SQRT(3.0d0)), 2.*PI / (3 * SQRT(3.0d0)), -2.*PI / (3 * SQRT(3.0d0)), -4.*PI / (3 * SQRT(3.0d0)), -2.*PI / (3 * SQRT(3.0d0)), 2.*PI / (3 * SQRT(3.0d0))/)
   Brillouin_zone_vertices(:, 2) = (/0.0d0, -2.*PI / 3.0d0, -2.*PI / 3.0d0, 0.0d0, 2.*PI / 3.0d0, 2.*PI / 3.0d0/)
 
-  dkx = 3 * KX_MAX / n_brillouin_points
-  dky = 3 * KY_MAX / n_brillouin_points
+  dkx = 3 * KX_MAX / gamma % Nk_points
+  dky = 3 * KY_MAX / gamma % Nk_points
 
-  kx_steps = INT(n_brillouin_points)
-  ky_steps = INT(n_brillouin_points)
+  kx_steps = INT(gamma % Nk_points)
+  ky_steps = INT(gamma % Nk_points)
 
-  CALL GET_INPUT(TRIM(input_path)//"input.nml")
+  CALL GET_INPUT(TRIM(gamma % path)//"input.nml", sc_input)
+  ASSOCIATE (SUBLATTICES => sc_input % discretization % SUBLATTICES, &
+         & SUBBANDS => sc_input % discretization % SUBBANDS, &
+         & ORBITALS => sc_input % discretization % ORBITALS, &
+         & TBA_DIM => sc_input % discretization % derived % TBA_DIM, &
+         & DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+         & DIM => sc_input % discretization % derived % DIM, &
+         & LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS)
 
-  ALLOCATE (Hamiltonian_const(DIM, DIM))
-  ALLOCATE (Hamiltonian_const_band(DIM, DIM))
-  ALLOCATE (Hamiltonian_dummy(DIM, DIM))
-  ALLOCATE (Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, 2, LAYER_COUPLINGS, SUBBANDS))
-  ALLOCATE (Gamma_K(ORBITALS, N_ALL_NEIGHBOURS, 2, LAYER_COUPLINGS, SUBBANDS))
-  ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
-  ALLOCATE (Delta_local(ORBITALS, N_ALL_NEIGHBOURS, 2, LAYER_COUPLINGS, SUBBANDS))
-  ALLOCATE (Charge_dens_local(DIM_POSITIVE_K, SUBBANDS))
-  ALLOCATE (File_unit_mapping(ORBITALS, 2, LAYER_COUPLINGS, SUBBANDS))
+    ALLOCATE (Hamiltonian_const(DIM, DIM))
+    ALLOCATE (Hamiltonian_const_band(DIM, DIM))
+    ALLOCATE (Hamiltonian_dummy(DIM, DIM))
+    ALLOCATE (Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, LAYER_COUPLINGS, SUBBANDS))
+    ALLOCATE (Gamma_K(ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, LAYER_COUPLINGS, SUBBANDS))
+    ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
+    ALLOCATE (Delta_local(ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, LAYER_COUPLINGS, SUBBANDS))
+    ALLOCATE (Charge_dens_local(DIM_POSITIVE_K, SUBBANDS))
+    ALLOCATE (File_unit_mapping(ORBITALS, SPINS, SPINS, LAYER_COUPLINGS, SUBBANDS))
+  END ASSOCIATE
 
   Hamiltonian_const = DCMPLX(0., 0.)
   Hamiltonian_const_band = DCMPLX(0., 0.)
   Gamma_SC = DCMPLX(0., 0.)
   Charge_dens = 0.
 
-  CALL GET_SAFE_GAMMA_SC(Gamma_SC, input_path)
-  CALL GET_SAFE_CHARGE_DENS(Charge_dens, input_path)
+  CALL GET_SAFE_GAMMA_SC(Gamma_SC, gamma % path, sc_input % discretization)
+  CALL GET_SAFE_CHARGE_DENS(Charge_dens, gamma % path, sc_input % discretization)
 
   !Computing k-independent terms
-  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const)
+  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const, sc_input % discretization, sc_input % physical)
 
   !Opening all files I will write gammas to and create a mapping of file units to appropriate names
   file_count = 10
-  DO orb = 1, ORBITALS
-    DO spin = 1, 2
-      DO layer = 1, LAYER_COUPLINGS
-        DO band = 1, SUBBANDS
-          File_unit_mapping(orb, spin, layer, band) = file_count
-          WRITE (filename, "(4(A, I0))") "GammaK_orb", orb, "_spin", spin, "_layer", layer, "_band", band
-          OPEN (unit=file_count, FILE=TRIM(input_path)//"OutputData/"//TRIM(filename)//".dat", FORM="FORMATTED", ACTION="WRITE")
-          WRITE (file_count, '(A)') "#kx[1/a]   ky[1/a]     Re(Gamma_ham_nn)[meV]     Im(Gamma_ham_nn)[meV]    OPTIONAL(if layer <= SUBLATTICES)[Re(Gamma_ham_nnn)[meV]     Im(Gamma_ham_nnn)[meV]]     Re(Gamma_neigh1)[meV]   Im(Gamma_neigh1)[meV]   Re(Gamma_neigh2)[meV] ..."
-          file_count = file_count + 1
+  DO orb = 1, sc_input % discretization % ORBITALS
+    DO spin1 = 1, SPINS
+      DO spin2 = 1, SPINS
+        DO layer = 1, sc_input % discretization % derived % LAYER_COUPLINGS
+          DO band = 1, sc_input % discretization % SUBBANDS
+            File_unit_mapping(orb, spin1, spin2, layer, band) = file_count
+            WRITE (filename, "(6(A, I0))") "GammaK_orb", orb, "_spin1", spin1, "_spin2", spin2, "_layer", layer, "_band", band
+            OPEN (unit=file_count, FILE=TRIM(gamma % path)//"OutputData/"//TRIM(filename)//".dat", FORM="FORMATTED", ACTION="WRITE")
+            WRITE (file_count, '(A)') "#kx[1/a]   ky[1/a]     Re(Gamma_ham_nn)[meV]     Im(Gamma_ham_nn)[meV]    OPTIONAL(if layer <= SUBLATTICES)[Re(Gamma_ham_nnn)[meV]     Im(Gamma_ham_nnn)[meV]]     Re(Gamma_neigh1)[meV]   Im(Gamma_neigh1)[meV]   Re(Gamma_neigh2)[meV] ..."
+            file_count = file_count + 1
+          END DO
         END DO
       END DO
     END DO
   END DO
 
   !$omp parallel private(kx, ky, k1, k2, band, Hamiltonian_const_band, Charge_dens_local, Delta_local,&
-  !$omp&                 Gamma_K, orb, spin, n, neigh, lat, orb_prime, band_prime, layer, file_count, row, col, &
+  !$omp&                 Gamma_K, orb, spin1, spin2, n, neigh, lat, orb_prime, band_prime, layer, file_count, row, col, &
   !$omp&                 gamma_spin_index, gamma_lat_index, Hamiltonian_dummy, gamma_nn_12, gamma_nn_21, gamma_nnn)
   !$omp do
   DO i = -kx_steps, kx_steps
@@ -900,68 +951,85 @@ SUBROUTINE CALCULATE_GAMMA_K(input_path, n_brillouin_points)
       kx = i * dkx
       ky = j * dky
 
-      DO band = 1, SUBBANDS
+      DO band = 1, sc_input % discretization % SUBBANDS
         Hamiltonian_const_band = Hamiltonian_const
-        CALL COMPUTE_SUBBAND_POTENTIAL(Hamiltonian_const_band, band)
+        CALL COMPUTE_SUBBAND_POTENTIAL(Hamiltonian_const_band, band, sc_input % physical % subband_params % Subband_energies, sc_input % discretization)
 
         k1 = SQRT(3.0d0) / (2.0d0 * PI) * kx
         k2 = 3.0d0 / (4.0d0 * PI) * (ky + 1.0d0 / SQRT(3.0d0) * kx)
-        CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const_band, Gamma_SC(:, :, :, :, band), Charge_dens(:, band), k1, k2, Delta_local(:, :, :, :, band), Charge_dens_local(:, band))
+        CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const_band, &
+                                        & Gamma_SC(:, :, :, :, :, band), &
+                                        & Charge_dens(:, band), &
+                                        & k1, &
+                                        & k2, &
+                                        & Delta_local(:, :, :, :, :, band), &
+                                        & Charge_dens_local(:, band), &
+                                        & sc_input % discretization, &
+                                        & sc_input % physical)
       END DO
 
-      CALL GET_GAMMAS_FROM_DELTAS(Gamma_K, Delta_local)
+      CALL GET_GAMMAS_FROM_DELTAS(Gamma_K, Delta_local, sc_input % discretization, sc_input % physical % subband_params % nearest_interorb_multiplier, sc_input % physical % subband_params % next_interorb_multiplier)
 
       !Write result for given k point to file
-      DO band = 1, SUBBANDS
+      DO band = 1, sc_input % discretization % SUBBANDS
         Hamiltonian_dummy = DCMPLX(0.0d0, 0.0d0)
-        CALL COMPUTE_SC(Hamiltonian_dummy, kx, ky, Gamma_SC(:, :, :, :, band))
+        CALL COMPUTE_SC(Hamiltonian_dummy, kx, ky, Gamma_SC(:, :, :, :, :, band), sc_input % discretization)
 
-        DO orb = 1, ORBITALS
-          DO spin = 0, 1
-            gamma_spin_index = MOD(spin + 1, 2) + 1
-            DO lat = 0, SUBLATTICES - 2
-              !Include inter and intralayer couplings
+        DO orb = 1, sc_input % discretization % ORBITALS
+          DO spin1 = 1, SPINS
+            DO spin2 = 1, SPINS
+              DO lat = 0, sc_input % discretization % SUBLATTICES - 2
+                !Include inter and intralayer couplings
 
-              !Interlayer coupling
-              !Coupling Ti1 - Ti2
-              gamma_lat_index = 2 * lat + 2
-              row = spin * TBA_DIM + orb + lat * ORBITALS
-              col = orb + (lat + 1) * ORBITALS + DIM_POSITIVE_K + TBA_DIM * MOD(spin + 1, 2)
-              gamma_nn_12 = Hamiltonian_dummy(row, col)
+                !Interlayer coupling
+                !Coupling Ti1 - Ti2
+                gamma_lat_index = 2 * lat + 2
+                row = (spin1 - 1) * sc_input % discretization % derived % TBA_DIM + &
+                    & orb + lat * sc_input % discretization % ORBITALS
+                col = (spin2 - 1) * sc_input % discretization % derived % TBA_DIM + &
+                    & orb + (lat + 1) * sc_input % discretization % ORBITALS + sc_input % discretization % derived % DIM_POSITIVE_K
+                gamma_nn_12 = Hamiltonian_dummy(row, col)
 
-              IF (gamma_lat_index .le. SUBLATTICES) THEN
-                row = orb + (gamma_lat_index - 1) * ORBITALS + spin * TBA_DIM
-                col = orb + (gamma_lat_index - 1) * ORBITALS + MOD(spin + 1, 2) * TBA_DIM + DIM_POSITIVE_K
-                gamma_nnn = Hamiltonian_dummy(row, col)
-              ELSE
-                gamma_nnn = DCMPLX(0.0d0, 0.0d0)
-              END IF
+                IF (gamma_lat_index .le. sc_input % discretization % SUBLATTICES) THEN
+                  row = orb + (gamma_lat_index - 1) * sc_input % discretization % ORBITALS + &
+                      & (spin1 - 1) * sc_input % discretization % derived % TBA_DIM
+                  col = orb + (gamma_lat_index - 1) * sc_input % discretization % ORBITALS + &
+                      & (spin2 - 1) * sc_input % discretization % derived % TBA_DIM + sc_input % discretization % derived % DIM_POSITIVE_K
+                  gamma_nnn = Hamiltonian_dummy(row, col)
+                ELSE
+                  gamma_nnn = DCMPLX(0.0d0, 0.0d0)
+                END IF
 
-              file_count = File_unit_mapping(orb, gamma_spin_index, gamma_lat_index, band)
-              WRITE (file_count, '(6F15.8, *(2F15.8))') kx, ky, &
-              & REAL(gamma_nn_12) / meV2au, AIMAG(gamma_nn_12) / meV2au, & !Interlayer couplings
-              & REAL(gamma_nnn) / meV2au, AIMAG(gamma_nnn) / meV2au, & !Intralayer couplings
-              & (REAL(Gamma_K(orb, neigh, gamma_spin_index, gamma_lat_index, band)) / meV2au, AIMAG(Gamma_K(orb, neigh, gamma_spin_index, gamma_lat_index, band)) / meV2au, neigh=1, N_ALL_NEIGHBOURS)
+                file_count = File_unit_mapping(orb, spin1, spin2, gamma_lat_index, band)
+                WRITE (file_count, '(6F15.8, *(2F15.8))') kx, ky, &
+                & REAL(gamma_nn_12) / meV2au, AIMAG(gamma_nn_12) / meV2au, & !Interlayer couplings
+                & REAL(gamma_nnn) / meV2au, AIMAG(gamma_nnn) / meV2au, & !Intralayer couplings
+                & (REAL(Gamma_K(orb, neigh, spin1, spin2, gamma_lat_index, band)) / meV2au, AIMAG(Gamma_K(orb, neigh, spin1, spin2, gamma_lat_index, band)) / meV2au, neigh=1, N_ALL_NEIGHBOURS)
 
-              !Coupling Ti2 - Ti1
-              gamma_lat_index = 2 * lat + 1
-              row = spin * TBA_DIM + orb + (lat + 1) * ORBITALS
-              col = orb + DIM_POSITIVE_K + TBA_DIM * MOD(spin + 1, 2) + lat * ORBITALS
-              gamma_nn_21 = Hamiltonian_dummy(row, col)
+                !Coupling Ti2 - Ti1
+                gamma_lat_index = 2 * lat + 1
+                row = (spin1 - 1) * sc_input % discretization % derived % TBA_DIM + &
+                    & orb + (lat + 1) * sc_input % discretization % ORBITALS
+                col = (spin2 - 1) * sc_input % discretization % derived % TBA_DIM + &
+                    & orb + lat * sc_input % discretization % ORBITALS + sc_input % discretization % derived % DIM_POSITIVE_K
+                gamma_nn_21 = Hamiltonian_dummy(row, col)
 
-              IF (gamma_lat_index .le. SUBLATTICES) THEN
-                row = orb + (gamma_lat_index - 1) * ORBITALS + spin * TBA_DIM
-                col = orb + (gamma_lat_index - 1) * ORBITALS + MOD(spin + 1, 2) * TBA_DIM + DIM_POSITIVE_K
-                gamma_nnn = Hamiltonian_dummy(row, col)
-              ELSE
-                gamma_nnn = DCMPLX(0.0d0, 0.0d0)
-              END IF
+                IF (gamma_lat_index .le. sc_input % discretization % SUBLATTICES) THEN
+                  row = orb + (gamma_lat_index - 1) * sc_input % discretization % ORBITALS + &
+                      & (spin1 - 1) * sc_input % discretization % derived % TBA_DIM
+                  col = orb + (gamma_lat_index - 1) * sc_input % discretization % ORBITALS + &
+                      & (spin2 - 1) * sc_input % discretization % derived % TBA_DIM + sc_input % discretization % derived % DIM_POSITIVE_K
+                  gamma_nnn = Hamiltonian_dummy(row, col)
+                ELSE
+                  gamma_nnn = DCMPLX(0.0d0, 0.0d0)
+                END IF
 
-              file_count = File_unit_mapping(orb, gamma_spin_index, gamma_lat_index, band)
-              WRITE (file_count, '(6F15.8, *(2F15.8))') kx, ky, &
-              & REAL(gamma_nn_21) / meV2au, AIMAG(gamma_nn_21) / meV2au, & !Interlayer couplings
-              & REAL(gamma_nnn) / meV2au, AIMAG(gamma_nnn) / meV2au, & !Intralayer couplings
-              & (REAL(Gamma_K(orb, neigh, gamma_spin_index, gamma_lat_index, band)) / meV2au, AIMAG(Gamma_K(orb, neigh, gamma_spin_index, gamma_lat_index, band)) / meV2au, neigh=1, N_ALL_NEIGHBOURS)
+                file_count = File_unit_mapping(orb, spin1, spin2, gamma_lat_index, band)
+                WRITE (file_count, '(6F15.8, *(2F15.8))') kx, ky, &
+                & REAL(gamma_nn_21) / meV2au, AIMAG(gamma_nn_21) / meV2au, & !Interlayer couplings
+                & REAL(gamma_nnn) / meV2au, AIMAG(gamma_nnn) / meV2au, & !Intralayer couplings
+                & (REAL(Gamma_K(orb, neigh, spin1, spin2, gamma_lat_index, band)) / meV2au, AIMAG(Gamma_K(orb, neigh, spin1, spin2, gamma_lat_index, band)) / meV2au, neigh=1, N_ALL_NEIGHBOURS)
+              END DO
             END DO
           END DO
         END DO
@@ -972,19 +1040,21 @@ SUBROUTINE CALCULATE_GAMMA_K(input_path, n_brillouin_points)
   !$omp end parallel
 
   !Close all files
-  DO orb = 1, ORBITALS
-    DO spin = 1, 2
-      DO layer = 1, LAYER_COUPLINGS
-        DO band = 1, SUBBANDS
-          file_count = File_unit_mapping(orb, spin, layer, band)
-          CLOSE (file_count)
+  DO orb = 1, sc_input % discretization % ORBITALS
+    DO spin1 = 1, SPINS
+      DO spin2 = 1, SPINS
+        DO layer = 1, sc_input % discretization % derived % LAYER_COUPLINGS
+          DO band = 1, sc_input % discretization % SUBBANDS
+            file_count = File_unit_mapping(orb, spin1, spin2, layer, band)
+            CLOSE (file_count)
+          END DO
         END DO
       END DO
     END DO
   END DO
 
-  IF (ALLOCATED(V_layer)) DEALLOCATE (V_layer)
-  IF (ALLOCATED(Subband_energies)) DEALLOCATE (Subband_energies) !Deallocate global variable
+  IF (ALLOCATED(sc_input % physical % subband_params % V_layer)) DEALLOCATE (sc_input % physical % subband_params % V_layer)
+  IF (ALLOCATED(sc_input % physical % subband_params % Subband_energies)) DEALLOCATE (sc_input % physical % subband_params % Subband_energies) !Deallocate global variable
 
   DEALLOCATE (Hamiltonian_const)
   DEALLOCATE (Hamiltonian_const_band)
@@ -997,12 +1067,15 @@ SUBROUTINE CALCULATE_GAMMA_K(input_path, n_brillouin_points)
   DEALLOCATE (File_unit_mapping)
 END SUBROUTINE CALCULATE_GAMMA_K
 
-SUBROUTINE CALCULATE_PROJECTIONS(input_path, n_r_points, n_phi_points)
-  CHARACTER(LEN=*), INTENT(IN) :: input_path !! This should be a path to folder where input.nml resides
-  INTEGER, INTENT(IN) :: n_r_points !! Number of steps in radial direction
-  INTEGER, INTENT(IN) :: n_phi_points !! Number of steps taken in angular direction in one of six triangles that make up the hexagon
+SUBROUTINE CALCULATE_PROJECTIONS(projections)
+  TYPE(post_projections_t), INTENT(IN) :: projections
+  TYPE(sc_input_params_t) :: sc_input
+  !TODO: Enable spin-triplet projections
+  ! CHARACTER(LEN=*), INTENT(IN) :: input_path !! This should be a path to folder where input.nml resides
+  ! INTEGER, INTENT(IN) :: n_r_points !! Number of steps in radial direction
+  ! INTEGER, INTENT(IN) :: n_phi_points !! Number of steps taken in angular direction in one of six triangles that make up the hexagon
 
-  COMPLEX*16, ALLOCATABLE :: Gamma_SC(:, :, :, :, :) !! Supercondicting pairings read from a simulation
+  COMPLEX*16, ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :) !! Supercondicting pairings read from a simulation
   REAL*8, ALLOCATABLE :: Charge_dens(:, :) !! Charge density read from a simulation
 
   REAL*8 :: Kappa_nearest(3) !! K-variables aligned with orbital's directions for nearest neighbours
@@ -1049,21 +1122,27 @@ SUBROUTINE CALCULATE_PROJECTIONS(input_path, n_r_points, n_phi_points)
   CALL ASSIGN_PROJECTION_CALLBACKS(Projections_cb)
   CALL ASSIGN_PROJECTION_NAMES(Projections_name_mapping)
 
-  CALL GET_INPUT(TRIM(input_path)//"input.nml")
+  CALL GET_INPUT(TRIM(projections % path)//"input.nml", sc_input)
 
   !Redefining step in radial and angular directions according to postprocessing parameters
-  dr_k = R_K_MAX / n_r_points
-  dphi_k = (PI / 3.0d0) / n_phi_points  !Slicing every hexagon's triangle into the same number of phi steps
+  sc_input % discretization % derived % dr_k = R_K_MAX / projections % Nr_points
+  sc_input % discretization % derived % dphi_k = (PI / 3.0d0) / projections % Nphi_points  !Slicing every hexagon's triangle into the same number of phi steps
 
-  ALLOCATE (Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, 2, LAYER_COUPLINGS, SUBBANDS))
-  ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
+  ALLOCATE (Gamma_SC(sc_input % discretization % ORBITALS, &
+                    & N_ALL_NEIGHBOURS, &
+                    & SPINS, &
+                    & SPINS, &
+                    & sc_input % discretization % derived % LAYER_COUPLINGS, &
+                    & sc_input % discretization % SUBBANDS))
+  ALLOCATE (Charge_dens(sc_input % discretization % derived % DIM_POSITIVE_K, &
+                       & sc_input % discretization % SUBBANDS))
 
-  CALL GET_SAFE_GAMMA_SC(Gamma_SC, input_path)
-  CALL GET_SAFE_CHARGE_DENS(Charge_dens, input_path)
+  CALL GET_SAFE_GAMMA_SC(Gamma_SC, projections % path, sc_input % discretization)
+  CALL GET_SAFE_CHARGE_DENS(Charge_dens, projections % path, sc_input % discretization)
 
-  Gamma_SC = 0.0d0
-  Gamma_SC(:, :, 1, :, :) = 1 * meV2au
-  Gamma_SC(:, :, 2, :, :) = -1 * meV2au
+  ! Gamma_SC = 0.0d0
+  ! Gamma_SC(:, :, 1, :, :) = 1 * meV2au
+  ! Gamma_SC(:, :, 2, :, :) = -1 * meV2au
 
   CALL GET_REAL_SPACE_PROJECTIONS(Projections_real_space, Gamma_SC)
   DO n = 1, N_PROJECTIONS
@@ -1075,27 +1154,27 @@ SUBROUTINE CALCULATE_PROJECTIONS(input_path, n_r_points, n_phi_points)
   !Open files for projection basis functions
   DO n = 1, N_PROJECTIONS
     WRITE (filename, "(A, A)") "BasisFunc_", TRIM(ADJUSTL(Projections_name_mapping(n)))
-    OPEN (unit=file_count, FILE=TRIM(input_path)//"OutputData/"//TRIM(filename)//".dat", FORM="FORMATTED", ACTION="WRITE")
+    OPEN (unit=file_count, FILE=TRIM(projections % path)//"OutputData/"//TRIM(filename)//".dat", FORM="FORMATTED", ACTION="WRITE")
     WRITE (file_count, '(A)') "#kx[1/a]   ky[1/a]   Re(Gamma_basis_orb_nearest_1)[meV]   Im(Gamma_basis_orb_nearest_1)[meV]   Re(Gamma_basis_orb_next_1)[meV]   Im(Gamma_basis_orb_next_1)[meV]  Re(Gamma_basis_orb_nearest_2)[meV] ... Re(Gamma_basis_weighted)[meV]   Im(Gamma_basis_weighted)[meV]"
     file_count = file_count + 1
   END DO
   gamma_nearest_weighted_file = file_count
   file_count = file_count + 1
-  OPEN (unit=gamma_nearest_weighted_file, FILE=TRIM(input_path)//"OutputData/Gamma_K_nearest_weighted.dat", FORM="FORMATTED", ACTION="WRITE")
+  OPEN (unit=gamma_nearest_weighted_file, FILE=TRIM(projections % path)//"OutputData/Gamma_K_nearest_weighted.dat", FORM="FORMATTED", ACTION="WRITE")
   WRITE (gamma_nearest_weighted_file, '(A)') "#kx[1/a]   ky[1/a]   Re(Gamma_orb_1)[meV]   Im(Gamma_orb_1)[meV]  Re(Gamma_basis_2)[meV] ... Re(Gamma_weighted)[meV]   Im(Gamma_weighted)[meV]"
 
   gamma_next_weighted_file = file_count
-  OPEN (unit=gamma_next_weighted_file, FILE=TRIM(input_path)//"OutputData/Gamma_K_next_weighted.dat", FORM="FORMATTED", ACTION="WRITE")
+  OPEN (unit=gamma_next_weighted_file, FILE=TRIM(projections % path)//"OutputData/Gamma_K_next_weighted.dat", FORM="FORMATTED", ACTION="WRITE")
   WRITE (gamma_next_weighted_file, '(A)') "#kx[1/a]   ky[1/a]   Re(Gamma_orb_1)[meV]   Im(Gamma_orb_1)[meV]  Re(Gamma_basis_2)[meV] ... Re(Gamma_weighted)[meV]   Im(Gamma_weighted)[meV]"
 
   !$omp parallel do collapse(3) schedule(dynamic, 1) private(phi_k, r_k, r_max, dr, kx, ky, Kappa_nearest, Kappa_next, C_l, Gamma_nearest_orb, Gamma_next_orb, n_triangle, j_phi, i_r, orb, n, Active_orbital)
   DO n_triangle = -N_BZ_SECTIONS / 2, N_BZ_SECTIONS / 2 - 1
-    DO j_phi = 0, n_phi_points - 1
-      DO i_r = 0, n_r_points - 1
+    DO j_phi = 0, projections % Nphi_points - 1
+      DO i_r = 0, projections % Nr_points - 1
         !Must stuck everhing here to provide pure loops for collapse(3)
-        phi_k = n_triangle * (PI / 3.0d0) + j_phi * dphi_k
+        phi_k = n_triangle * (PI / 3.0d0) + j_phi * sc_input % discretization % derived % dphi_k
         r_max = r_max_phi(MOD(ABS(phi_k), PI / 3))
-        dr = r_max / n_r_points
+        dr = r_max / projections % Nr_points
         r_k = i_r * dr
 
         !Transform from graphene reciprocal lattice to kx and ky
@@ -1119,32 +1198,32 @@ SUBROUTINE CALCULATE_PROJECTIONS(input_path, n_r_points, n_phi_points)
         Gamma_nearest_orb = DCMPLX(0.0d0, 0.0d0)
         Gamma_next_orb = DCMPLX(0.0d0, 0.0d0)
         !Performing simple Fourier transform of Gamma in each orbital
-        DO orb = 1, ORBITALS
+        DO orb = 1, sc_input % discretization % ORBITALS
           !Nearest neighbours
-          Gamma_nearest_orb(orb) = Gamma_SC(orb, 1, 1, 1, 1) * pairing_1(ky) + Gamma_SC(orb, 1, 1, 2, 1) * CONJG(pairing_1(ky)) + &
-                                   Gamma_SC(orb, 2, 1, 1, 1) * pairing_2(kx, ky) + Gamma_SC(orb, 2, 1, 2, 1) * CONJG(pairing_2(kx, ky)) + &
-                                   Gamma_SC(orb, 3, 1, 1, 1) * pairing_3(kx, ky) + Gamma_SC(orb, 3, 1, 2, 1) * CONJG(pairing_3(kx, ky))
+          Gamma_nearest_orb(orb) = Gamma_SC(orb, 1, 1, 2, 1, 1) * pairing_1(ky) + Gamma_SC(orb, 1, 1, 2, 2, 1) * CONJG(pairing_1(ky)) + &
+                                   Gamma_SC(orb, 2, 1, 2, 1, 1) * pairing_2(kx, ky) + Gamma_SC(orb, 2, 1, 2, 2, 1) * CONJG(pairing_2(kx, ky)) + &
+                                   Gamma_SC(orb, 3, 1, 2, 1, 1) * pairing_3(kx, ky) + Gamma_SC(orb, 3, 1, 2, 2, 1) * CONJG(pairing_3(kx, ky))
 
           !Next-nearest neighbours
-          Gamma_next_orb(orb) = Gamma_SC(orb, N_NEIGHBOURS + 1, 1, 1, 1) * pairing_nnn_1(kx) + Gamma_SC(orb, N_NEIGHBOURS + 2, 1, 1, 1) * pairing_nnn_2(kx, ky) + &
-                                Gamma_SC(orb, N_NEIGHBOURS + 3, 1, 1, 1) * pairing_nnn_3(kx, ky) + Gamma_SC(orb, N_NEIGHBOURS + 4, 1, 1, 1) * pairing_nnn_4(kx) + &
-                                Gamma_SC(orb, N_NEIGHBOURS + 5, 1, 1, 1) * pairing_nnn_5(kx, ky) + Gamma_SC(orb, N_NEIGHBOURS + 6, 1, 1, 1) * pairing_nnn_6(kx, ky)
+          Gamma_next_orb(orb) = Gamma_SC(orb, N_NEIGHBOURS + 1, 1, 2, 1, 1) * pairing_nnn_1(kx) + Gamma_SC(orb, N_NEIGHBOURS + 2, 1, 2, 1, 1) * pairing_nnn_2(kx, ky) + &
+                                Gamma_SC(orb, N_NEIGHBOURS + 3, 1, 2, 1, 1) * pairing_nnn_3(kx, ky) + Gamma_SC(orb, N_NEIGHBOURS + 4, 1, 2, 1, 1) * pairing_nnn_4(kx) + &
+                                Gamma_SC(orb, N_NEIGHBOURS + 5, 1, 2, 1, 1) * pairing_nnn_5(kx, ky) + Gamma_SC(orb, N_NEIGHBOURS + 6, 1, 2, 1, 1) * pairing_nnn_6(kx, ky)
         END DO
 
         !Write Gamma(k) resulting from the file that was read
-        WRITE (gamma_nearest_weighted_file, '(10F15.5)') kx, ky, (REAL(Gamma_nearest_orb(orb)), AIMAG(Gamma_nearest_orb(orb)), orb=1, ORBITALS),&
+        WRITE (gamma_nearest_weighted_file, '(10F15.5)') kx, ky, (REAL(Gamma_nearest_orb(orb)), AIMAG(Gamma_nearest_orb(orb)), orb=1, sc_input % discretization % ORBITALS),&
         & REAL(SUM(C_l * Gamma_nearest_orb)), AIMAG(SUM(C_l * Gamma_nearest_orb))
 
-        WRITE (gamma_next_weighted_file, '(10F15.5)') kx, ky, (REAL(Gamma_next_orb(orb)), AIMAG(Gamma_next_orb(orb)), orb=1, ORBITALS),&
+        WRITE (gamma_next_weighted_file, '(10F15.5)') kx, ky, (REAL(Gamma_next_orb(orb)), AIMAG(Gamma_next_orb(orb)), orb=1, sc_input % discretization % ORBITALS),&
         & REAL(SUM(C_l * Gamma_next_orb)), AIMAG(SUM(C_l * Gamma_next_orb))
 
         !Project onto basis functions and write basis functions onto which we project
         DO n = 1, N_PROJECTIONS
           !$omp critical (projections_update)
-          Projections_k_space_nearest(n) = Projections_k_space_nearest(n) + Projections_cb(n) % cb(Kappa_nearest, Gamma_nearest_orb) * r_k * dr * dphi_k
-          Projections_k_space_next(n) = Projections_k_space_next(n) + Projections_cb(n) % cb(Kappa_next, Gamma_next_orb) * r_k * dr * dphi_k
+          Projections_k_space_nearest(n) = Projections_k_space_nearest(n) + Projections_cb(n) % cb(Kappa_nearest, Gamma_nearest_orb) * r_k * dr * sc_input % discretization % derived % dphi_k
+          Projections_k_space_next(n) = Projections_k_space_next(n) + Projections_cb(n) % cb(Kappa_next, Gamma_next_orb) * r_k * dr * sc_input % discretization % derived % dphi_k
           WRITE (FIRST_FILE_UNIT + n - 1, '(2F15.5)', ADVANCE='NO') kx, ky
-          DO orb = 1, ORBITALS
+          DO orb = 1, sc_input % discretization % ORBITALS
             Active_orbital = 0.0d0
             Active_orbital(orb) = 1.0d0
             WRITE (FIRST_FILE_UNIT + n - 1, '(2F15.5)', ADVANCE='NO') REAL(Projections_cb(n) % cb(Kappa_nearest, Active_orbital)), AIMAG(Projections_cb(n) % cb(Kappa_nearest, Active_orbital))
@@ -1164,7 +1243,7 @@ SUBROUTINE CALCULATE_PROJECTIONS(input_path, n_r_points, n_phi_points)
   END DO
 
   !Writing normalized projections since we are interested only in relative contributions
-  OPEN (unit=gamma_next_weighted_file + 1, FILE=TRIM(input_path)//"OutputData/Projections_nearest.dat", FORM="FORMATTED", ACTION="WRITE")
+  OPEN (unit=gamma_next_weighted_file + 1, FILE=TRIM(projections % path)//"OutputData/Projections_nearest.dat", FORM="FORMATTED", ACTION="WRITE")
   WRITE (gamma_next_weighted_file + 1, '(A)') "#Irrep      ABS(R-space projection)      ABS(K-space projection)"
   DO n = 1, N_PROJECTIONS
     WRITE (gamma_next_weighted_file + 1, '(A, 2F15.5)') Projections_name_mapping(n), &
@@ -1179,8 +1258,8 @@ SUBROUTINE CALCULATE_PROJECTIONS(input_path, n_r_points, n_phi_points)
     CLOSE (FIRST_FILE_UNIT + n - 1)
   END DO
 
-  IF (ALLOCATED(V_layer)) DEALLOCATE (V_layer)
-  IF (ALLOCATED(Subband_energies)) DEALLOCATE (Subband_energies) !Deallocate global variable
+  IF (ALLOCATED(sc_input % physical % subband_params % V_layer)) DEALLOCATE (sc_input % physical % subband_params % V_layer)
+  IF (ALLOCATED(sc_input % physical % subband_params % Subband_energies)) DEALLOCATE (sc_input % physical % subband_params % Subband_energies) !Deallocate global variable
 
   DEALLOCATE (Gamma_SC)
   DEALLOCATE (Charge_dens)
@@ -1243,16 +1322,21 @@ CONTAINS
   SUBROUTINE GET_REAL_SPACE_PROJECTIONS(Projections_real_space, Gamma_SC)
     IMPLICIT NONE
     COMPLEX*16, INTENT(OUT) :: Projections_real_space(N_PROJECTIONS) !! Array of projections in real space
-    COMPLEX*16, INTENT(IN) :: Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, 2, LAYER_COUPLINGS, SUBBANDS)
+    COMPLEX*16, INTENT(IN) :: Gamma_SC(sc_input % discretization % ORBITALS, &
+                                      & N_ALL_NEIGHBOURS, &
+                                      & SPINS, &
+                                      & SPINS, &
+                                      & sc_input % discretization % derived % LAYER_COUPLINGS, &
+                                      & sc_input % discretization % SUBBANDS)
     COMPLEX*16 :: Gamma_flat(N_PROJECTIONS)
     INTEGER*4 :: orb, neigh, n
     n = 1
-    DO orb = 1, ORBITALS
+    DO orb = 1, sc_input % discretization % ORBITALS
       DO neigh = 1, N_NEIGHBOURS
-        Gamma_flat(n) = Gamma_SC(orb, neigh, 1, 1, 1)
+        Gamma_flat(n) = Gamma_SC(orb, neigh, 1, 2, 1, 1)
         n = n + 1
         !Get neighbor from opposite sublattice corresponding to the next vector in conter-clockwise rotation
-        Gamma_flat(n) = Gamma_SC(orb, MOD(neigh + 1, N_NEIGHBOURS) + 1, 1, 2, 1)
+        Gamma_flat(n) = Gamma_SC(orb, MOD(neigh + 1, N_NEIGHBOURS) + 1, 1, 2, 2, 1)
         n = n + 1
       END DO
     END DO
@@ -1284,8 +1368,8 @@ CONTAINS
   PURE COMPLEX * 16 FUNCTION a1_1_proj(k_orb, Gamma_projected)
     !! Project Gamma_projected onto A1_1 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(ORBITALS) !! Set of k-dependent Gammas to be projected
+    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
     COMPLEX*16 :: F_orb(3) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = 2 * COS(K_orb(1))
     F_orb(2) = 2 * COS(K_orb(2))
@@ -1298,9 +1382,9 @@ CONTAINS
   PURE COMPLEX * 16 FUNCTION a1_2_proj(K_orb, Gamma_projected)
     !! Project Gamma_projected onto A1_2 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(ORBITALS)
+    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS)
     F_orb(1) = 2 * (COS(K_orb(2)) + COS(K_orb(3)))
     F_orb(2) = 2 * (COS(K_orb(1)) + COS(K_orb(3)))
     F_orb(3) = 4 * COS(K_orb(3) / 2.0d0) * COS((K_orb(1) - K_orb(2)) / 2.0d0)
@@ -1312,9 +1396,9 @@ CONTAINS
   PURE COMPLEX * 16 FUNCTION a2_1_proj(K_orb, Gamma_projected)
     !! Project Gamma_projected onto A2_1 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(ORBITALS) !! Basis function for each orbital at given irreducible representation
+    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = 2 * (COS(K_orb(2)) - COS(K_orb(3)))
     F_orb(2) = 2 * (-COS(K_orb(1)) + COS(K_orb(3)))
     F_orb(3) = 4 * SIN(K_orb(3) / 2.0d0) * SIN((K_orb(1) - K_orb(2)) / 2.0d0)
@@ -1326,9 +1410,9 @@ CONTAINS
   PURE COMPLEX * 16 FUNCTION b1_1_proj(K_orb, Gamma_projected)
     !! Project Gamma_projected onto B1_1 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(ORBITALS) !! Basis function for each orbital at given irreducible representation
+    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = 2 * imag * SIN(K_orb(1))
     F_orb(2) = 2 * imag * SIN(K_orb(2))
     F_orb(3) = 2 * imag * SIN(K_orb(3))
@@ -1340,9 +1424,9 @@ CONTAINS
   PURE COMPLEX * 16 FUNCTION b1_2_proj(K_orb, Gamma_projected)
     !! Project Gamma_projected onto B1_2 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(ORBITALS) !! Basis function for each orbital at given irreducible representation
+    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = 2 * imag * (SIN(K_orb(2)) + SIN(K_orb(3)))
     F_orb(2) = 2 * imag * (SIN(K_orb(1)) + SIN(K_orb(3)))
     F_orb(3) = -4 * imag * SIN(K_orb(3) / 2.0d0) * COS((K_orb(1) - K_orb(2)) / 2.0d0)
@@ -1354,9 +1438,9 @@ CONTAINS
   PURE COMPLEX * 16 FUNCTION b2_1_proj(K_orb, Gamma_projected)
     !! Project Gamma_projected onto B2_1 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(ORBITALS) !! Basis function for each orbital at given irreducible representation
+    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = 2 * imag * (SIN(K_orb(2)) - SIN(K_orb(3)))
     F_orb(2) = 2 * imag * (-SIN(K_orb(1)) + SIN(K_orb(3)))
     F_orb(3) = 4 * imag * COS(K_orb(3) / 2.0d0) * SIN((K_orb(1) - K_orb(2)) / 2.0d0)
@@ -1368,9 +1452,9 @@ CONTAINS
   PURE COMPLEX * 16 FUNCTION e1_1_proj(K_orb, Gamma_projected)
     !! Project Gamma_projected onto E1_1 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(ORBITALS) !! Basis function for each orbital at given irreducible representation
+    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = -2 * imag * SIN(K_orb(2))
     F_orb(2) = 2 * imag * SIN(K_orb(3))
     F_orb(3) = 0.d0
@@ -1382,9 +1466,9 @@ CONTAINS
   PURE COMPLEX * 16 FUNCTION e1_2_proj(K_orb, Gamma_projected)
     !! Project Gamma_projected onto E1_2 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(ORBITALS) !! Basis function for each orbital at given irreducible representation
+    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = 2 * imag * SIN(K_orb(1))
     F_orb(2) = -2 * imag * SIN(K_orb(2))
     F_orb(3) = 0.d0
@@ -1396,9 +1480,9 @@ CONTAINS
   PURE COMPLEX * 16 FUNCTION e1_3_proj(K_orb, Gamma_projected)
     !! Project Gamma_projected onto E1_3 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(ORBITALS) !! Basis function for each orbital at given irreducible representation
+    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = -2 * imag * SIN(K_orb(3))
     F_orb(2) = 2 * imag * SIN(K_orb(1))
     F_orb(3) = 0.d0
@@ -1410,9 +1494,9 @@ CONTAINS
   PURE COMPLEX * 16 FUNCTION e1_4_proj(K_orb, Gamma_projected)
     !! Project Gamma_projected onto E1_4 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(ORBITALS) !! Basis function for each orbital at given irreducible representation
+    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = -2 * imag * SIN(K_orb(1))
     F_orb(2) = 0.d0
     F_orb(3) = 2 * imag * SIN(K_orb(3))
@@ -1424,9 +1508,9 @@ CONTAINS
   PURE COMPLEX * 16 FUNCTION e1_5_proj(K_orb, Gamma_projected)
     !! Project Gamma_projected onto E1_5 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(ORBITALS) !! Basis function for each orbital at given irreducible representation
+    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = 2 * imag * SIN(K_orb(3))
     F_orb(2) = 0.d0
     F_orb(3) = -2 * imag * SIN(K_orb(2))
@@ -1438,9 +1522,9 @@ CONTAINS
   PURE COMPLEX * 16 FUNCTION e1_6_proj(K_orb, Gamma_projected)
     !! Project Gamma_projected onto E1_6 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(ORBITALS) !! Basis function for each orbital at given irreducible representation
+    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = -2 * imag * SIN(K_orb(2))
     F_orb(2) = 0.d0
     F_orb(3) = 2 * imag * SIN(K_orb(1))
@@ -1452,9 +1536,9 @@ CONTAINS
   PURE COMPLEX * 16 FUNCTION e2_1_proj(K_orb, Gamma_projected)
     !! Project Gamma_projected onto E2_1 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(ORBITALS) !! Basis function for each orbital at given irreducible representation
+    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = -2 * COS(K_orb(2))
     F_orb(2) = 2 * COS(K_orb(3))
     F_orb(3) = 0.d0
@@ -1466,9 +1550,9 @@ CONTAINS
   PURE COMPLEX * 16 FUNCTION e2_2_proj(K_orb, Gamma_projected)
     !! Project Gamma_projected onto E2_2 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(ORBITALS) !! Basis function for each orbital at given irreducible representation
+    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = -2 * COS(K_orb(1))
     F_orb(2) = 2 * COS(K_orb(2))
     F_orb(3) = 0.d0
@@ -1480,9 +1564,9 @@ CONTAINS
   PURE COMPLEX * 16 FUNCTION e2_3_proj(K_orb, Gamma_projected)
     !! Project Gamma_projected onto E2_3 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(ORBITALS) !! Basis function for each orbital at given irreducible representation
+    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = -2 * COS(K_orb(3))
     F_orb(2) = 2 * COS(K_orb(1))
     F_orb(3) = 0.d0
@@ -1494,9 +1578,9 @@ CONTAINS
   PURE COMPLEX * 16 FUNCTION e2_4_proj(K_orb, Gamma_projected)
     !! Project Gamma_projected onto E2_4 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(ORBITALS) !! Basis function for each orbital at given irreducible representation
+    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = -2 * COS(K_orb(1))
     F_orb(2) = 0.d0
     F_orb(3) = 2 * COS(K_orb(3))
@@ -1508,9 +1592,9 @@ CONTAINS
   PURE COMPLEX * 16 FUNCTION e2_5_proj(K_orb, Gamma_projected)
     !! Project Gamma_projected onto E2_5 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(ORBITALS) !! Basis function for each orbital at given irreducible representation
+    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = -2 * COS(K_orb(3))
     F_orb(2) = 0.d0
     F_orb(3) = 2 * COS(K_orb(2))
@@ -1522,9 +1606,9 @@ CONTAINS
   PURE COMPLEX * 16 FUNCTION e2_6_proj(K_orb, Gamma_projected)
     !! Project Gamma_projected onto E2_6 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(ORBITALS) !! Basis function for each orbital at given irreducible representation
+    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = -2 * COS(K_orb(2))
     F_orb(2) = 0.d0
     F_orb(3) = 2 * COS(K_orb(1))
@@ -1533,129 +1617,6 @@ CONTAINS
   END FUNCTION e2_6_proj
 
 END SUBROUTINE CALCULATE_PROJECTIONS
-
-SUBROUTINE TRANSFORM_DELTA_MATRIX(inputPath, nBrillouinPoints)
-  CHARACTER(LEN=*), INTENT(IN) :: inputPath !! This should be a path to folder where input.nml resides
-  INTEGER*4, INTENT(IN) :: nBrillouinPoints
-
-  CHARACTER(LEN=20) :: output_format
-
-  COMPLEX*16, ALLOCATABLE :: Hamiltonian(:, :), Hamiltonian_const(:, :), Gamma_matrix(:, :), Gamma_matrix_temp(:, :), Gamma_matrix_diagonal(:, :)
-  COMPLEX*16, ALLOCATABLE :: U_transformation(:, :)
-  REAL*8, ALLOCATABLE :: Energies(:)
-
-  COMPLEX*16, ALLOCATABLE :: Gamma_SC(:, :, :, :)
-  REAL*8, ALLOCATABLE :: Charge_dens(:)
-  REAL*8 :: brillouinZoneVertices(6, 2)
-
-  REAL*8 :: k1, k2, kx, ky, dkx, dky
-  INTEGER*4 :: i, j, n, m
-  INTEGER*4 :: kx_steps, ky_steps
-
-  LOGICAL :: fileExists
-
-  brillouinZoneVertices(:, 1) = (/4.*PI / (3 * SQRT(3.0d0)), 2.*PI / (3 * SQRT(3.0d0)), -2.*PI / (3 * SQRT(3.0d0)), -4.*PI / (3 * SQRT(3.0d0)), -2.*PI / (3 * SQRT(3.0d0)), 2.*PI / (3 * SQRT(3.0d0))/)
-  brillouinZoneVertices(:, 2) = (/0.0d0, -2.*PI / 3.0d0, -2.*PI / 3.0d0, 0.0d0, 2.*PI / 3.0d0, 2.*PI / 3.0d0/)
-
-  dkx = KX_MAX / nBrillouinPoints
-  dky = KY_MAX / nBrillouinPoints
-
-  kx_steps = INT(nBrillouinPoints)
-  ky_steps = INT(nBrillouinPoints)
-
-  ALLOCATE (Hamiltonian(DIM, DIM))
-  ALLOCATE (Hamiltonian_const(DIM, DIM))
-  ALLOCATE (U_transformation(DIM, DIM))
-  ALLOCATE (Gamma_matrix(DIM, DIM))
-  ALLOCATE (Gamma_matrix_diagonal(DIM, DIM))
-  ALLOCATE (Gamma_matrix_temp(DIM, DIM))
-  ALLOCATE (Energies(DIM))
-  ALLOCATE (Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, 2, SUBLATTICES))
-  ALLOCATE (Charge_dens(DIM_POSITIVE_K))
-
-  Gamma_SC = DCMPLX(0.0d0, 0.0d0)
-  Charge_dens = 0.0d0
-
-  !Get parameters from simulation
-  CALL GET_INPUT(TRIM(inputPath)//"input.nml")
-  !Charge densities
-  ! INQUIRE(FILE = TRIM(inputPath)//"OutputData/Charge_dens_final.dat", EXIST = fileExists)
-  ! IF (fileExists) THEN
-  !     CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
-  ! ELSE
-  !     CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
-  ! END IF
-  ! !Superconducting gap parameters
-  ! INQUIRE(FILE = TRIM(inputPath)//"OutputData/Gamma_SC__final.dat", EXIST = fileExists)
-  ! IF (fileExists) THEN
-  !     CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(inputPath)//"OutputData/Gamma_SC_final.dat")
-  ! ELSE
-  !     CALL GET_GAMMA_SC(Gamma_SC(:,:,:,:), TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
-  ! END IF
-
-  Gamma_SC(:, :, 1, :) = 999.*meV2au
-  Gamma_SC(:, :, 2, :) = -999.*meV2au
-
-  !Initialize constant hamiltonian
-  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const)
-
-  DO i = -kx_steps, kx_steps
-    DO j = -ky_steps, ky_steps
-      kx = i * dkx !* (2. * PI * 2./3.)
-      ky = j * dky !* (2. * PI * 2./3.)
-
-      IF (is_inside_polygon(brillouinZoneVertices, 6, kx, ky)) THEN
-
-        Hamiltonian(:, :) = DCMPLX(0., 0.)
-        Energies(:) = 0.
-        CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky)
-        CALL COMPUTE_HUBBARD(Hamiltonian(:, :), Charge_dens(:))
-        CALL COMPUTE_SC(Hamiltonian(:, :), kx, ky, Gamma_SC(:, :, :, :))
-        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
-
-        Hamiltonian(:, :) = 0.5 * (Hamiltonian_const(:, :) + Hamiltonian(:, :)) !Should by multiplied by 0.5 if in Nambu space
-        ! DO n = 1, DIM
-        !     WRITE(*,'(24E12.4)') (ABS(Hamiltonian(n,m))**2/meV2au, m = 1, DIM)
-        ! END DO
-        ! WRITE(*,*)
-        ! WRITE(*,*)
-
-        !CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:, :), Energies(:), DIM)
-        CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:, :), Energies(:), U_transformation(:, :), DIM)
-
-        !Compute current superconducing coupling matrix separately
-        Gamma_matrix(:, :) = DCMPLX(0.0d0, 0.0d0)
-        Gamma_matrix_diagonal(:, :) = DCMPLX(0.0d0, 0.0d0)
-        Gamma_matrix_temp(:, :) = DCMPLX(0.0d0, 0.0d0)
-        CALL COMPUTE_SC(Gamma_matrix(:, :), kx, ky, Gamma_SC(:, :, :, :))
-        CALL COMPUTE_CONJUGATE_ELEMENTS(Gamma_matrix(:, :), DIM)
-        Gamma_matrix = 0.5 * Gamma_matrix
-        DO n = 1, DIM
-          DO m = 1, DIM
-            Gamma_matrix_temp(n, m) = SUM(Gamma_matrix(n, :) * U_transformation(:, m))
-          END DO
-        END DO
-
-        DO n = 1, DIM
-          DO m = 1, DIM
-            Gamma_matrix_diagonal(n, m) = SUM(CONJG(U_transformation(:, n)) * Gamma_matrix_temp(:, m))
-          END DO
-        END DO
-
-        !Gamma_matrix_diagonal = MATMUL(MATMUL(Gamma_matrix, U_transformation), TRANSPOSE(CONJG(U_transformation)))
-
-        WRITE (*, '(A, 24F10.4)') 'Energies: ', (Energies(m) / meV2au, m=1, DIM)
-        DO n = 1, DIM
-          WRITE (*, '(24F10.4)') (REAL(Gamma_matrix_diagonal(n, m)) / meV2au, m=1, DIM)
-        END DO
-        WRITE (*, *)
-        WRITE (*, *)
-
-      END IF
-    END DO
-  END DO
-
-END SUBROUTINE TRANSFORM_DELTA_MATRIX
 
 SUBROUTINE HELLICAL_TEST_CHERN(potChem, B, Nk1, Nk2, i, j, U_transformation)
   INTEGER*4, PARAMETER :: HamDim = 4
@@ -1713,7 +1674,7 @@ SUBROUTINE HELLICAL_TEST_CHERN(potChem, B, Nk1, Nk2, i, j, U_transformation)
 
 END SUBROUTINE HELLICAL_TEST_CHERN
 
-SUBROUTINE LAO_STO_CHERN_ENERGIES(Nk1, Nk2, i, j, inputPath, U_transformation)
+SUBROUTINE LAO_STO_CHERN_ENERGIES(Nk1, Nk2, i, j, inputPath, sc_input, U_transformation)
     !! This subroutine calculates energies and wavefunctions of LAO-STO in [111] direction.
     !! Returns sorted wavefunctions in (i,j) point of the Brillouin zone.
   INTEGER*4, INTENT(IN) :: Nk1 !! Number of divisions of Brillouin zone in direction k1.
@@ -1723,14 +1684,25 @@ SUBROUTINE LAO_STO_CHERN_ENERGIES(Nk1, Nk2, i, j, inputPath, U_transformation)
   CHARACTER(LEN=*), INTENT(IN) :: inputPath !! Directory of the run, where input.nml should be placed.
                                             !! It contains material information and physical parameter of calculation:
                                             !! Fermi energy, temperature etc.
-  COMPLEX*16, INTENT(OUT) :: U_transformation(DIM, DIM) !! Matrix containing eigenvectors stored in consecutive columns.
-                                                          !! On output sorted based on energies from lowest to highest.
 
-  REAL*8 :: Energies(DIM) !! Eigenvalues of the hamiltonian
+  TYPE(sc_input_params_t), INTENT(IN) :: sc_input
+  COMPLEX*16, INTENT(OUT) :: U_transformation(sc_input % discretization % derived % DIM, &
+                                             & sc_input % discretization % derived % DIM) !! Matrix containing eigenvectors stored in consecutive columns.
+                                                                                          !! On output sorted based on energies from lowest to highest.
 
-  COMPLEX*16 :: Hamiltonian(DIM, DIM), Hamiltonian_const(DIM, DIM)
-  COMPLEX*16 :: Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, 2, SUBLATTICES)
-  REAL*8 :: Charge_dens(DIM_POSITIVE_K)
+  REAL*8 :: Energies(sc_input % discretization % derived % DIM) !! Eigenvalues of the hamiltonian
+
+  COMPLEX*16 :: Hamiltonian(sc_input % discretization % derived % DIM,&
+                                        & sc_input % discretization % derived % DIM)
+  COMPLEX*16 :: Hamiltonian_const(sc_input % discretization % derived % DIM,&
+                                              & sc_input % discretization % derived % DIM)
+  COMPLEX*16 :: Gamma_SC(sc_input % discretization % ORBITALS,&
+                                    & N_ALL_NEIGHBOURS,&
+                                    & SPINS,&
+                                    & SPINS,&
+                                    & sc_input % discretization % derived % LAYER_COUPLINGS,&
+                                    & sc_input % discretization % SUBBANDS)
+  REAL*8 :: Charge_dens(sc_input % discretization % derived % DIM_POSITIVE_K)
   REAL*8 :: k1, k2, kx, ky
   REAL*8 :: dk1_Chern, dk2_Chern
   INTEGER*4 :: n
@@ -1747,30 +1719,16 @@ SUBROUTINE LAO_STO_CHERN_ENERGIES(Nk1, Nk2, i, j, inputPath, U_transformation)
 
   !PRINT*, "Entered chern energies"
   !Get parameters from simulation
-  CALL GET_INPUT(TRIM(inputPath)//"input.nml")
-  !CHeck if units are correct
-  !Get Gammas from run
-  INQUIRE (FILE=TRIM(inputPath)//"OutputData/Gamma_SC__final.dat", EXIST=fileExists)
-  IF (fileExists) THEN
-    CALL GET_GAMMA_SC(Gamma_SC(:, :, :, :), TRIM(inputPath)//"OutputData/Gamma_SC_final.dat")
-  ELSE
-    CALL GET_GAMMA_SC(Gamma_SC(:, :, :, :), TRIM(inputPath)//"OutputData/Gamma_SC_iter.dat")
-  END IF
 
-  !Get cherge densities from file
-  INQUIRE (FILE=TRIM(inputPath)//"OutputData/Charge_dens_final.dat", EXIST=fileExists)
-  IF (fileExists) THEN
-    CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_final.dat")
-  ELSE
-    CALL GET_CHARGE_DENS(Charge_dens(:), TRIM(inputPath)//"OutputData/Charge_dens_iter.dat")
-  END IF
+  CALL GET_SAFE_GAMMA_SC(Gamma_SC, inputPath, sc_input % discretization)
+  CALL GET_SAFE_CHARGE_DENS(Charge_dens, inputPath, sc_input % discretization)
 
   !Gamma_SC(:,:,1,:) = 100.0d0 * meV2au
   !Gamma_SC(:,:,2,:) = -100.0d0 * meV2au
 
   !Computing k-independent terms
   Hamiltonian_const = DCMPLX(0., 0.)
-  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const)
+  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const, sc_input % discretization, sc_input % physical)
 
   !Calculate eigenvalues and eigenvectors to later compute chern numbers
   k1 = i * dk1_Chern
@@ -1779,22 +1737,20 @@ SUBROUTINE LAO_STO_CHERN_ENERGIES(Nk1, Nk2, i, j, inputPath, U_transformation)
   kx = 2.*PI / (SQRT(3.0d0)) * k1
   ky = -2.*PI / 3.*k1 + 4.*PI / 3.*k2
   Hamiltonian(:, :) = DCMPLX(0., 0.)
-  CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky)
-  CALL COMPUTE_HUBBARD(Hamiltonian(:, :), Charge_dens(:))
-  CALL COMPUTE_SC(Hamiltonian(:, :), kx, ky, Gamma_SC(:, :, :, :))
+  CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
+  CALL COMPUTE_HUBBARD(Hamiltonian, &
+                      & Charge_dens, &
+                      & sc_input % physical % subband_params % U_HUB, &
+                      & sc_input % physical % subband_params % V_HUB, &
+                      & sc_input % discretization)
+  CALL COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC, sc_input % discretization)
+  CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM) !This is not needed, since ZHEEV takes only upper triangle
 
-  CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:, :), DIM) !This is not needed, since ZHEEV takes only upper triangle
+  Hamiltonian = 0.5 * (Hamiltonian_const + Hamiltonian) !Should by multiplied by 0.5 if in Nambu space
 
-  Hamiltonian(:, :) = 0.5 * (Hamiltonian_const(:, :) + Hamiltonian(:, :)) !Should by multiplied by 0.5 if in Nambu space
+  CALL DIAGONALIZE_GENERALIZED(Hamiltonian, Energies, U_transformation, sc_input % discretization % derived % DIM)
 
-  CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:, :), Energies(:), U_transformation(:, :), DIM)
-
-  CALL SORT_ENERGIES_AND_WAVEFUNCTIONS(Energies, U_transformation, DIM)
-
-  ! PRINT*, "ENERGIES FOR ", i, j, k1, k2
-  ! DO n = 1, DIM
-  !     PRINT*, Energies(n)
-  ! END DO
+  CALL SORT_ENERGIES_AND_WAVEFUNCTIONS(Energies, U_transformation, sc_input % discretization % derived % DIM)
 
 END SUBROUTINE LAO_STO_CHERN_ENERGIES
 
@@ -1896,49 +1852,4 @@ LOGICAL FUNCTION is_inside_polygon(verticesArray, nVertices, pointX, pointY)
   RETURN
 END FUNCTION is_inside_polygon
 
-!MAKE THIS A SUBROUTINE
-!Plot this dispersion
-! OPEN(unit = 9, FILE= "./OutputData/EnergiesHellical.dat", FORM = "FORMATTED", ACTION = "WRITE")
-! DO n = -Nk1/2, Nk1/2
-!     kx = n*dkx
-!     ky = kx
-
-!     ! Hamiltonian(1, 1) = 2.0*tHop*(1. - DCOS(kx)) + 2.0*tHop*(1 - DCOS(ky)) + 0.5*muB*g*B(3)
-!     ! Hamiltonian(2, 2) = 2.0*tHop*(1. - DCOS(kx)) + 2.0*tHop*(1 - DCOS(ky)) - 0.5*muB*g*B(3)
-
-!     ! !Spin-orbit coupling
-!     ! Hamiltonian(1,2) = 0.5d0*mub*g*(B(1) - imag*B(2)) + alphaSOC*(DSIN(kx) + imag*DSIN(ky))
-!     ! CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian(:2, :2), 2)
-
-!     ! CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:2, :2), Energies(:2), U_transformation(:2,:2), 2)
-
-!     !Diagonal terms
-!     !Electrons H(k)
-!     Hamiltonian(1, 1) = 2.0*tHop*(1. - DCOS(kx)) + 2.0*tHop*(1 - DCOS(ky)) - potChem + 0.5*muB*g*B(3)
-!     Hamiltonian(2, 2) = 2.0*tHop*(1. - DCOS(kx)) + 2.0*tHop*(1 - DCOS(ky)) - potChem - 0.5*muB*g*B(3)
-
-!     !Holes -H*(-k)
-!     Hamiltonian(3, 3) = -(2.0*tHop*(1. - DCOS(-kx)) + 2.0*tHop*(1 - DCOS(-ky)) - potChem + 0.5*muB*g*B(3))
-!     Hamiltonian(4, 4) = -(2.0*tHop*(1. - DCOS(-kx)) + 2.0*tHop*(1 - DCOS(-ky)) - potChem - 0.5*muB*g*B(3))
-
-!     !Spin-orbit coupling
-!     Hamiltonian(1,2) = 0.5*mub*g*(B(1) - imag*B(2)) + alphaSOC*(DSIN(kx) + imag*DSIN(ky))
-!     Hamiltonian(3,4) = -(0.5*mub*g*(B(1) + imag*B(2)) + alphaSOC*(DSIN(-kx) - imag*DSIN(-ky)))
-
-!     !Superconductivity
-!     Hamiltonian(1, 4) = gammaSC
-!     Hamiltonian(2,3) = -gammaSC
-
-!     Hamiltonian(:,:) = 0.5 * Hamiltonian(:,:)
-!     CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, HamDim)
-
-!     CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:,:), Energies(:), U_transformation(:,:), HamDim)
-
-!     DO m = 1, HamDim
-!         WRITE(9,*) kx, Energies(m)/meV2au
-!     END DO
-
-! END DO
-! CLOSE(9)
-
-END MODULE mod_postprocessing
+END MODULE postprocessing

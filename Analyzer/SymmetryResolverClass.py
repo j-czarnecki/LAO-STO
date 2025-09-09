@@ -77,63 +77,56 @@ class SymmetryResolver(DataReader):
         # Loop over all dict keys except for neighbours
         # Nearest neighbors
         for band in range(1, max(1, self.subbands) + 1):
-            for spin in range(1, 3):
-                #TODO: This loop is the repeated below. This is not good.
-                for sublat in range(1, self.layerCouplings + 1):
-                    symmetryKey = (band, spin, sublat)
+            for spin1 in range(1, 3):
+                for spin2 in range(1, 3):
+                    for sublat in range(1, self.layerCouplings + 1):
+                        symmetryKey = (band, spin1, spin2, sublat)
 
-                    for i in range(listLen):
-                        gammaToSymmetrize = []
-                        for orbital in range(1, 4):
-                            # This code could be simplified, maybe list comprehension?
-                            # Nearest neighbours pairing
-                            for sublat in range(1, 2 + 1):
-                                for neighbor in range(1, self.nNeighbors + 1):
-                                    gammaKey = (
-                                        (spin, neighbor, sublat, orbital)
-                                        if self.subbands == 0
-                                        else (band, spin, neighbor, sublat, orbital)
-                                    )
-                                    gammaToSymmetrize.append(self.gamma[gammaKey][i])
-                                    # Generating next atom from second sublattice
-                                    # such that it obeys the order of neighbors defined on a regular hexagon
-                                    # gammaKeySecondSublat = (
-                                    #     (spin, self.__getFollowingNeighbor(neighbor), self.__getOppositeSublat(sublat), orbital)
-                                    #     if self.subbands == 0
-                                    #     else (band, spin, self.__getFollowingNeighbor(neighbor), self.__getOppositeSublat(sublat), orbital)
-                                    # )
-                                    #gammaToSymmetrize.append(self.gamma[gammaKeySecondSublat][i])
-                        for i, sym in enumerate(symmetries):
-                            self.symmetryGammaDict[(*symmetryKey, sym)].append(
-                                symmetryCallbacks[i](gammaToSymmetrize, "nearest")
-                            )
+                        for i in range(listLen):
+                            gammaToSymmetrize = []
+                            for orbital in range(1, 4):
+                                # This code could be simplified, maybe list comprehension?
+                                # Nearest neighbours pairing
+                                for sublat in range(1, self.layerCouplings + 1):
+                                    for neighbor in range(1, self.nNeighbors + 1):
+                                        gammaKey = (band, spin1, spin2, neighbor, sublat, orbital)
+                                        gammaToSymmetrize.append(self.gamma[gammaKey][i])
+                                        # Generating next atom from second sublattice
+                                        # such that it obeys the order of neighbors defined on a regular hexagon
+                                        # gammaKeySecondSublat = (
+                                        #     (spin, self.__getFollowingNeighbor(neighbor), self.__getOppositeSublat(sublat), orbital)
+                                        #     if self.subbands == 0
+                                        #     else (band, spin, self.__getFollowingNeighbor(neighbor), self.__getOppositeSublat(sublat), orbital)
+                                        # )
+                                        #gammaToSymmetrize.append(self.gamma[gammaKeySecondSublat][i])
+                            for i, sym in enumerate(symmetries):
+                                self.symmetryGammaDict[(*symmetryKey, sym)].append(
+                                    symmetryCallbacks[i](gammaToSymmetrize, "nearest")
+                                )
         if self.nNextNeighbors == 0:
             return
 
         # Next-to-nearest neighbors
         for band in range(1, max(1, self.subbands) + 1):
-            for spin in range(1, 3):
-                for sublat in range(1, self.sublattices + 1):
-                    symmetryKey = (band, spin, sublat)
-                    for i in range(listLen):
-                        nnnGammaToSymmetrize = []
-                        for orbital in range(1, 4):
-                            # Next nearest neighbours pairing
-                            if self.nNextNeighbors != 0:
-                                for neighbor in range(
-                                    self.nNeighbors + 1,
-                                    self.nNeighbors + self.nNextNeighbors + 1,
-                                ):
-                                    gammaKey = (
-                                        (spin, neighbor, sublat, orbital)
-                                        if self.subbands == 0
-                                        else (band, spin, neighbor, sublat, orbital)
-                                    )
-                                    nnnGammaToSymmetrize.append(self.gamma[gammaKey][i])
-                        for i, sym in enumerate(symmetries):
-                            self.nnnSymmetryGammaDict[(*symmetryKey, sym)].append(
-                                symmetryCallbacks[i](nnnGammaToSymmetrize, "next")
-                            )
+            for spin1 in range(1, 3):
+                for spin2 in range(1, 3):
+                    for sublat in range(1, self.sublattices + 1):
+                        symmetryKey = (band, spin1, spin2, sublat)
+                        for i in range(listLen):
+                            nnnGammaToSymmetrize = []
+                            for orbital in range(1, 4):
+                                # Next nearest neighbours pairing
+                                if self.nNextNeighbors != 0:
+                                    for neighbor in range(
+                                        self.nNeighbors + 1,
+                                        self.nNeighbors + self.nNextNeighbors + 1,
+                                    ):
+                                        gammaKey = (band, spin1, spin2, neighbor, sublat, orbital)
+                                        nnnGammaToSymmetrize.append(self.gamma[gammaKey][i])
+                            for i, sym in enumerate(symmetries):
+                                self.nnnSymmetryGammaDict[(*symmetryKey, sym)].append(
+                                    symmetryCallbacks[i](nnnGammaToSymmetrize, "next")
+                                )
 
     """ ---------------------------------------------------------------------------------- """
     """ ---------------------------- Private methods ------------------------------------- """

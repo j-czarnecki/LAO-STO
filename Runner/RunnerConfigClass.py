@@ -38,7 +38,7 @@ class RunnerConfig:
                 ##### Partition name
                 #SBATCH -p cpu
                 ##### Name of job in queuing system
-                #SBATCH --job-name=Gap
+                #SBATCH --job-name=DOS
                 #SBATCH --output=\"output.out\"    # Path to the standard output and error files relative to the working directory
                 """
                 ),
@@ -114,10 +114,10 @@ class RunnerConfig:
                 ("v", 0.0e3),
                 ("V_pdp", 0.028e3),
                 ("V_pds", -0.065e3),
-                ("J_SC", 0.0e3),
-                ("J_SC_PRIME", 0.0e3),
-                ("J_SC_NNN", 0.0e3),
-                ("J_SC_PRIME_NNN", 0.0e3),
+                ("J_SC_tensor", [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]),
+                ("nearest_interorb_multiplier", 0.1),
+                ("J_SC_NNN_tensor", [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]),
+                ("next_interorb_multiplier", 0.1),
                 ("U_HUB", 0.0e3),
                 ("V_HUB", 0.0e3),
                 ("E_Fermi", 0.0e3),

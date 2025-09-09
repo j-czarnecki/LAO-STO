@@ -21,12 +21,16 @@
 !! arXiv:2508.05075 (2025).
 !! https://arxiv.org/abs/2508.05075
 
-MODULE mod_types
+MODULE types
+
+USE parameters
+IMPLICIT NONE
 
 TYPE derived_dimensions_t
   !Those parameters are in fact derived and recalculated if needed at GET_INPUT
   !(see SET_HAMILTONIAN_PARAMS)
-  INTEGER*4 :: ORBITALS = 0
+  REAL*8 :: dr_k = 0.0d0
+  REAL*8 :: dphi_k = 0.0d0
   INTEGER*4 :: TBA_DIM = 0
   INTEGER*4 :: DIM_POSITIVE_K = 0  !Hamiltonian for positive k i.e half of the Nambu space, *2 due to spin
   INTEGER*4 :: DIM = 0    !*2 to transform to Nambu Space.
@@ -40,10 +44,8 @@ TYPE discretization_t
   INTEGER*4 :: k2_steps = 0
   INTEGER*4 :: SUBLATTICES = 2
   INTEGER*4 :: SUBBANDS = 1
+  INTEGER*4 :: ORBITALS = 3
   !Derived
-  REAL*8 :: dk1 = 0.0d0
-  REAL*8 :: dk2 = 0.0d0
-  REAL*8 :: domega = 0.0d0
   TYPE(derived_dimensions_t) :: derived
 END TYPE discretization_t
 
@@ -58,25 +60,26 @@ TYPE subband_params_t
   REAL*8 :: v = 0.0d0
   REAL*8 :: V_pdp = 0.0d0
   REAL*8 :: V_pds = 0.0d0
-  REAL*8 :: J_SC = 0.0d0
-  REAL*8 :: J_SC_PRIME = 0.0d0
-  REAL*8 :: J_SC_NNN = 0.0d0
-  REAL*8 :: J_SC_PRIME_NNN = 0.0d0
+  REAL*8 :: J_SC_tensor(SPINS, SPINS, SPINS, SPINS) = 0.0d0
+  REAL*8 :: nearest_interorb_multiplier = 0.0d0
+  REAL*8 :: J_SC_NNN_tensor(SPINS, SPINS, SPINS, SPINS) = 0.0d0
+  REAL*8 :: next_interorb_multiplier = 0.0d0
   REAL*8 :: U_HUB = 0.0d0
   REAL*8 :: V_HUB = 0.0d0
   REAL*8 :: E_Fermi = 0.0d0
-  REAL*8 :: V_layer = 0.0d0
-  REAL*8 :: Subband_energies = 0.0d0
+  REAL*8, ALLOCATABLE :: V_layer(:)
+  REAL*8, ALLOCATABLE :: Subband_energies(:)
+  REAL*8 :: g_factor = 0.0d0
   !Derived
   REAL*8 :: eta_p = 0.0d0
 END TYPE subband_params_t
 
 TYPE external_params_t
-  REAL*8 :: B_field(3) = (/0.0d0, 0.0d0, 0.0d0/)
+  REAL*8 :: T = 0.0d0 !! Temparature
+  REAL*8 :: B_field(3)
 END TYPE external_params_t
 
 TYPE physical_params_t
-  REAL*8 :: T = 0.0d0                         !! Temparature
   TYPE(subband_params_t) :: subband_params
   TYPE(external_params_t) :: external
 END TYPE physical_params_t
@@ -117,46 +120,61 @@ END TYPE sc_input_params_t
 ! ----------------------------------------------------------------------
 TYPE post_sc_gap_t
     !! Superconducting gap calculation
-  LOGICAL :: enable_sc_gap_calc = .FALSE.
-  CHARACTER(1000) :: path_to_run_dir_sc_gap = ""
-  REAL*8 :: dE_sc_gap = 0.0d0
-  INTEGER*4 :: Nk_points_sc_gap = 0
-  INTEGER*4 :: Nk_points_sc_gap_refined = 0
+  LOGICAL :: enable = .FALSE.
+  CHARACTER(1000) :: path = ""
+  REAL*8 :: dE = 0.0d0
+  INTEGER*4 :: Nk_points = 0
+  INTEGER*4 :: Nk_points_refined = 0
 END TYPE post_sc_gap_t
 
 TYPE post_chern_number_t
     !! Chern number calculation
-  LOGICAL :: enable_chern_number_calc = .FALSE.
-  CHARACTER(1000) :: path_to_run_dir_chern_number = ""
-  INTEGER*4 :: Nk_points_chern_number = 0
+  LOGICAL :: enable = .FALSE.
+  CHARACTER(1000) :: path = ""
+  INTEGER*4 :: Nk_points = 0
 END TYPE post_chern_number_t
 
 TYPE post_dispersion_relation_t
     !! Dispersion relation calculation
-  LOGICAL :: enable_dispersion_relation_calc = .FALSE.
-  CHARACTER(1000) :: path_to_run_dir_dispersion_relation = ""
-  LOGICAL :: include_sc_in_dispersion = .FALSE.
-  INTEGER*4 :: Nk_points_dispersion_relation = 0
+  LOGICAL :: enable = .FALSE.
+  CHARACTER(1000) :: path = ""
+  LOGICAL :: include_sc = .FALSE.
+  INTEGER*4 :: Nk_points = 0
 END TYPE post_dispersion_relation_t
 
 TYPE post_dos_t
-    !! DOS calculation
-  LOGICAL :: enable_dos_calc = .FALSE.
-  CHARACTER(1000) :: path_to_run_dir_dos = ""
-  REAL*8 :: E_DOS_min = 0
-  REAL*8 :: E_DOS_max = 0
+  !! DOS calculation
+  LOGICAL :: enable = .FALSE.
+  CHARACTER(1000) :: path = ""
+  REAL*8 :: E_min = 0
+  REAL*8 :: E_max = 0
   REAL*8 :: dE0 = 0
   REAL*8 :: zeta_DOS = 0
-  LOGICAL :: include_sc_in_dos = .FALSE.
-  INTEGER*4 :: Nk_points_dos = 0
-  INTEGER*4 :: Nk_points_dos_refined = 0
+  LOGICAL :: include_sc = .FALSE.
+  INTEGER*4 :: Nk_points = 0
+  INTEGER*4 :: Nk_points_refined = 0
 END TYPE post_dos_t
 
+TYPE post_gamma_k_t
+  LOGICAL :: enable = .FALSE.
+  CHARACTER(1000) :: path = ""
+  INTEGER*4 :: Nk_points = 0
+END TYPE post_gamma_k_t
+
+TYPE post_projections_t
+  LOGICAL :: enable = .FALSE.
+  CHARACTER(1000) :: path = ""
+  INTEGER*4 :: Nr_points = 0
+  INTEGER*4 :: Nphi_points = 0
+END TYPE post_projections_t
+
 TYPE post_input_params_t
-  TYPE(post_sc_gap_t) :: post_sc
-  TYPE(post_chern_number_t) :: post_chern
-  TYPE(post_dispersion_relation_t) :: post_dispersion
-  TYPE(post_dos_t) :: post_dos
+  TYPE(post_sc_gap_t) :: sc_gap
+  TYPE(post_chern_number_t) :: chern
+  TYPE(post_dispersion_relation_t) :: dispersion
+  TYPE(post_dos_t) :: dos
+  TYPE(post_gamma_k_t) :: gamma_k
+  TYPE(post_projections_t) :: projections
 END TYPE post_input_params_t
 
-END MODULE mod_types
+END MODULE types

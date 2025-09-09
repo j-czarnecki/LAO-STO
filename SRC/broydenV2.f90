@@ -1,4 +1,4 @@
-MODULE mod_broydenV2
+MODULE broydenV2
 CONTAINS
 ! Copyright (C) 2010-2016 Samuel Ponce', Roxana Margine, Carla Verdi, Feliciano Giustino
 !
@@ -139,5 +139,5 @@ SUBROUTINE mix_broyden(ndim, deltaout, deltain, alphamix, iter, n_iter, conv)
   !
 END SUBROUTINE mix_broyden
 
-END MODULE mod_broydenV2
+END MODULE broydenV2
 
