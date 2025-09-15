@@ -29,16 +29,16 @@ class RunnerConfig:
     def __init__(self):
 
         # Using dedent to remove indentation and align every row with the first column of file
-        self.job_header = {
+        self.jobHeader = {
             "default": textwrap.dedent(
                 """\
                 #!/bin/bash
                 ##### Amount of cores per task
-                #SBATCH --cpus-per-task=1
+                #SBATCH --cpus-per-task=32
                 ##### Partition name
                 #SBATCH -p cpu
                 ##### Name of job in queuing system
-                #SBATCH --job-name=KTO-B_planar
+                #SBATCH --job-name=Gap
                 #SBATCH --output=\"output.out\"    # Path to the standard output and error files relative to the working directory
                 """
                 ),
@@ -123,6 +123,7 @@ class RunnerConfig:
                 ("E_Fermi", 0.0e3),
                 ("V_layer", [0.0, 0.0]),
                 ("Subband_energies", 0.0e3),
+                ("g_factor", 3.0),
                 ("B_magnitude", 0.0),
                 ("B_theta", 90.0),
                 ("B_phi", 0.0),
@@ -155,8 +156,8 @@ class RunnerConfig:
             ("sc_gap_calculation", OrderedDict([
                 ("enable_sc_gap_calc", False),
                 ("path_to_run_dir_sc_gap", ""),
-                ("dE_sc_gap", 1e-3),
-                ("Nk_points_sc_gap", 8000),
+                ("dE_sc_gap", 5e-3),
+                ("Nk_points_sc_gap", 10000),
                 ("Nk_points_sc_gap_refined", 20),
             ])),
             ("chern_number_calculation", OrderedDict([
@@ -173,13 +174,13 @@ class RunnerConfig:
             ("dos_calculation", OrderedDict([
                 ("enable_dos_calc", False),
                 ("path_to_run_dir_dos", ""),
-                ("E_DOS_min", -0.35),
-                ("E_DOS_max", 0.35),
-                ("dE0", 2e-3),
-                ("zeta_DOS", 1.5e-2),
+                ("E_DOS_min", -0.45),
+                ("E_DOS_max", 0.45),
+                ("dE0", 2.5e-4),
+                ("zeta_DOS", 5e-3),
                 ("include_sc_in_dos", True),
-                ("Nk_points_dos", 1000),
-                ("Nk_points_dos_refined", 10),
+                ("Nk_points_dos", 2000),
+                ("Nk_points_dos_refined", 20),
             ])),
             ("gamma_k_calculation", OrderedDict([
                 ("enable_gamma_k_calc", False),
@@ -194,7 +195,7 @@ class RunnerConfig:
             ])),
         ])
 
-    def LAO_STO_default_nml(self):
+    def getLaoStoDefaultNml(self) -> f90nml.Namelist:
         nml = f90nml.Namelist(self.defaultSelfConsistencyNmlDict)
         nml['physical_params']['t_D'] = 0.5e3
         nml['physical_params']['t_I'] = 0.04e3
@@ -206,7 +207,7 @@ class RunnerConfig:
         nml['romberg_integration']['max_grid_refinements_y'] = 12
         return nml
 
-    def LAO_KTO_default_nml(self):
+    def getLaoKtoDefaultNml(self) -> f90nml.Namelist:
         nml = f90nml.Namelist(self.defaultSelfConsistencyNmlDict)
         nml['discretization']['SUBLATTICES'] = 3
         nml['physical_params']['t_D'] = 0.65e3
@@ -217,10 +218,10 @@ class RunnerConfig:
         nml['physical_params']['V_layer'] = [1946.0, 1946.0, 1946.0]
         return nml
 
-    def LAO_STO_postprocessing_default_nml(self):
+    def getPostprocessingDefaultNml(self):
         return f90nml.Namelist(self.defaultPostNmlDict)
 
-    def DOS_fitter_yaml(self):
+    def getDosFitterYamlDict(self):
         fitConfig = {
             "runsDir": "KTO-SC/NicolasDosFitting/J2_0mT",
             "dosExpPath": "/net/people/plgrid/plgjczarnecki/NicolasFit/J2_exp_0mT.dat",

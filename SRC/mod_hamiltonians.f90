@@ -566,7 +566,6 @@ END SUBROUTINE COMPUTE_HUBBARD
 RECURSIVE SUBROUTINE COMPUTE_ZEEMAN(B, Hamiltonian)
   REAL*8, INTENT(IN) :: B(3)
   COMPLEX*16, INTENT(INOUT) :: Hamiltonian(DIM, DIM)
-  REAL*8, PARAMETER :: gFactor = 3.0d0
   REAL*8, PARAMETER :: muB = 0.5
   INTEGER*4 :: i, spin, nambu, row, col
   REAL*8 :: sign_nambu, sign_spin
@@ -579,7 +578,7 @@ RECURSIVE SUBROUTINE COMPUTE_ZEEMAN(B, Hamiltonian)
         row = nambu * DIM_POSITIVE_K + spin * TBA_DIM + i
         col = MIN(row + TBA_DIM, DIM)
         !B_z terms
-        Hamiltonian(row, row) = Hamiltonian(row, row) + sign_nambu * sign_spin * 0.5d0 * muB * gFactor * B(3)
+        Hamiltonian(row, row) = Hamiltonian(row, row) + sign_nambu * sign_spin * 0.5d0 * muB * g_factor * B(3)
       END DO
     END DO
   END DO
@@ -590,7 +589,7 @@ RECURSIVE SUBROUTINE COMPUTE_ZEEMAN(B, Hamiltonian)
       row = nambu * DIM_POSITIVE_K + i
       col = nambu * DIM_POSITIVE_K + TBA_DIM + i
       !B_x and B_y terms
-      Hamiltonian(row, col) = Hamiltonian(row, col) + sign_nambu * 0.5d0 * muB * gFactor * (B(1) - imag * B(2))
+      Hamiltonian(row, col) = Hamiltonian(row, col) + sign_nambu * 0.5d0 * muB * g_factor * (B(1) - imag * B(2))
     END DO
   END DO
 END SUBROUTINE COMPUTE_ZEEMAN

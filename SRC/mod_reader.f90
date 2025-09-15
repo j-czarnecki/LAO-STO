@@ -65,6 +65,7 @@ REAL*8 :: V_HUB = 0.
 REAL*8 :: E_Fermi = 0.
 REAL*8, ALLOCATABLE :: V_layer(:)
 REAL*8, ALLOCATABLE :: Subband_energies(:)
+REAL*8 :: g_factor = 0
 REAL*8 :: B_magnitude = 0 !! Magnitude of magnetic field [T]
 REAL*8 :: B_theta = 0 !! Angle of magnetic field defined with respect to Z axis [deg]
 REAL*8 :: B_phi = 0 !! Angle of magnetic field defined with respect to X axis [deg]
@@ -158,6 +159,7 @@ NAMELIST /physical_params/  &
 & E_Fermi,                  &
 & V_layer,                  &
 & Subband_energies,         &
+& g_factor,                 &
 & B_magnitude,              &
 & B_theta,                  &
 & B_phi
@@ -183,11 +185,11 @@ NAMELIST /self_consistency/ &
 & charge_eps_convergence
 
 NAMELIST /romberg_integration/ &
-& romb_eps_x,                 &
-& interpolation_deg_x,        &
-& max_grid_refinements_x,     &
-& romb_eps_y,                 &
-& interpolation_deg_y,        &
+& romb_eps_x,                  &
+& interpolation_deg_x,         &
+& max_grid_refinements_x,      &
+& romb_eps_y,                  &
+& interpolation_deg_y,         &
 & max_grid_refinements_y
 
 NAMELIST /sc_gap_calculation/ &
@@ -198,36 +200,36 @@ NAMELIST /sc_gap_calculation/ &
 & Nk_points_sc_gap_refined
 
 NAMELIST /chern_number_calculation/ &
-& enable_chern_number_calc, &
-& path_to_run_dir_chern_number, &
+& enable_chern_number_calc,         &
+& path_to_run_dir_chern_number,     &
 & Nk_points_chern_number
 
 NAMELIST /dispersion_relation_calculation/ &
-& enable_dispersion_relation_calc, &
-& path_to_run_dir_dispersion_relation, &
-& include_sc_in_dispersion, &
+& enable_dispersion_relation_calc,         &
+& path_to_run_dir_dispersion_relation,     &
+& include_sc_in_dispersion,                &
 & Nk_points_dispersion_relation
 
 NAMELIST /dos_calculation/ &
-& enable_dos_calc, &
-& path_to_run_dir_dos, &
-& E_DOS_min, &
-& E_DOS_max, &
-& dE0, &
-& zeta_DOS, &
-& include_sc_in_dos, &
-& Nk_points_dos, &
+& enable_dos_calc,         &
+& path_to_run_dir_dos,     &
+& E_DOS_min,               &
+& E_DOS_max,               &
+& dE0,                     &
+& zeta_DOS,                &
+& include_sc_in_dos,       &
+& Nk_points_dos,           &
 & Nk_points_dos_refined
 
 NAMELIST /gamma_k_calculation/ &
-& enable_gamma_k_calc, &
-& path_to_run_dir_gamma_k, &
+& enable_gamma_k_calc,         &
+& path_to_run_dir_gamma_k,     &
 & Nk_points_gamma_k
 
 NAMELIST /projections_calculation/ &
-& enable_projections_calc, &
-& path_to_run_dir_projections, &
-& Nr_points_projections, &
+& enable_projections_calc,         &
+& path_to_run_dir_projections,     &
+& Nr_points_projections,           &
 & Nphi_points_projections
 
 CONTAINS
@@ -275,7 +277,7 @@ SUBROUTINE GET_INPUT(nmlfile)
     STOP "Error reading physical_params"
   END IF
 
-  WRITE (log_string, '(21(A, E15.5))') "T: ", T,&
+  WRITE (log_string, '(22(A, E15.5))') "T: ", T,&
                                    & " t_D: ", t_D,&
                                    & " t_I: ", t_I,&
                                    & " t_Rashba: ", t_Rashba,&
@@ -293,6 +295,7 @@ SUBROUTINE GET_INPUT(nmlfile)
                                    & " U_HUB: ", U_HUB,&
                                    & " V_HUB: ", V_HUB,&
                                    & " E_Fermi: ", E_Fermi,&
+                                   & " g_factor: ", g_factor,&
                                    & " B_magnitude: ", B_magnitude,&
                                    & " B_theta: ", B_theta,&
                                    & " B_phi: ", B_phi
