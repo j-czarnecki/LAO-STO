@@ -33,6 +33,14 @@ from Projectors.Projectors import *
 
 class OutputMocker:
   def __init__(self, outputPath: str, nOrbs: int = 3, nBands: int = 1, nSublats: int = 2):
+    """
+    Constructor for OutputMocker class.
+    Parameters:
+    outputPath (str): Path to output directory.
+    nOrbs (int): Number of orbitals.
+    nBands (int): Number of bands.
+    nSublats (int): Number of sublattices.
+    """
     self.outputPath: str = outputPath
     self.nOrbs: int = nOrbs
     self.nBands: int = nBands
@@ -44,7 +52,10 @@ class OutputMocker:
     self.projector = ProjectorC6v()
 
   def mockChargeOutput(self) -> None:
-    mockChargeValue = 1.
+    """
+    Produces an artificial Charge_dens_final.dat file in a directory specified by self.outputPath.
+    """
+    mockChargeValue = 1. #Value is not relevant unless Hubbard interaction is turned on.
     fortFormat = ff.FortranRecordWriter("(4I5, 1E15.5)")
     with open(os.path.join(self.outputPath, "OutputData", "Charge_dens_final.dat"), "w") as f:
       print(" #band spin lattice orbital Charge", file=f)
@@ -55,7 +66,16 @@ class OutputMocker:
               line = fortFormat.write([band + 1, spin + 1, sublat + 1, orb + 1, mockChargeValue])
               print(line, file=f)
 
-  def mockGammaOutput(self, gammaAmplitude: np.complex128, symmetries: tuple[str, ...]) -> None:
+  def mockGammaOutput(self, gammaAmplitudeDict: dict[str, np.complex128], symmetriesWeightsDict: dict[str, dict[str, float]]) -> None:
+    """
+    Produces an artificial Gamma_SC_final.dat file in a directory specified by self.outputPath.
+    Resultng Gamma is a linear combination of symmetries specified in symmetriesWeightsDict.
+    Magnitude of the Gamma is specified by gammaAmplitudeDict.
+
+    Parameters:
+    gammaAmplitudeDict (dict[str, np.complex128]): Dictionary specifying amplitudes of symmetries for nearest and next-nearest neighbors.
+    symmetriesWeightsDict (dict[str, dict[str, float]]): Dictionary specifying weights of symmetries for nearest and next-nearest neighbors.
+    """
 
     fortFormat = ff.FortranRecordWriter("(5I5, 2E15.5)")
     with open(os.path.join(self.outputPath, "OutputData", "Gamma_SC_final.dat"), "w") as f:
@@ -63,40 +83,83 @@ class OutputMocker:
       for band in range(self.nBands):
         for spin in range(self.nSpins):
           spinSign = (-1)**(spin) #Assuming spin singlet
-          symGamma = self.__createFlatSymmetryGamma(symmetries) * gammaAmplitude * spinSign
+          symGammaNearest = self.__createFlatSymmetryGamma(symmetriesWeightsDict["nearest"], "nearest") * gammaAmplitudeDict["nearest"] * spinSign
+          symGammaNext = self.__createFlatSymmetryGamma(symmetriesWeightsDict["next"], "next") * gammaAmplitudeDict["next"] * spinSign
           for neigh in range(self.nNeighbors + self.nNextNeighbors):
             maxLat = self.layerCouplings if neigh <= self.nNeighbors else self.nSublats
             for lat in range(maxLat):
               for orb in range(self.nOrbs):
+                #Nearest neighbors
                 if neigh < self.nNeighbors:
-                  gammaIdx = self.__getGammaIdx(orb, lat, neigh)
-                  line = fortFormat.write([band + 1, spin + 1, neigh + 1, lat + 1, orb + 1, symGamma[gammaIdx].real, symGamma[gammaIdx].imag])
+                  gammaIdx = self.__getGammaIdx(orb, lat, neigh, "nearest")
+                  line = fortFormat.write([band + 1, spin + 1, neigh + 1, lat + 1, orb + 1, symGammaNearest[gammaIdx].real, symGammaNearest[gammaIdx].imag])
+                #Next-nearest neighbors
                 else:
-                  line = fortFormat.write([band + 1, spin + 1, neigh + 1, lat + 1, orb + 1, 0, 0])
+                  gammaIdx = self.__getGammaIdx(orb, lat, neigh - self.nNeighbors, "next") #Enumerate next-nearest neighbors from 0 to 6 for index getter
+                  line = fortFormat.write([band + 1, spin + 1, neigh + 1, lat + 1, orb + 1, symGammaNext[gammaIdx].real, symGammaNext[gammaIdx].imag])
                 print(line, file=f)
             print(" ", file=f)
             print(" ", file=f)
 
-  def __createFlatSymmetryGamma(self, symmetries: tuple[str, ...]) -> np.ndarray:
-    projectionIndecesNearestDict = self.projector.getProjectionIndeces()["nearest"]
-    gammaFlat = np.zeros((self.nOrbs * self.nSublats * self.nNeighbors ), dtype=np.complex128)
-    for symmetry in symmetries:
-      for idx in projectionIndecesNearestDict[symmetry]["plus"]:
-        gammaFlat[idx] += 1
-      for idx in projectionIndecesNearestDict[symmetry]["minus"]:
-        gammaFlat[idx] -= 1
+  def __createFlatSymmetryGamma(self, symmetriesWeightsDict: dict[str, float], neighborsType: str = "nearest") -> np.ndarray:
+    """
+    Creates a flat array of gamma, taking into account weights of symmetries specified in symmetriesWeightsDict
+    Constraint: Only two lattices currently supported
+    """
+    projectionIndecesDict = self.projector.getProjectionIndeces()[neighborsType]
+    if neighborsType == "next":
+      maxNeighbors = 6
+      nCouplings = 1 #Because we do not take second sublat to irreps
+    elif neighborsType == "nearest":
+      maxNeighbors = 3
+      nCouplings = self.layerCouplings
+    else:
+      raise ValueError("Unknown neighbors type")
+
+    gammaFlat = np.zeros((self.nOrbs * nCouplings * maxNeighbors ), dtype=np.complex128)
+    for symmetry in symmetriesWeightsDict.keys():
+      for idx in projectionIndecesDict[symmetry]["plus"]:
+        gammaFlat[idx] += 1 * symmetriesWeightsDict[symmetry]
+      for idx in projectionIndecesDict[symmetry]["minus"]:
+        gammaFlat[idx] -= 1 * symmetriesWeightsDict[symmetry]
 
     return gammaFlat
 
-  def __getGammaIdx(self, orb, lat, neigh):
-    return orb * self.nSublats * self.nNeighbors + lat * self.nNeighbors + neigh
+  def __getGammaIdx(self, orb: int, lat: int, neigh: int, neighborsType: str = "nearest"):
+    """
+    Calculates index of flattened gamma array for given orb, lat, neigh
+    Constraint: Only two lattices currently supported
+    """
+    maxNeighbors = 1
+    nCouplings = 1
+    if neighborsType == "next":
+      maxNeighbors = 6
+      nCouplings = 1 #Because we do not take second sublat to irreps
+      return orb * nCouplings * maxNeighbors + neigh
+    elif neighborsType == "nearest":
+      maxNeighbors = 3
+      nCouplings = self.layerCouplings
+      return orb * nCouplings * maxNeighbors + lat * maxNeighbors + neigh
+    else:
+      raise ValueError("Unknown neighbors type")
 
 
 
 def main():
   mocker = OutputMocker("/home/czarnecki/LAO-STO/")
   mocker.mockChargeOutput()
-  mocker.mockGammaOutput(np.complex128(0.1), (r"$A_1^{(1)}$",))
+  symmetriesWeightsDict = {"nearest": {
+                              r"$A_1^{(1)}$": 0.1,
+                              r"$A_1^{(2)}$": 0.4,
+                            },
+                          "next": {
+                              r"$A_1^{(1)}$": 0.2,
+                              r"$A_1^{(2)}$": 0.8,
+                            },
+                          }
+  gammaAmplitudesDict = {"nearest": np.complex128(0.1),
+                         "next": np.complex128(0.1)}
+  mocker.mockGammaOutput(gammaAmplitudesDict, symmetriesWeightsDict)
 
 if __name__ == "__main__":
   main()

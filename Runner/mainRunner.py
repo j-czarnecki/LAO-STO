@@ -27,7 +27,7 @@ import numpy as np
 
 def runTemperatureDependence():
     runner = Runner()
-    pathToT0 = os.path.join(SCRATCH_PATH, "STO-SC", "LAO-STO-E_Fermi_J_SC_NNN")
+    pathToT0 = os.path.join(SCRATCH_PATH, "STO-SC", "LAO-STO-E_Fermi_J_SC")
 
     n_sublattices = 2
     Sublat_param = ("discretization", "SUBLATTICES", n_sublattices)
@@ -89,7 +89,7 @@ def runTemperatureDependence():
             gammaDirSetting = ("self_consistency", "path_to_gamma_start", t0DirGamma)
             chargeDirSetting = ("self_consistency", "path_to_charge_start", t0DirCharge)
 
-            runner.run_slurm_param_value(
+            runner.runSlurmParamValue(
                 paramValuePairs=[
                     T,
                     Ef,
@@ -106,19 +106,20 @@ def runTemperatureDependence():
 
 def configureAndRunPostprocessing():
     runner = Runner()
-    pathToRuns = os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-B_planar_J_SC_NNN")
+    pathToRuns = os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-E_Fermi_J_SC")
     # Adding '' at the end to terminate path with /
-    directories = [
-        os.path.join(pathToRuns, dir, "")
-        for dir in os.listdir(pathToRuns)
-        if re.match("RUN.*", dir)
-    ]
     # directories = [
-    #     os.path.join(pathToRuns, f"RUN_E_Fermi_{ef}.0_J_SC_100.0_J_SC_NNN_75.0", "")
-    #     for ef in [-1026, -966]]
+    #     os.path.join(pathToRuns, dir, "")
+    #     for dir in os.listdir(pathToRuns)
+    #     if re.match("RUN.*", dir)
+    # ]
+    directories = [
+        os.path.join(pathToRuns, f"RUN_E_Fermi_{ef}.0_J_SC_375.0", "")
+        for ef in [20, 40, 60]]
+
     enable_sc = ("sc_gap_calculation", "enable_sc_gap_calc", True)
     enable_chern = ("chern_number_calculation", "enable_chern_number_calc", False)
-    enable_dos = ("dos_calculation", "enable_dos_calc", False)
+    enable_dos = ("dos_calculation", "enable_dos_calc", True)
     enable_gamma_k = ("gamma_k_calculation", "enable_gamma_k_calc", False)
     for dir in directories:
         nmlDirectorySC = ("sc_gap_calculation", "path_to_run_dir_sc_gap", dir)
@@ -129,7 +130,7 @@ def configureAndRunPostprocessing():
         )
         nmlDirectoryDos = ("dos_calculation", "path_to_run_dir_dos", dir)
         nmlDirectoryGammaK = ("gamma_k_calculation", "path_to_run_dir_gamma_k", dir)
-        runner.run_slurm_postprocessing(
+        runner.runSlurmPostprocessing(
             dir,
             [enable_sc, nmlDirectorySC],
             machine="default"
@@ -199,7 +200,7 @@ def configureAndRunSc():
             if int(B[2]) == 6 and int(Ef[2]) == -60:
                     continue
             for phi in phi_table:
-                runner.run_slurm_param_value(
+                runner.runSlurmParamValue(
                     paramValuePairs=[
                         Ef,
                         B,
@@ -247,16 +248,52 @@ def runDosFitting():
             "bounds": [[-gammaMax, gammaMax], [-gammaMax, gammaMax], [-gammaMax, gammaMax]]
         }
 
-        runner.run_slurm_dos_fitter(fitConfig=dosFitDict,
+        runner.runSlurmDosFitter(fitConfig=dosFitDict,
                                     paramValuePairs=[Ef, B_field],
                                     material="KTO",
                                     isAres=True)
 
+
+def runMockedOutputPostprocessing():
+    runner = Runner()
+
+    nml_name = "physical_params"
+    param_name = "E_Fermi"
+    Ef_min = 0.05e3
+    Ef_max = 0.1e3
+    Ef_steps = 2
+    dE = abs(Ef_max - Ef_min) / Ef_steps
+    Fermi_table = [(nml_name, param_name, Ef_min + i * dE) for i in range(Ef_steps + 1)]
+
+    symmetriesWeightsDict = {"nearest": {
+                                r"$A_1^{(1)}$": 0.1,
+                                r"$A_1^{(2)}$": 0.4,
+                                },
+                            "next": {
+                                r"$E_2^{(1)}$": 0.5,
+                                r"$E_2^{(2)}$": 0.5,
+                                },
+                            }
+    gammaAmplitudesDict = {"nearest": np.complex128(0.),
+                            "next": np.complex128(0.1)}
+
+    for Ef in Fermi_table:
+        runner.runSlurmMockedOutputPostprocessing(
+            paramValuePairs=[Ef],
+            paramValuePairsPost=[],
+            gammaAmplitudesDict=gammaAmplitudesDict,
+            symmetriesWeightsDict=symmetriesWeightsDict,
+            runsDir="STO-SC/LAO-STO-E1/",
+            material="STO",
+            machine="default",
+        )
+
 def main():
     #runTemperatureDependence()
-    configureAndRunSc()
-    #configureAndRunPostprocessing()
+    #configureAndRunSc()
+    configureAndRunPostprocessing()
     #runDosFitting()
+    #runMockedOutputPostprocessing()
 
 if __name__ == "__main__":
     main()
