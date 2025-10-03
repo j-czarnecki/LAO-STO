@@ -39,6 +39,7 @@ from matplotlib.patches import Polygon
 import colorcet as cc
 from matplotlib.colors import ListedColormap
 import re
+import pandas as pd
 
 try:
     from IPython.utils.io import capture_output
@@ -83,7 +84,11 @@ class SymmetryPlotterClass:
     self.__createLamdifiedOrbitalShapeFunctions()
     self.__createCoordinateSystemAndDeltaTabs()
 
-  def plotBasisFunctions(self, irrepsEigenvectors: dict[str, list[tuple[int, int, list[sp.Matrix]]]], neighbor:str = "nearest", enablePrinting=True):
+  def plotBasisFunctions(self,
+                         irrepsEigenvectors: dict[str, list[tuple[int, int, list[sp.Matrix]]]],
+                         neighbor:str = "nearest",
+                         scGapPath:str = "",
+                         enablePrinting: bool = True):
     nCols = 1 #Real and imaginary part plotted on separate figures
     nRows: dict[str, int] = {}
     if neighbor == "nearest":
@@ -142,7 +147,7 @@ class SymmetryPlotterClass:
             for i in range(v[1]):
               lastInRow = col == nCols - 1
               print(lastInRow)
-              self.__getSingleBasisFunction(v[2][i], [axes[row + 1, col], axes[row, col]], neighbor, fig, lastInRow)
+              self.__getSingleBasisFunction(v[2][i], [axes[row + 1, col], axes[row, col]], neighbor, fig, lastInRow, scGapPath)
 
               row += 2
               col += row // maxRows
@@ -265,7 +270,7 @@ class SymmetryPlotterClass:
       # -1 * (-sp.sqrt(3)/sp.S(2) * self.N.i + sp.Rational(3, 2) * self.N.j),       # (√3/2, -3/2)
     ]
 
-  def __getSingleBasisFunction(self, eigenvec, axes, neighbor, fig, lastInRow):
+  def __getSingleBasisFunction(self, eigenvec, axes, neighbor, fig, lastInRow, scGapPath):
     N = CoordSys3D('N')
     nOrbs = 3
     k_x, k_y, k_z = self.cartesianKSymbols
@@ -305,10 +310,10 @@ class SymmetryPlotterClass:
     display(orbBasisFunctions)
     print(latexOrbBasisFunctions)
 
-    self.__getZerosOfBasisFunction(orbKxKyBasisFunctions, axes, fig, lastInRow)
+    self.__getZerosOfBasisFunction(orbKxKyBasisFunctions, axes, fig, lastInRow, scGapPath)
 
 
-  def __getZerosOfBasisFunction(self, orbBasisFunctions, axes, fig, lastInRow):
+  def __getZerosOfBasisFunction(self, orbBasisFunctions, axes, fig, lastInRow, scGapPath):
     """
     Orbitals are stored in the following order:
     d_yz, d_zx, d_xy
@@ -339,6 +344,7 @@ class SymmetryPlotterClass:
                                         cmap="Greys",
                                         norm=PowerNorm(gamma=0.5, vmin=0, vmax=1))
         axModule.contour(X, Y, zPlot, levels=[-zeroThreshold, zeroThreshold], colors='magenta', linestyles='dotted', linewidths=0.5)
+        self.__loadAndPlotScGapData(scGapPath, axModule)
         axModule.set_aspect("equal")
         if lastInRow:
           # Manual colorbar axis (left, bottom, width, height) in figure coords
@@ -356,6 +362,7 @@ class SymmetryPlotterClass:
                                        cmap=self.__shiftCmap(cc.cm.cyclic_tritanopic_cwrk_40_100_c20, -0.75),
                                        norm=PowerNorm(gamma=1., vmin = -1, vmax = 1))
         axPhase.contour(X, Y, zPlot, levels=[-zeroThreshold, zeroThreshold], colors='magenta', linestyles='dotted', linewidths=0.5)
+        self.__loadAndPlotScGapData(scGapPath, axPhase)
         axPhase.set_aspect("equal")
         if lastInRow:
           # Manual colorbar axis (left, bottom, width, height) in figure coords
@@ -363,6 +370,37 @@ class SymmetryPlotterClass:
           cbar = fig.colorbar(colormesh, cax=cax)
           cbar.set_ticks([-1, -0.5, 0, 0.5, 1])
           cbar.set_label(r"$\arg \left( \Gamma \right)$ ($\pi$)")
+
+
+  def __loadAndPlotScGapData(self, scGapPath, ax):
+
+    if not os.path.exists(scGapPath):
+      print(f"Superconducting gap file {scGapPath} does not exist")
+      return
+
+    colorsMapping = {1: "#1f77b4", 2:"#ff7f0e", 3: "#2ca02c", 4: "#d62728"}
+
+    superconductingGapDataframe = pd.read_fwf(
+      scGapPath,
+      skiprows=1,
+      infer_nrows=-100,
+      colspecs=[(0, 16), (17, 31), (32, 46), (47, 56)],
+      names=["kx", "ky", "gap", "state"],
+      dtype=np.float64,
+    )
+    superconductingGapDataframe["stateColor"] = superconductingGapDataframe["state"].map(colorsMapping)
+
+
+    norm = PowerNorm(gamma=1.2, vmin=0, vmax=superconductingGapDataframe.gap.max()*1e3)
+    scat = ax.scatter(
+        superconductingGapDataframe.kx,
+        superconductingGapDataframe.ky,
+        c=superconductingGapDataframe.stateColor,
+        s=0.5,
+        alpha=0.3,
+    )
+    print("Minimal value of gap is ", superconductingGapDataframe.gap.min())
+
 
   def __plotFirstBrillouinZoneBoundary(self, ax = None):
     brillouinZoneVertices = np.zeros((7, 2))  # One more to close the polygon

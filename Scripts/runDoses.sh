@@ -23,7 +23,7 @@ for val in "${e_fermi_values[@]}"; do
     sed -i "s/^\s*e_fermi\s*=.*/  e_fermi = $val/" ./input.nml
 
     # You can call your program here using the modified input.nml
-    srun -c 48 ./bin/POST_LAO_STO.x
+    srun -c 32 ./bin/POST_LAO_STO.x
     #cp ./OutputData/DOS.dat ${OUTPUT_DIR_DOS}/DOS_${val}.dat
     cp ./OutputData/SuperconductingGap.dat ${OUTPUT_DIR_GAP}/SuperconductingGap_${val}.dat
 

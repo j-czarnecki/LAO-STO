@@ -23,7 +23,6 @@
 
 test_suite mod_hamiltonians
 
-REAL*8, PARAMETER :: gFactor = 3.0d0
 REAL*8, PARAMETER :: muB = 0.5
 REAL*8, PARAMETER :: s = 0.5
 
@@ -32,6 +31,7 @@ USE mod_parameters
 USE mod_utilities
 USE mod_reader
 SUBLATTICES = 2
+g_factor = 3.0d0
 CALL SET_HAMILTONIAN_PARAMS()
 end setup
 
@@ -421,14 +421,14 @@ DO i = 1, DIM
   DO j = 1, DIM
     IF (i == j) THEN
       !B_z terms
-      assert_real_equal(REAL(Hamiltonian(i, j)), gFactor * muB * s * nambu_sign * spin_sign * B(3))
+      assert_real_equal(REAL(Hamiltonian(i, j)), g_factor * muB * s * nambu_sign * spin_sign * B(3))
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)
     ELSE IF (((i .LE. TBA_DIM) .OR. ((i .GE. DIM_POSITIVE_K + 1) .AND. (i .LE. TBA_DIM + DIM_POSITIVE_K))) &
              .AND. j == i + TBA_DIM) THEN
       !B_x term
-      assert_real_equal(REAL(Hamiltonian(i, j)), gFactor * muB * s * nambu_sign * spin_sign * B(1))
+      assert_real_equal(REAL(Hamiltonian(i, j)), g_factor * muB * s * nambu_sign * spin_sign * B(1))
       !B_y term
-      assert_real_equal(AIMAG(Hamiltonian(i, j)), -gFactor * muB * s * nambu_sign * spin_sign * B(2))
+      assert_real_equal(AIMAG(Hamiltonian(i, j)), -g_factor * muB * s * nambu_sign * spin_sign * B(2))
     ELSE
       assert_real_equal(REAL(Hamiltonian(i, j)), 0.0d0)
       assert_real_equal(AIMAG(Hamiltonian(i, j)), 0.0d0)

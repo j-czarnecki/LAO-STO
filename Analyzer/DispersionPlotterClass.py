@@ -345,37 +345,37 @@ class DispersionPlotter(DataReader):
         colorbar = fig.colorbar(sm, ax=axes)
         colorbar.set_label(r"$\mu$ (meV)")  # Update label as needed
 
-        fig.text(0.04, 0.5, r"DOS (a.u.)", va='center', rotation='vertical')
+        fig.text(0.01, 0.5, r"DOS (a.u.)", va='center', rotation='vertical')
         plt.savefig(plotOutputPath)
         plt.close()
 
     def plotSuperconductingGap(self, postfix: str, title: str):
         fig = plt.figure(figsize=(7, 5), dpi=400)
         # Set up GridSpec (1 row, 1 column, with some spacing)
-        gs = gridspec.GridSpec(1, 1, figure=fig, left=0.22, right=0.65, top=1, bottom=0.05)
+        gs = gridspec.GridSpec(1, 1, figure=fig, left=0.25, right=0.65, top=1, bottom=0.15)
         ax = fig.add_subplot(gs[0,0])
         self.plotFirstBrillouinZoneBoundary()
-        norm = PowerNorm(gamma=1.2, vmin=0, vmax=self.superconductingGapDataframe.gap.max()*1e3)
+        norm = PowerNorm(gamma=1.5, vmin=0, vmax=self.superconductingGapDataframe.gap.max()*1e3)
         scat = ax.scatter(
             self.superconductingGapDataframe.kx,
             self.superconductingGapDataframe.ky,
             c=self.superconductingGapDataframe.gap*1e3,
             s=0.5,
-            cmap="inferno",
+            cmap="cool",
             norm=norm,
         )
         print("Minimal value of gap is ", self.superconductingGapDataframe.gap.min())
 
-        cax = fig.add_axes([0.67, 0.22, 0.05, 0.6])  # [left, bottom, width 5% of figure width, height 75% of figure height]
-        cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap='inferno'), cax=cax, orientation='vertical')
+        cax = fig.add_axes([0.67, 0.3, 0.05, 0.55])  # [left, bottom, width 5% of figure width, height 75% of figure height]
+        cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap='cool'), cax=cax, orientation='vertical')
         cbar.set_label(r"$\tilde{\Delta}$ ($\mu$eV)")
         cbar.set_ticks(ticker.MultipleLocator(150))
 
 
         ax.set_xlim(-2.5, 2.5)
         ax.set_ylim(-2.5, 2.5)
-        ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
-        ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(2))
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(2))
 
         ax.set_title(title)
         ax.set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
@@ -388,10 +388,19 @@ class DispersionPlotter(DataReader):
 
     def plotSuperconductingGapAngular(self, postfix: str = "", title: str = None):
         #self.__setPalette(nColors=self.superconductingGapDataframe['state'].nunique(), palette="tab10")
-        stateColors = ["black", "red", "blue", "orange"]
-        figAngular, axAngular = plt.subplots(figsize=(7, 5), dpi=400)
-        #baxAngular = brokenaxes(ylims=((0,1), (15,50)), hspace=0.1)
-        figFourier, axFourier = plt.subplots(figsize=(7, 5), dpi=400)
+        colorsMapping = {1: "#1f77b4", 2:"#ff7f0e", 3: "#2ca02c", 4: "#d62728"}
+        figAngular = plt.figure(figsize=(7, 5), dpi=400)
+        # Set up GridSpec (1 row, 1 column, with some spacing)
+        gs = gridspec.GridSpec(1, 1, figure=figAngular, left=0.25, right=0.95, top=0.9, bottom=0.3)
+        axAngular = figAngular.add_subplot(gs[0,0])
+        figFourier = plt.figure(figsize=(7, 5), dpi=400)
+        # Set up GridSpec (1 row, 1 column, with some spacing)
+        gs = gridspec.GridSpec(1, 1, figure=figFourier, left=0.25, right=0.95, top=0.9, bottom=0.3)
+        axFourier = figFourier.add_subplot(gs[0,0])
+
+
+        yMin = np.inf
+        threshold = 0.005
 
         for state, group in self.superconductingGapDataframe.groupby("state"):
             dPhi = 0.05                                   # the maximum allowed x–gap
@@ -409,36 +418,48 @@ class DispersionPlotter(DataReader):
             # --- draw each chunk separately so Matplotlib never bridges the gap ---------
             for seg in segments:
                 axAngular.plot(
-                    x[seg], y[seg],
+                    x[seg], y[seg]*1e3,
                     label=f"{int(state)}" if seg is segments[0] else None,   # one legend entry
-                    color=stateColors[int(state) - 1]
+                    color=colorsMapping[(state - 1) % 4 + 1],
                 )
-            # angles = np.arctan2(group.ky, group.kx) / (np.pi)
-            # sortedIndices = np.argsort(angles)
-            # sortedAngles = angles.iloc[sortedIndices]
-            # sortedGaps = group.gap.iloc[sortedIndices]
-            # axAngular.plot(
-            #     sortedAngles,
-            #     sortedGaps,
-            #     label=f"{int(state)}",
-            # )
+            angles = np.arctan2(group.ky, group.kx) / (np.pi)
+            sortedIndices = np.argsort(angles)
+            sortedAngles = angles.iloc[sortedIndices]
+            sortedGaps = group.gap.iloc[sortedIndices]
 
-            # gapFft = np.fft.fft(sortedGaps) / len(sortedGaps)
-            # freqs = np.fft.fftfreq(len(sortedGaps), d=np.mean(np.diff(sortedAngles))) / np.pi
-            # axFourier.scatter(freqs, np.abs(gapFft), label=f"{int(state)}")
 
+            if sortedGaps.min() < yMin and sortedGaps.min() > threshold:
+                yMin = sortedGaps.min()
+
+            axAngular.plot(
+                sortedAngles,
+                sortedGaps,
+                label=f"{int(state)}",
+            )
+
+            gapFft = np.fft.fft(sortedGaps) / len(sortedGaps)
+            freqs = np.fft.fftfreq(len(sortedGaps), d=np.mean(np.diff(sortedAngles))) / np.pi
+            axFourier.scatter(freqs, np.abs(gapFft), label=f"{int(state)}")
+
+
+
+        axAngular.yaxis.set_major_locator(ticker.MultipleLocator(10))
+        axAngular.xaxis.set_major_locator(ticker.MultipleLocator(0.5))
         axAngular.set_title(title)
-        axAngular.legend(title="n", loc="upper right")
+        #axAngular.legend(title="n", loc="upper right")
         axAngular.set_xlabel(r"$\varphi$~($\pi$)")
-        axAngular.set_ylabel(r"$\tilde{\Delta}$~(meV)")
+        axAngular.set_ylabel(r"$\tilde{\Delta}$~($\mu$eV)")
+        axAngular.set_ylim(bottom=0.98 * yMin * 1e3)
+        axAngular.grid(True, linestyle=':')
         figAngular.savefig(f"../Plots/SuperconductingGapAngular{postfix}.png")
         plt.close(figAngular)
 
         axFourier.set_title(title)
-        axFourier.legend(title="n", loc="upper right")
+        #axFourier.legend(title="n", loc="upper right")
         axFourier.set_xlabel(r"f ($\pi^{-1}$)")
         axFourier.set_ylabel(r"$\tilde{\Delta}$~(meV)")
         axFourier.set_xlim(-2, 2)
+        axFourier.grid(True, linestyle=':')
         figFourier.savefig(f"../Plots/SuperconductingGapFourier{postfix}.png")
         plt.close(figFourier)
 

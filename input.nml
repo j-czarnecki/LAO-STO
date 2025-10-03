@@ -26,10 +26,10 @@
     e_fermi = 0.0
     v_layer = 1946.0, 1946.0, 1946.0
     subband_energies = 0.0,
-    g_factor = 3.0,
-    B_magnitude = 0.0,
+    g_factor = 6.0,
+    B_magnitude = 20.0,
     B_theta = 90.0,
-    B_phi = 0.0
+    B_phi = 90.0
 /
 
 &self_consistency

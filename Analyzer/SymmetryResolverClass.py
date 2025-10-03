@@ -78,6 +78,7 @@ class SymmetryResolver(DataReader):
         # Nearest neighbors
         for band in range(1, max(1, self.subbands) + 1):
             for spin in range(1, 3):
+                #TODO: This loop is the repeated below. This is not good.
                 for sublat in range(1, self.layerCouplings + 1):
                     symmetryKey = (band, spin, sublat)
 
@@ -86,7 +87,7 @@ class SymmetryResolver(DataReader):
                         for orbital in range(1, 4):
                             # This code could be simplified, maybe list comprehension?
                             # Nearest neighbours pairing
-                            for sublat in range(1, self.layerCouplings + 1):
+                            for sublat in range(1, 2 + 1):
                                 for neighbor in range(1, self.nNeighbors + 1):
                                     gammaKey = (
                                         (spin, neighbor, sublat, orbital)

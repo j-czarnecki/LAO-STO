@@ -576,7 +576,6 @@ RECURSIVE SUBROUTINE COMPUTE_ZEEMAN(B, Hamiltonian)
       sign_spin = (-1)**spin
       DO i = 1, TBA_DIM
         row = nambu * DIM_POSITIVE_K + spin * TBA_DIM + i
-        col = MIN(row + TBA_DIM, DIM)
         !B_z terms
         Hamiltonian(row, row) = Hamiltonian(row, row) + sign_nambu * sign_spin * 0.5d0 * muB * g_factor * B(3)
       END DO
