@@ -120,7 +120,8 @@ INTEGER*4 :: Nk_points_chern_number = 0
 LOGICAL :: enable_dispersion_relation_calc = .FALSE.
 CHARACTER(1000) :: path_to_run_dir_dispersion_relation = ""
 LOGICAL :: include_sc_in_dispersion = .FALSE.
-INTEGER*4 :: Nk_points_dispersion_relation = 0
+INTEGER*4 :: Nr_points_dispersion = 0
+INTEGER*4 :: Nphi_points_dispersion = 0
 
 !DOS calculation
 LOGICAL :: enable_dos_calc = .FALSE.
@@ -214,7 +215,8 @@ NAMELIST /dispersion_relation_calculation/ &
 & enable_dispersion_relation_calc,         &
 & path_to_run_dir_dispersion_relation,     &
 & include_sc_in_dispersion,                &
-& Nk_points_dispersion_relation
+& Nr_points_dispersion,                    &
+& Nphi_points_dispersion
 
 NAMELIST /dos_calculation/ &
 & enable_dos_calc,         &
@@ -471,13 +473,15 @@ SUBROUTINE GET_POSTPROCESSING_INPUT(nmlfile, post_input)
 
   READ (9, NML=dispersion_relation_calculation)
   IF (enable_dispersion_relation_calc) THEN
-    IF (Nk_points_dispersion_relation .LE. 0) STOP "Nk_points_dispersion_relation must be > 0"
+    IF (Nr_points_dispersion .LE. 0) STOP "Nr_pointsNr_points_dispersion must be > 0"
+    IF (Nphi_points_dispersion .LE. 0) STOP "Nphi_points_dispersion must be > 0"
     IF (path_to_run_dir_dispersion_relation == "") STOP "path_to_run_dir_dispersion_relation must not be empty"
 
     post_input % dispersion % enable = enable_dispersion_relation_calc
     post_input % dispersion % path = path_to_run_dir_dispersion_relation
     post_input % dispersion % include_sc = include_sc_in_dispersion
-    post_input % dispersion % Nk_points = Nk_points_dispersion_relation
+    post_input % dispersion % Nr_points = Nr_points_dispersion
+    post_input % dispersion % Nphi_points = Nphi_points_dispersion
   END IF
 
   READ (9, NML=dos_calculation)

@@ -139,7 +139,8 @@ TYPE post_dispersion_relation_t
   LOGICAL :: enable = .FALSE.
   CHARACTER(1000) :: path = ""
   LOGICAL :: include_sc = .FALSE.
-  INTEGER*4 :: Nk_points = 0
+  INTEGER*4 :: Nr_points = 0
+  INTEGER*4 :: Nphi_points = 0
 END TYPE post_dispersion_relation_t
 
 TYPE post_dos_t

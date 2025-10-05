@@ -120,6 +120,7 @@ class DispersionPlotter(DataReader):
         isSuperconducting: bool = False,
     ):
 
+        eps = 1e-3
         fixedK = ""
         xLabelOnPlot = ""
         if sliceAlong == "kx":
@@ -130,7 +131,7 @@ class DispersionPlotter(DataReader):
             fixedK = "kx"
 
         filteredDispersion = self.dispersionDataframe[
-            self.dispersionDataframe[fixedK] == fixedKVal
+            np.abs(self.dispersionDataframe[fixedK] - fixedKVal) < eps
         ]
         filteredDispersion["zeros"] = np.zeros(len(filteredDispersion))
 
@@ -141,7 +142,7 @@ class DispersionPlotter(DataReader):
 
         lat3 = "P_lat3" if "P_lat3" in self.dispersionDataframe else "zeros"
         colorValuesDict = {"orbital": ["P_yz", "P_zx", "P_xy"],
-                     "spin": ["P_up", "zeros", "P_down"],
+                     "spin": ["P_sx", "P_sy", "P_sz"],
                      "lattice": ["P_lat1", "P_lat2", lat3],
                      "quasiparticle": ["P_elec", "zeros", "P_hole"],
         }
@@ -155,27 +156,38 @@ class DispersionPlotter(DataReader):
         for colorKey in colorValuesDict.keys():
             fig = plt.figure(figsize=(7, 5), dpi=400)
             # Set up GridSpec (1 row, 1 column, with some spacing)
-            gs = gridspec.GridSpec(1, 1, figure=fig, left=0.2, right=0.9, top=0.9, bottom=0.2)
+            gs = gridspec.GridSpec(1, 1, figure=fig, left=0.3, right=0.9, top=0.9, bottom=0.25)
             ax = fig.add_subplot(gs[0,0])
-            #left, bottom, width, height = [0.7, 0.7, 0.2, 0.2]
-            #axin = fig.add_axes([left, bottom, width, height])
 
-            for _, group in groups:
-                x = group[sliceAlong].values
-                y = group["E"].values
-                c = group[colorValuesDict[colorKey]].values
-                # Make line segments
-                points = np.array([x, y]).T.reshape(-1, 1, 2)
-                segments = np.concatenate([points[:-1], points[1:]], axis=1)
+            if colorKey == "spin":
+                for _, group in groups:
+                    group.sort_values(by=sliceAlong, inplace=True, ignore_index=True)
+                    x = group[sliceAlong].values
+                    y = group["E"].values
+                    P_sz = group["P_sz"].values
+                    points = np.array([x, y]).T.reshape(-1, 1, 2)
+                    segments = np.concatenate([points[:-1], points[1:]], axis=1)
+                    segmentColors = 0.5 * (P_sz[:-1] + P_sz[1:])
 
-                # For color per segment, average adjacent colors
-                segment_colors = 0.5 * (c[:-1] + c[1:])
+                    lc = LineCollection(segments, linewidths=2, cmap="coolwarm")
+                    lc.set_array(segmentColors)
+                    ax.add_collection(lc)
 
-                lc = LineCollection(segments, colors=segment_colors, linewidths=2)
-                ax.add_collection(lc)
+            else:
+                for _, group in groups:
+                    group.sort_values(by=sliceAlong, inplace=True, ignore_index=True)
+                    x = group[sliceAlong].values
+                    y = group["E"].values
+                    c = group[colorValuesDict[colorKey]].values
+                    # Make line segments
+                    points = np.array([x, y]).T.reshape(-1, 1, 2)
+                    segments = np.concatenate([points[:-1], points[1:]], axis=1)
 
-                # lc = LineCollection(segments, colors=segment_colors, linewidths=2)
-                # axin.add_collection(lc)
+                    # For color per segment, average adjacent colors
+                    segment_colors = 0.5 * (c[:-1] + c[1:])
+
+                    lc = LineCollection(segments, colors=segment_colors, linewidths=2)
+                    ax.add_collection(lc)
 
             ax.grid(True, linestyle=':')
             ax.xaxis.set_major_locator(ticker.LinearLocator(5))
@@ -205,17 +217,29 @@ class DispersionPlotter(DataReader):
 
         lat3 = "P_lat3" if "P_lat3" in self.dispersionDataframe else "zeros"
         colorValuesDict = {"orbital": ["P_yz", "P_zx", "P_xy"],
-                     "spin": ["P_up", "zeros", "P_down"],
+                     "spin": ["P_sx", "P_sy", "P_sz"],
                      "lattice": ["P_lat1", "P_lat2", lat3],
                      "quasiparticle": ["P_elec", "zeros", "P_hole"],
         }
+
+        def sortByPhase(group):
+            # Sort values with repect to the center of Fermi surface to be able to connect with lines
+            xCenter, yCenter = group["kx"].mean(), group["ky"].mean()
+            phase = np.arctan2(group["ky"] - yCenter, group["kx"] - xCenter)
+
+            group["k_phase"] = phase
+            group.sort_values(by="k_phase", inplace=True, ignore_index=True)
+            return pd.concat([group, group.iloc[[0]]], ignore_index=True)
+
+        filteredDispersion = filteredDispersion.groupby("N", group_keys=False).apply(sortByPhase)
         groups = filteredDispersion.groupby("N")
 
+        vectorProbing = 10
 
         for colorKey in colorValuesDict.keys():
             fig = plt.figure(figsize=(5, 5), dpi=400)
             # Set up GridSpec (1 row, 1 column, with some spacing)
-            gs = gridspec.GridSpec(1, 1, figure=fig, left=0.3, right=0.95, top=0.95, bottom=0.3)
+            gs = gridspec.GridSpec(1, 1, figure=fig, left=0.3, right=0.95, top=0.95, bottom=0.25)
             ax = fig.add_subplot(gs[0,0])
             self.plotFirstBrillouinZoneBoundary()
             if colorKey == "orbital":
@@ -223,9 +247,44 @@ class DispersionPlotter(DataReader):
                 axin = fig.add_axes([left, bottom, width, height])
                 self.__plotRGBLegend(axin)
 
-            for _, group in groups:
-                colors = group[colorValuesDict[colorKey]].values
-                ax.scatter(group["kx"], group["ky"], marker="o", s=0.6, c=colors)
+            if colorKey == "spin":
+                for _, group in groups:
+                    kx = group["kx"].values
+                    ky = group["ky"].values
+                    P_sz = group["P_sz"].values
+                    points = np.array([kx, ky]).T.reshape(-1, 1, 2)
+                    segments = np.concatenate([points[:-1], points[1:]], axis=1)
+                    segmentColors = 0.5 * (P_sz[:-1] + P_sz[1:])
+
+                    lc = LineCollection(segments, linewidths=0.5, cmap="coolwarm")
+                    lc.set_array(segmentColors)
+                    ax.add_collection(lc)
+
+                    #ax.plot(group["kx"], group["ky"], c='black', linewidth=0.5, zorder=3)
+                    vectorsGroup = group.iloc[::vectorProbing, :]
+                    ax.quiver(vectorsGroup["kx"], vectorsGroup["ky"],
+                              vectorsGroup["P_sx"], vectorsGroup["P_sy"],
+                              vectorsGroup["P_sz"],
+                              cmap="coolwarm",
+                              scale=4,
+                              scale_units="xy",
+                              width=0.004,
+                              headwidth=5,
+                              headlength=4,
+                              headaxislength=3,
+                              zorder=2)
+            else:
+                for _, group in groups:
+                    kx = group["kx"].values
+                    ky = group["ky"].values
+                    colors = group[colorValuesDict[colorKey]].values
+
+                    points = np.array([kx, ky]).T.reshape(-1, 1, 2)
+                    segments = np.concatenate([points[:-1], points[1:]], axis=1)
+                    segmentColors = 0.5 * (colors[:-1] + colors[1:])
+
+                    lc = LineCollection(segments, colors=segmentColors, linewidths=0.5)
+                    ax.add_collection(lc)
 
             ax.grid(True, linestyle=':')
             ax.set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
@@ -616,10 +675,10 @@ class DispersionPlotter(DataReader):
         plt.rcParams["font.serif"] = "Computer Modern Roman"
         plt.rcParams["font.sans-serif"] = "Computer Modern Sans serif"
         plt.rcParams["font.monospace"] = "Computer Modern Typewriter"
-        plt.rcParams["axes.titlesize"] = 50
-        plt.rcParams["axes.labelsize"] = 50
-        plt.rcParams["xtick.labelsize"] = 40
-        plt.rcParams["ytick.labelsize"] = 40
+        plt.rcParams["axes.titlesize"] = 40
+        plt.rcParams["axes.labelsize"] = 40
+        plt.rcParams["xtick.labelsize"] = 36
+        plt.rcParams["ytick.labelsize"] = 36
         plt.rcParams["font.size"] = 40
         plt.rcParams["legend.fontsize"] = 34
         plt.rcParams["legend.title_fontsize"] = 36

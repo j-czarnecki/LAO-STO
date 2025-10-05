@@ -214,8 +214,9 @@ class DataReader:
             "P_zx",
             "P_xy",
             *[f"P_lat{i}" for i in range(1, self.sublattices + 1)],
-            "P_up",
-            "P_down",
+            "P_sx",
+            "P_sy",
+            "P_sz",
             "P_elec",
             "P_hole",
         ]
@@ -224,7 +225,7 @@ class DataReader:
             (0, 6),
             *[
                 (7 + i + i * real_width, 7 + i + (i + 1) * real_width)
-                for i in range(10 + self.sublattices)
+                for i in range(11 + self.sublattices)
             ],
         ]
         if os.path.exists(energiesPath):

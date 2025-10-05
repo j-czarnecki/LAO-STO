@@ -319,21 +319,23 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
   TYPE(sc_input_params_t) :: sc_input
   CHARACTER(LEN=20) :: output_format
 
-  COMPLEX*16, ALLOCATABLE :: Hamiltonian(:, :), Hamiltonian_const(:, :), Hamiltonian_const_band(:, :), U_transformation(:, :)
-  REAL*8, ALLOCATABLE :: Energies(:, :, :)
-  REAL*8, ALLOCATABLE :: Probability(:, :, :, :) ! |Psi^2|
+  COMPLEX*16, ALLOCATABLE :: Hamiltonian(:, :), Hamiltonian_const(:, :), Hamiltonian_const_band(:, :)
+  REAL*8, ALLOCATABLE :: Energies(:)
 
   COMPLEX*16, ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :)
   REAL*8, ALLOCATABLE :: Charge_dens(:, :)
 
-  REAL*8 :: k1, k2, kx, ky, dkx, dky
+  REAL*8 :: kx, ky
+  REAL*8 :: phi_k, r_max, dr, r_k
   REAL*8 :: sc_multiplier
   INTEGER*4 :: i, j, k, n, lat, orb, orb_prime, spin, l, m, band
+  INTEGER*4 :: i_r, j_phi, n_triangle
+  INTEGER*4 :: s_up_idx, s_down_idx
   INTEGER*4 :: kx_steps, ky_steps
   REAL*8 :: yz_contribution, zx_contribution, xy_contribution
   REAL*8 :: lat1_contribution, lat2_contribution
   REAL*8, ALLOCATABLE :: Lat_contributions(:)
-  REAL*8 :: spin_up_contribution, spin_down_contribution
+  REAL*8 :: spin_x_contribution, spin_y_contribution, spin_z_contribution
   REAL*8 :: electron_contribution, hole_contribution
   REAL*8 :: brillouinZoneVertices(6, 2)
 
@@ -345,6 +347,10 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
 
   CALL GET_INPUT(TRIM(dispersion % path)//"input.nml", sc_input)
 
+  !Redefining step in radial and angular directions according to postprocessing parameters
+  sc_input % discretization % derived % dr_k = R_K_MAX / dispersion % Nr_points
+  sc_input % discretization % derived % dphi_k = (PI / 3.0d0) / dispersion % Nphi_points  !Slicing every hexagon's triangle into the same number of phi steps
+
   !If superconductivity is to be included, we add Nambu space to the Hamiltonian and double the size.
   IF (dispersion % include_sc) THEN
     hamiltonian_dim = sc_input % discretization % derived % DIM
@@ -354,22 +360,6 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
     sc_multiplier = 1.0d0
   END IF
 
-  yz_contribution = 0.
-  zx_contribution = 0.
-  xy_contribution = 0.
-  lat1_contribution = 0.
-  lat2_contribution = 0.
-  spin_up_contribution = 0.
-  spin_down_contribution = 0.
-  electron_contribution = 0.
-  hole_contribution = 0.
-
-  dkx = KX_MAX / dispersion % Nk_points
-  dky = KY_MAX / dispersion % Nk_points
-
-  kx_steps = INT(dispersion % Nk_points)
-  ky_steps = INT(dispersion % Nk_points)
-
   ASSOCIATE (SUBLATTICES => sc_input % discretization % SUBLATTICES, &
         & SUBBANDS => sc_input % discretization % SUBBANDS, &
         & ORBITALS => sc_input % discretization % ORBITALS, &
@@ -378,25 +368,23 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
         & DIM => sc_input % discretization % derived % DIM, &
         & LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS)
 
-    WRITE (output_format, '(A, I0, A)') '(I5, ', 10 + SUBLATTICES, 'E15.5)'
+    WRITE (output_format, '(A, I0, A)') '(I5, ', 11 + SUBLATTICES, 'E15.5)'
 
     ALLOCATE (Hamiltonian(DIM, DIM))
     ALLOCATE (Hamiltonian_const(DIM, DIM))
     ALLOCATE (Hamiltonian_const_band(DIM, DIM))
-    ALLOCATE (U_transformation(hamiltonian_dim, hamiltonian_dim))
-    ALLOCATE (Probability(-kx_steps:kx_steps, -ky_steps:ky_steps, hamiltonian_dim, hamiltonian_dim))
-    ALLOCATE (Energies(-kx_steps:kx_steps, -ky_steps:ky_steps, hamiltonian_dim))
+    ALLOCATE (Energies(hamiltonian_dim))
     ALLOCATE (Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, LAYER_COUPLINGS, SUBBANDS))
     ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
     ALLOCATE (Lat_contributions(SUBLATTICES))
   END ASSOCIATE
 
-  Hamiltonian(:, :) = DCMPLX(0., 0.)
-  Hamiltonian_const(:, :) = DCMPLX(0., 0.)
-  Probability(:, :, :, :) = 0.
-  Energies(:, :, :) = 0.
+  Hamiltonian = DCMPLX(0., 0.)
+  Hamiltonian_const = DCMPLX(0., 0.)
+  Energies = 0.
   Gamma_SC = DCMPLX(0., 0.) * meV2au
   Charge_dens = 0.
+  Lat_contributions = 0.
 
   IF ((sc_input % physical % subband_params % U_HUB .NE. 0.0) .OR. &
      & (sc_input % physical % subband_params % V_HUB .NE. 0.0)) THEN
@@ -411,7 +399,7 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
   CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const, sc_input % discretization, sc_input % physical)
 
   OPEN (unit=9, FILE=TRIM(dispersion % path)//"OutputData/Energies.dat", FORM="FORMATTED", ACTION="WRITE")
-  WRITE (9, '(A)') "#N kx[1/a] ky[1/a] Energy[meV] P(yz) P(zx) P(xy) P(lat1) P(lat2) ... P(latN) P(s_up) P(s_down) P(electron) P(hole)"
+  WRITE (9, '(A)') "#N kx[1/a] ky[1/a] Energy[meV] P(yz) P(zx) P(xy) P(lat1) P(lat2) ... P(latN) P(s_up) P(sigma_x) P(sigma_y) P(sigma_z) P(electron) P(hole)"
 
   DO band = 1, sc_input % discretization % SUBBANDS
     WRITE (log_string, *) "Band: ", band
@@ -421,13 +409,18 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
     Hamiltonian_const_band = Hamiltonian_const
     CALL COMPUTE_SUBBAND_POTENTIAL(Hamiltonian_const_band, band, sc_input % physical % subband_params % Subband_energies, sc_input % discretization)
 
-    !$omp parallel private(kx, ky, Hamiltonian)
-    !$omp do
-    DO i = -kx_steps, kx_steps
-      DO j = -ky_steps, ky_steps
-        kx = i * dkx !* (2. * PI * 2./3.)
-        ky = j * dky !* (2. * PI * 2./3.)
-        IF (is_inside_polygon(brillouinZoneVertices, 6, kx, ky)) THEN
+    !$omp parallel do collapse(3) schedule(dynamic, 1) private(phi_k, r_k, r_max, dr, kx, ky, n_triangle, j_phi, i_r, orb, n, Energies, Hamiltonian)
+    DO n_triangle = -N_BZ_SECTIONS / 2, N_BZ_SECTIONS / 2 - 1
+      DO j_phi = 0, dispersion % Nphi_points - 1
+        DO i_r = 0, dispersion % Nr_points
+          phi_k = n_triangle * (PI / 3.0d0) + j_phi * sc_input % discretization % derived % dphi_k
+          r_max = r_max_phi(MOD(ABS(phi_k), PI / 3))
+          dr = r_max / dispersion % Nr_points
+          r_k = i_r * dr
+
+          !Transform from graphene reciprocal lattice to kx and ky
+          kx = r_k * COS(phi_k)
+          ky = r_k * SIN(phi_k)
 
           Hamiltonian(:, :) = DCMPLX(0., 0.)
           CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
@@ -440,33 +433,18 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
           CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM) !This is not needed, since ZHEEV takes only upper triangle
           Hamiltonian = sc_multiplier * (Hamiltonian_const_band + Hamiltonian) !Should by multiplied by 0.5 if in Nambu space
 
-          !CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:DIM_POSITIVE_K,:DIM_POSITIVE_K), Energies(i,j,:), U_transformation(:,:), DIM_POSITIVE_K)
-          !Probability(i,j,:,:) = ABS(U_transformation)**2
+          CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:hamiltonian_dim, :hamiltonian_dim), Energies(:), hamiltonian_dim)
 
-          CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:hamiltonian_dim, :hamiltonian_dim), Energies(i, j, :), hamiltonian_dim)
-          Probability(i, j, :, :) = ABS(Hamiltonian(:hamiltonian_dim, :hamiltonian_dim))**2
-        END IF
-      END DO
-    END DO
-    !$omp end do
-    !$omp end parallel
-
-    DO l = 1, hamiltonian_dim
-      DO i = -kx_steps, kx_steps
-        DO j = -ky_steps, ky_steps
-          kx = i * dkx !* (2. * PI * 2./3.)
-          ky = j * dky !* (2. * PI * 2./3.)
-          IF (is_inside_polygon(brillouinZoneVertices, 6, kx, ky)) THEN
-
-            !Calculate specific contributions
+          !Calculate contributions
+          DO l = 1, hamiltonian_dim
             !Distinguishing orbital contributions
             yz_contribution = 0.
             zx_contribution = 0.
             xy_contribution = 0.
             DO n = 1, hamiltonian_dim, sc_input % discretization % ORBITALS
-              yz_contribution = yz_contribution + Probability(i, j, n, l)
-              zx_contribution = zx_contribution + Probability(i, j, n + 1, l)
-              xy_contribution = xy_contribution + Probability(i, j, n + 2, l)
+              yz_contribution = yz_contribution + ABS(Hamiltonian(n, l))**2
+              zx_contribution = zx_contribution + ABS(Hamiltonian(n + 1, l))**2
+              xy_contribution = xy_contribution + ABS(Hamiltonian(n + 2, l))**2
             END DO
 
             !Distinguishing lattice contributions
@@ -477,24 +455,43 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
               DO spin = 0, 1
                 DO n = 1, sc_input % discretization % ORBITALS
                   Lat_contributions(m + 1) = Lat_contributions(m + 1) + &
-                  & Probability(i, j, spin * sc_input % discretization % derived % TBA_DIM + m * sc_input % discretization % ORBITALS + n, l)
+                  & ABS(Hamiltonian(spin * sc_input % discretization % derived % TBA_DIM + m * sc_input % discretization % ORBITALS + n, l))**2
                   IF (dispersion % include_sc) THEN
                     Lat_contributions(m + 1) = Lat_contributions(m + 1) + &
-                    & Probability(i, j, sc_input % discretization % derived % DIM_POSITIVE_K + spin * sc_input % discretization % derived % TBA_DIM + m * sc_input % discretization % ORBITALS + n, l)
+                    & ABS(Hamiltonian(sc_input % discretization % derived % DIM_POSITIVE_K + spin * sc_input % discretization % derived % TBA_DIM + m * sc_input % discretization % ORBITALS + n, l))**2
                   END IF
                 END DO
               END DO
             END DO
 
             !Distinguishing spin contributions
-            spin_up_contribution = 0.
-            spin_down_contribution = 0.
+            spin_x_contribution = 0.
+            spin_y_contribution = 0.
+            spin_z_contribution = 0.
             DO n = 1, sc_input % discretization % derived % TBA_DIM
-              spin_up_contribution = spin_up_contribution + Probability(i, j, n, l)
-              spin_down_contribution = spin_down_contribution + Probability(i, j, sc_input % discretization % derived % TBA_DIM + n, l)
+              s_up_idx = n
+              s_down_idx = n + sc_input % discretization % derived % TBA_DIM
+              !sigma_x
+              spin_x_contribution = spin_x_contribution + CONJG(Hamiltonian(s_up_idx, l)) * Hamiltonian(s_down_idx, l)
+              spin_x_contribution = spin_x_contribution + CONJG(Hamiltonian(s_down_idx, l)) * Hamiltonian(s_up_idx, l)
+              !sigma_y
+              spin_y_contribution = spin_y_contribution - imag * CONJG(Hamiltonian(s_up_idx, l)) * Hamiltonian(s_down_idx, l)
+              spin_y_contribution = spin_y_contribution + imag * CONJG(Hamiltonian(s_down_idx, l)) * Hamiltonian(s_up_idx, l)
+              !sigma_z
+              spin_z_contribution = spin_z_contribution + ABS(Hamiltonian(s_up_idx, l))**2 !Spin up
+              spin_z_contribution = spin_z_contribution - ABS(Hamiltonian(s_down_idx, l))**2 !Spin down
               IF (dispersion % include_sc) THEN
-                spin_up_contribution = spin_up_contribution + Probability(i, j, sc_input % discretization % derived % DIM_POSITIVE_K + n, l)
-                spin_down_contribution = spin_down_contribution + Probability(i, j, sc_input % discretization % derived % DIM_POSITIVE_K + sc_input % discretization % derived % TBA_DIM + n, l)
+                s_up_idx = n + sc_input % discretization % derived % DIM_POSITIVE_K
+                s_down_idx = n + sc_input % discretization % derived % TBA_DIM + sc_input % discretization % derived % DIM_POSITIVE_K
+                !sigma_x
+                spin_x_contribution = spin_x_contribution + CONJG(Hamiltonian(s_up_idx, l)) * Hamiltonian(s_down_idx, l)
+                spin_x_contribution = spin_x_contribution + CONJG(Hamiltonian(s_down_idx, l)) * Hamiltonian(s_up_idx, l)
+                !sigma_y
+                spin_y_contribution = spin_y_contribution - imag * CONJG(Hamiltonian(s_up_idx, l)) * Hamiltonian(s_down_idx, l)
+                spin_y_contribution = spin_y_contribution + imag * CONJG(Hamiltonian(s_down_idx, l)) * Hamiltonian(s_up_idx, l)
+                !sigma_z
+                spin_z_contribution = spin_z_contribution + ABS(Hamiltonian(s_up_idx, l))**2 !Spin up
+                spin_z_contribution = spin_z_contribution - ABS(Hamiltonian(s_down_idx, l))**2 !Spin down
               END IF
             END DO
 
@@ -502,32 +499,30 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
             hole_contribution = 0.
             IF (dispersion % include_sc) THEN
               DO n = 1, sc_input % discretization % derived % DIM_POSITIVE_K
-                electron_contribution = electron_contribution + Probability(i, j, n, l)
-                hole_contribution = hole_contribution + Probability(i, j, sc_input % discretization % derived % DIM_POSITIVE_K + n, l)
+                electron_contribution = electron_contribution + ABS(Hamiltonian(n, l))**2
+                hole_contribution = hole_contribution + ABS(Hamiltonian(sc_input % discretization % derived % DIM_POSITIVE_K + n, l))**2
               END DO
             ELSE
               electron_contribution = 1.
               hole_contribution = 0.
             END IF
 
-            WRITE (9, output_format) band * hamiltonian_dim + l, kx, ky, Energies(i, j, l) / meV2au, &
+            WRITE (9, output_format) (band - 1) * hamiltonian_dim + l, kx, ky, Energies(l) / meV2au, &
             & yz_contribution, zx_contribution, xy_contribution, &
             & (Lat_contributions(lat), lat=1, sc_input % discretization % SUBLATTICES), &
-            & spin_up_contribution, spin_down_contribution, &
+            & spin_x_contribution, spin_y_contribution, spin_z_contribution, &
             & electron_contribution, hole_contribution
-          END IF
+          END DO
+
         END DO
       END DO
-      ! WRITE(9,*)
-      ! WRITE(9,*)
     END DO
-  END DO !End of iteration over subbands
+    !$omp end parallel do
+  END DO
   CLOSE (9)
 
   DEALLOCATE (Hamiltonian)
   DEALLOCATE (Hamiltonian_const)
-  DEALLOCATE (U_transformation)
-  DEALLOCATE (Probability)
   DEALLOCATE (Energies)
   DEALLOCATE (Gamma_SC)
   DEALLOCATE (Charge_dens)
@@ -1163,7 +1158,7 @@ SUBROUTINE CALCULATE_PROJECTIONS(projections)
   !$omp parallel do collapse(3) schedule(dynamic, 1) private(phi_k, r_k, r_max, dr, kx, ky, Kappa_nearest, Kappa_next, C_l, Gamma_nearest_orb, Gamma_next_orb, n_triangle, j_phi, i_r, orb, n, Active_orbital)
   DO n_triangle = -N_BZ_SECTIONS / 2, N_BZ_SECTIONS / 2 - 1
     DO j_phi = 0, projections % Nphi_points - 1
-      DO i_r = 0, projections % Nr_points - 1
+      DO i_r = 0, projections % Nr_points
         !Must stuck everhing here to provide pure loops for collapse(3)
         phi_k = n_triangle * (PI / 3.0d0) + j_phi * sc_input % discretization % derived % dphi_k
         r_max = r_max_phi(MOD(ABS(phi_k), PI / 3))
