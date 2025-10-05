@@ -267,12 +267,19 @@ def runMockedOutputPostprocessing():
             machine="default",
         )
 
+def getJTensor():
+    runner = Runner()
+    jCouplings = {("S", "S"): 350.0 * 2,}
+    nmlInput = runner.createJTensorTable(jCouplings)
+    print(nmlInput)
+
 def main():
     #runTemperatureDependence()
     #configureAndRunSc()
     #configureAndRunPostprocessing()
     #runDosFitting()
     #runMockedOutputPostprocessing()
+    getJTensor()
 
 if __name__ == "__main__":
     main()

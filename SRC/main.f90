@@ -121,21 +121,19 @@ Energies = 0.
 Delta_local = DCMPLX(0., 0.)
 Delta_new = DCMPLX(0., 0.)
 
-ASSOCIATE (sc => sc_input % self_consistency)
+ASSOCIATE (sc => sc_input % self_consistency, &
+          & sb => sc_input % physical % subband_params)
   IF (sc % read_gamma_from_file) THEN
     LOG_INFO("Reading gamma from file: "//TRIM(sc % path_to_gamma_start))
     CALL GET_GAMMA_SC(Gamma_SC, TRIM(sc % path_to_gamma_start), sc_input % discretization)
   ELSE
-    Gamma_SC = DCMPLX(0., 0.)
-    !Breaking spin up-down down-up symmetry
-    !coupling for nearest-neighbours
-    !TODO: Think about this initial condition. Should it be hardcoded or always specified in input.nml?
-    !This shall not assume any symmetry, only total fermionic antisymmetry has to be taken into account.
-    Gamma_SC(:, :N_NEIGHBOURS, 1, 2, :, :) = DCMPLX(sc % gamma_start, 0.)
-    Gamma_SC(:, :N_NEIGHBOURS, 2, 1, :, :) = DCMPLX(-sc % gamma_start, 0.)
-    !coupling for next nearest neighbours
-    Gamma_SC(:, (N_NEIGHBOURS + 1):, 1, 2, :, :) = DCMPLX(sc % gamma_nnn_start, 0.)
-    Gamma_SC(:, (N_NEIGHBOURS + 1):, 2, 1, :, :) = DCMPLX(-sc % gamma_nnn_start, 0.)
+    LOG_INFO("Initializing Gamma_SC")
+    CALL SET_GAMMA_INITIAL(Gamma_SC, &
+                          & sb % J_SC_tensor, &
+                          & sb % J_SC_NNN_tensor, &
+                          & sc % gamma_start, &
+                          & sc % gamma_nnn_start, &
+                          & sc_input % discretization)
   END IF
 
   Gamma_SC_new = DCMPLX(0., 0.)

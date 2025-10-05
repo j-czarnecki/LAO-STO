@@ -38,13 +38,6 @@ CONTAINS
 SUBROUTINE CALCULATE_DOS(dos_params)
   TYPE(post_dos_t), INTENT(IN) :: dos_params
 
-  !DOS calculation
-  ! REAL*8, INTENT(IN) :: E_DOS_min, E_DOS_max, dE0
-  ! REAL*8, INTENT(IN) :: zeta_DOS
-  ! INTEGER*4, INTENT(IN) :: Nk_points, N_refs
-  ! LOGICAL, INTENT(IN) :: include_sc
-  ! CHARACTER(LEN=*), INTENT(IN) :: inputPath
-
   TYPE(sc_input_params_t) :: sc_input
 
   REAL*8 :: E0

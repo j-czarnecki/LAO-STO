@@ -28,8 +28,71 @@ USE parameters
 USE reader
 USE logger
 USE types
+USE writers
 IMPLICIT NONE
 CONTAINS
+
+SUBROUTINE SET_GAMMA_INITIAL(Gamma_SC, J_nearest_tensor, J_next_tensor, gamma_start_nearest, gamma_start_next, discretization)
+  !! This subroutine sets initial values of superconducting couplings
+  !! based on the energy tensors i.e. sets values relevant to the non-zero elements of tensors
+  !! to gamma_start_nearest(next) and others to zero.
+  !! TODO: This should eventually enable all possible pairing and randomize the initial condition.
+  !! This way, it could be run several times to find the lowest-energy solution.
+  IMPLICIT NONE
+  TYPE(discretization_t), INTENT(IN) :: discretization !! Discretization parameters used in calculations
+  REAL*8, INTENT(IN) :: J_nearest_tensor(SPINS, SPINS, SPINS, SPINS) !! Interaction energy between different spins for nearest neighbours
+  REAL*8, INTENT(IN) :: J_next_tensor(SPINS, SPINS, SPINS, SPINS) !! Interaction energy between different spins for next neighbours
+  REAL*8, INTENT(IN) :: gamma_start_nearest, gamma_start_next !! Starting value of superconducting coupling for nearest neighbours and next neighbours
+  COMPLEX*16, INTENT(OUT) :: Gamma_SC(discretization % ORBITALS, &
+                                     & N_ALL_NEIGHBOURS, &
+                                     & SPINS, &
+                                     & SPINS, &
+                                     & discretization % derived % LAYER_COUPLINGS, &
+                                     & discretization % SUBBANDS)
+
+  INTEGER*4 :: spin1, spin2, spin3, spin4
+  LOGICAL :: set_to_nonzero_nearest, set_to_nonzero_next
+  REAL*8 :: eps = 1e-9 !! To compare reals
+
+  Gamma_SC = DCMPLX(0.0, 0.0)
+
+  DO spin1 = 1, SPINS
+    DO spin2 = 1, SPINS
+
+      set_to_nonzero_nearest = .FALSE.
+      set_to_nonzero_next = .FALSE.
+
+      DO spin3 = 1, SPINS
+        DO spin4 = 1, SPINS
+          IF (ABS(J_nearest_tensor(spin1, spin2, spin3, spin4)) .GT. eps) set_to_nonzero_nearest = .TRUE.
+          IF (ABS(J_next_tensor(spin1, spin2, spin3, spin4)) .GT. eps) set_to_nonzero_next = .TRUE.
+        END DO
+      END DO
+
+      ! Set initial values if we allow certain pairing by energy tensor
+      IF (set_to_nonzero_nearest) THEN
+        !If opposite spin coupling has been set, then assume spin-singlet and set to minus
+        IF (ABS(Gamma_SC(1, 1, spin2, spin1, 1, 1)) .GT. eps) THEN
+          Gamma_SC(:, :N_NEIGHBOURS, spin1, spin2, :, :) = -Gamma_SC(1, 1, spin2, spin1, 1, 1)
+        ELSE
+          Gamma_SC(:, :N_NEIGHBOURS, spin1, spin2, :, :) = gamma_start_nearest
+        END IF
+      END IF
+      IF (set_to_nonzero_next) THEN
+        IF (ABS(Gamma_SC(1, 4, spin2, spin1, 1, 1)) .GT. eps) THEN
+          Gamma_SC(:, (N_NEIGHBOURS + 1):, spin1, spin2, :, :) = -Gamma_SC(1, 4, spin2, spin1, 1, 1)
+        ELSE
+          Gamma_SC(:, (N_NEIGHBOURS + 1):, spin1, spin2, :, :) = gamma_start_next
+        END IF
+      END IF
+
+    END DO
+  END DO
+
+  !Printing initial values
+  CALL PRINT_GAMMA(Gamma_SC, "Gamma_SC_initial", discretization)
+
+END SUBROUTINE SET_GAMMA_INITIAL
 
 SUBROUTINE GET_GAMMAS_FROM_DELTAS(Gamma_SC, Delta, discretization, nearest_interorb_multiplier, next_interorb_multiplier)
   IMPLICIT NONE

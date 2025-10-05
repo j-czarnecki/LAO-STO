@@ -236,6 +236,8 @@ $(OBJ_DIR)/postprocessing.o: 	$(OBJ_DIR)/hamiltonians.o \
 
 $(OBJ_DIR)/self_consistency.o: $(OBJ_DIR)/parameters.o \
 															 $(OBJ_DIR)/reader.o \
-															 $(OBJ_DIR)/logger.o
+															 $(OBJ_DIR)/logger.o \
+															 $(OBJ_DIR)/types.o \
+															 $(OBJ_DIR)/writers.o
 
 $(OBJ_DIR)/logger.o:
