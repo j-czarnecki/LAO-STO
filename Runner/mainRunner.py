@@ -143,59 +143,37 @@ def configureAndRunSc():
     #Fermi energy
     nml_name = "physical_params"
     param_name = "E_Fermi"
-    Ef_min = -0.06e3
-    Ef_max = 0.0e3
-    Ef_steps = 2
+    Ef_min = 0.00e3
+    Ef_max = 0.15e3
+    Ef_steps = 50
     dE = abs(Ef_max - Ef_min) / Ef_steps
     Fermi_table = [(nml_name, param_name, Ef_min + i * dE) for i in range(Ef_steps + 1)]
     #Fermi_table = [(nml_name, param_name, -0.06e3)]
 
-    #B_field
+    # J_SC
     nml_name = "physical_params"
-    param_name = "b_magnitude"
-    B_min = 3
-    B_max = 9
-    B_steps = 2
-    dB = abs(B_max - B_min) / B_steps
-    B_table = [(nml_name, param_name, B_min + i * dB) for i in range(B_steps + 1)]
-    #B_table = [(nml_name, param_name, 6)]
-
-    #Phi
-    param_name = "b_phi"
-    phi_min = 180
-    phi_max = 360
-    phi_steps = 36
-    dphi = abs(phi_max - phi_min) / phi_steps
-    phi_table = [(nml_name, param_name, phi_min + i * dphi) for i in range(phi_steps + 1)]
-
-    jNearest = {("S", "S"): -350.0 * 2,}
-    inputJNearest = runner.createJTensorTable(jNearest)
-    print(inputJNearest)
-
+    param_name = "J_SC_tensor"
+    J_SC_val = [0.0, 0.0, 0.0, 0.0, 0.0, 170, 0.0, 0.0, 0.0, 0.0, 170.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    J_SC = (nml_name, param_name, J_SC_val)
 
     #for phi in phi_table:
     for Ef in Fermi_table:
-        for B in B_table:
-            if int(B[2]) == 6 and int(Ef[2]) == -60:
-                    continue
-            for phi in phi_table:
-                runner.runSlurmParamValue(
-                    paramValuePairs=[
-                        Ef,
-                        B,
-                        phi,
-                        #U_nml,
-                        #V_nml
-                        #J_NNN
-                        #V_layer_param,
-                        #Sublat_param,
-                        #Subband_param,
-                        #Subband_energies_param,
-                    ],
-                    runsDir="KTO-SC/KTO-B_planar_J_SC_NNN",
-                    material="KTO",
-                    machine="default",
-                )
+        runner.runSlurmParamValue(
+            paramValuePairs=[
+                Ef,
+                J_SC,
+                #U_nml,
+                #V_nml
+                #J_NNN
+                #V_layer_param,
+                #Sublat_param,
+                #Subband_param,
+                #Subband_energies_param,
+            ],
+            runsDir="STO-SC/STO-E_Fermi_J_SC",
+            material="STO",
+            machine="helios",
+        )
 
 
 def runDosFitting():
@@ -275,11 +253,11 @@ def getJTensor():
 
 def main():
     #runTemperatureDependence()
-    #configureAndRunSc()
+    configureAndRunSc()
     #configureAndRunPostprocessing()
     #runDosFitting()
     #runMockedOutputPostprocessing()
-    getJTensor()
+    #getJTensor()
 
 if __name__ == "__main__":
     main()

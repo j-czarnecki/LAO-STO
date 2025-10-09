@@ -35,13 +35,14 @@ READ_OLD_FLAG = -DREAD_NO_BAND
 endif
 
 # the command shell
-SHELL = /bin/sh
+SHELL = /bin/bash
 F90 = ifx
 CC = gcc
 CXX = g++
 
 LIB_OPENMP = -qopenmp -qmkl
 F90FLAGS = -Ofast -ipo -g -fpp -ipo -I$(SRC_DIR)/input_output $(LIB_OPENMP) -module $(MOD_DIR) $(READ_OLD_FLAG) -diag-disable 5268,7025 -stand f2018
+F90FLAGS_HELIOS = -Ofast -ipo -g -fpp -ipo -I$(SRC_DIR)/input_output $(LIB_OPENMP) -module $(MOD_DIR) $(READ_OLD_FLAG)
 F90_DEBUG_FLAGS = -O0 -g -fpp -I$(SRC_DIR)/input_output -DDEBUG -module $(MOD_DIR) -debug all -fpe0 -fstack-protector -traceback -check all -ftrapuv -heap-arrays $(LIB_OPENMP) $(READ_OLD_FLAG)
 LIBS = -llapack -lblas
 LIBS_MKL = -I${MKLROOT}/include \
@@ -90,6 +91,17 @@ all: $(TARGET)
 
 ares_all: LIBS = -lscalapack -lflexiblas
 ares_all: $(TARGET)
+
+#Rememebr to load
+#module load GCC/13.2.0 OpenMPI/5.0.3 FlexiBLAS/3.3.1 ScaLAPACK/2.2.0-fb gimkl/2023b
+#before compilation
+helios_all: LIBS = -lscalapack -lflexiblas
+helios_all: F90FLAGS = $(F90FLAGS_HELIOS)
+helios_all: $(TARGET)
+
+helios_post: LIBS = -lscalapack -lflexiblas
+helios_post: F90FLAGS = $(F90FLAGS_HELIOS)
+helios_post: $(POSTPROCESSING_TARGET)
 
 ares_post: LIBS = -lscalapack -lflexiblas
 ares_post: $(POSTPROCESSING_TARGET)

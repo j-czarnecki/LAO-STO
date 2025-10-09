@@ -59,7 +59,6 @@ class Runner(RunnerConfig):
         for pair in paramValuePairs:
             nml[pair[0]][pair[1]] = pair[2]  # editing all key-value pairs
 
-        self.__setDerivedValues(nml)
 
         with open("input.nml", "w") as nmlFile:
             f90nml.write(nml, nmlFile, sort=False)
@@ -145,7 +144,7 @@ class Runner(RunnerConfig):
         with open("job.sh", "w") as jobFile:
             print(self.jobHeader[machine], file=jobFile)
 
-            print(f"cd {os.path.join(HOME_PATH, "LAO-STO")}", file=jobFile)
+            print(f"cd {os.path.join(HOME_PATH, 'LAO-STO')}", file=jobFile)
             print(f"python3 -m Fitter.mainFitter --config {os.path.join(fitConfig['runsDir'], 'fitConfig.yaml')}", file=jobFile)
 
         # queue slurm job
@@ -174,8 +173,6 @@ class Runner(RunnerConfig):
 
         for pair in paramValuePairs:
             nml[pair[0]][pair[1]] = pair[2]  # editing all key-value pairs
-
-        self.__setDerivedValues(nml)
 
         # Save input.nml
         with open("input.nml", "w") as nmlFile:
@@ -273,25 +270,6 @@ class Runner(RunnerConfig):
 
         return path
 
-
-    def __setDerivedValues(self, nml: f90nml.Namelist):
-        """
-        This method sets all values derived from other namelist parameters
-        """
-        # Setting inter-orbital pairing
-        nml["physical_params"]["J_SC_PRIME"] = (
-            nml["physical_params"]["J_SC"] / 10.0
-        )  # No need to specify J_SC_PRIME
-        nml["physical_params"]["J_SC_PRIME_NNN"] = (
-            nml["physical_params"]["J_SC_NNN"] / 10.0
-        )  # No need to specify J_SC_PRIME_NNN
-
-        # Setting appropriate starting values
-        if nml["physical_params"]["J_SC"] == 0.0:
-            nml["self_consistency"]["gamma_start"] = 0.0
-        if nml["physical_params"]["J_SC_NNN"] == 0.0:
-            nml["self_consistency"]["gamma_nnn_start"] = 0.0
-
     def __getMaterialNml(self, material: str) -> f90nml.Namelist:
         """
         Returns a namelist for self-consistent calculation that appropriate for a given material
@@ -313,8 +291,6 @@ class Runner(RunnerConfig):
 
         for pair in paramValuePairs:
             nml[pair[0]][pair[1]] = pair[2]  # editing all key-value pairs
-
-        self.__setDerivedValues(nml)
 
         with open("input.nml", "w") as nmlFile:
             f90nml.write(nml, nmlFile, sort=False)

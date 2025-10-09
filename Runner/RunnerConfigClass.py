@@ -75,13 +75,13 @@ class RunnerConfig:
                 ## Number of allocated nodes
                 #SBATCH -N 1
                 ## Number of tasks per node (by default this corresponds to the number of cores allocated per node)
-                #SBATCH --ntasks-per-node=48
+                #SBATCH --ntasks-per-node=24
                 ## Memory allocated per core (default is 5GB), comment if mem for whole job should be taken
                 ##SBATCH --mem-per-cpu=3800MB
                 ## Memory allocated for whole job, comment if mem-per-cpu should be taken
                 #SBATCH --mem=16GB
                 ## Max task execution time (format is HH:MM:SS)
-                #SBATCH --time=72:00:00
+                #SBATCH --time=24:00:00
                 ## Name of grant to which resource usage will be charged
                 #SBATCH -A plgktosto111-cpu
                 ## Name of partition

@@ -28,6 +28,7 @@ import sys
 import fortranformat as ff
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '/home', 'czarnecki', 'LAO-STO', 'Analyzer')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '/net', 'home', 'plgrid', 'plgjczarnecki', 'LAO-STO', 'Analyzer')))
 
 from Projectors.Projectors import *
 
