@@ -14,7 +14,8 @@
     enable_dispersion_relation_calc = .TRUE.,
     path_to_run_dir_dispersion_relation = "/home/czarnecki/LAO-STO/",
     include_sc_in_dispersion = .FALSE.,
-    Nk_points_dispersion_relation = 500 /
+    Nr_points_dispersion = 200,
+    Nphi_points_dispersion = 200 /
 
 &dos_calculation
     enable_dos_calc = .FALSE.,

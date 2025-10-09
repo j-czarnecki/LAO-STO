@@ -22,6 +22,7 @@
 !! https://arxiv.org/abs/2508.05075
 
 MODULE writers
+use, intrinsic :: iso_fortran_env, only: real64, int8, int16, int32, int64
 USE parameters
 USE reader
 USe types
@@ -29,11 +30,11 @@ IMPLICIT NONE
 CONTAINS
 
 SUBROUTINE PRINT_HAMILTONIAN(Hamiltonian, N, name)
-  INTEGER*4, INTENT(IN) :: N
-  COMPLEX*16, INTENT(IN) :: Hamiltonian(N, N)
+  INTEGER(INT32), INTENT(IN) :: N
+  COMPLEX(REAL64), INTENT(IN) :: Hamiltonian(N, N)
   CHARACTER(LEN=*), INTENT(IN) :: name
   CHARACTER(LEN=20) :: output_format
-  INTEGER*4 :: i
+  INTEGER(INT32) :: i
 
   WRITE (output_format, '(A, I0, A)') '(', N, 'E15.5)'
   output_format = TRIM(output_format)
@@ -50,15 +51,15 @@ SUBROUTINE PRINT_HAMILTONIAN(Hamiltonian, N, name)
 END SUBROUTINE PRINT_HAMILTONIAN
 
 SUBROUTINE PRINT_ENERGIES(Energies, k1_steps, k2_steps, dk1, dk2, filename, N)
-  INTEGER*4, INTENT(IN) :: N
-  REAL*8, INTENT(IN) :: Energies(0:k1_steps, 0:k2_steps, N)
-  REAL*8, INTENT(IN) :: dk1, dk2
-  INTEGER*4, INTENT(IN) :: k1_steps, k2_steps
-  REAL*8 :: k1, k2, kx, ky
+  INTEGER(INT32), INTENT(IN) :: N
+  INTEGER(INT32), INTENT(IN) :: k1_steps, k2_steps
+  REAL(REAL64), INTENT(IN) :: Energies(0:k1_steps, 0:k2_steps, N)
+  REAL(REAL64), INTENT(IN) :: dk1, dk2
+  REAL(REAL64) :: k1, k2, kx, ky
 
   CHARACTER(LEN=*), INTENT(IN) :: filename
   CHARACTER(LEN=20) :: output_format
-  INTEGER*4 :: i, j, l
+  INTEGER(INT32) :: i, j, l
 
   output_format = '(I5, 3E15.5)'
 
@@ -84,7 +85,7 @@ END SUBROUTINE
 
 SUBROUTINE PRINT_GAMMA(Gamma_SC, filename, discretization)
   TYPE(discretization_t), INTENT(IN) :: discretization
-  COMPLEX*16, INTENT(IN) :: Gamma_SC(discretization % ORBITALS, &
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_SC(discretization % ORBITALS, &
                                     & N_ALL_NEIGHBOURS, &
                                     & SPINS, &
                                     & SPINS, &
@@ -93,7 +94,7 @@ SUBROUTINE PRINT_GAMMA(Gamma_SC, filename, discretization)
   CHARACTER(LEN=*), INTENT(IN) :: filename
   CHARACTER(LEN=20) :: output_format
 
-  INTEGER*4 :: orb, j, spin1, spin2, lat, band
+  INTEGER(INT32) :: orb, j, spin1, spin2, lat, band
   output_format = '(6I5, 2E15.5)'
 
   !Printing SC gammas in [meV]
@@ -133,11 +134,11 @@ END SUBROUTINE PRINT_GAMMA
 
 SUBROUTINE PRINT_CHARGE(Charge_dens, filename, discretization)
   TYPE(discretization_t), INTENT(IN) :: discretization
-  REAL*8, INTENT(IN) :: Charge_dens(discretization % derived % DIM_POSITIVE_K, &
+  REAL(REAL64), INTENT(IN) :: Charge_dens(discretization % derived % DIM_POSITIVE_K, &
                                    & discretization % SUBBANDS)
   CHARACTER(LEN=*), INTENT(IN) :: filename
   CHARACTER(LEN=20) :: output_format
-  INTEGER*4 :: spin, lat, orb, n, band
+  INTEGER(INT32) :: spin, lat, orb, n, band
 
   output_format = '(4I5, 1E15.5)'
   OPEN (unit=9, FILE="./OutputData/"//filename//".dat", FORM="FORMATTED", ACTION="WRITE")

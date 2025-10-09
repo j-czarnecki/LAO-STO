@@ -22,12 +22,13 @@
 !! https://arxiv.org/abs/2508.05075
 
 MODULE logger
+use, intrinsic :: iso_fortran_env, only: real64, int8, int16, int32, int64
 USE omp_lib
 IMPLICIT NONE
 SAVE
-INTEGER*4, PRIVATE, PARAMETER :: LOGGER_UNIT = 66
-INTEGER*4, PRIVATE, PARAMETER :: MAX_LOG_LEN = 2000
-REAL*8, PRIVATE :: T_START, T_END
+INTEGER(INT32), PRIVATE, PARAMETER :: LOGGER_UNIT = 66
+INTEGER(INT32), PRIVATE, PARAMETER :: MAX_LOG_LEN = 2000
+REAL(REAL64), PRIVATE :: T_START, T_END
 CHARACTER(LEN=MAX_LOG_LEN) :: log_string
 !$omp threadprivate(log_string)
 
@@ -35,7 +36,7 @@ CONTAINS
 
 RECURSIVE SUBROUTINE INIT_LOGGER(filename)
   CHARACTER(LEN=*), INTENT(IN) :: filename
-  INTEGER*4 :: i
+  INTEGER(INT32) :: i
   CHARACTER(LEN=120) :: license_lines(21)
   license_lines(1) = 'Copyright (C) 2025 Julian Czarnecki'//REPEAT(' ', 120 - 35)
   license_lines(2) = REPEAT(' ', 120)
@@ -82,7 +83,7 @@ END SUBROUTINE
 
 RECURSIVE SUBROUTINE LOG_STRING_DEBUG(logMsg)
   CHARACTER(LEN=*), INTENT(IN) :: logMsg
-  INTEGER*4 :: Values(8)
+  INTEGER(INT32) :: Values(8)
   CALL DATE_AND_TIME(VALUES=Values)
   !Add time printing
   WRITE (LOGGER_UNIT, '(7(I0, a), a, I0, a, a)') Values(1), '-', Values(2), '-', Values(3), ' ', Values(5), ':', Values(6), ':', Values(7), '.', Values(8), ' ',&
@@ -93,7 +94,7 @@ END SUBROUTINE
 
 RECURSIVE SUBROUTINE LOG_STRING_INFO(logMsg)
   CHARACTER(LEN=*), INTENT(IN) :: logMsg
-  INTEGER*4 :: Values(8)
+  INTEGER(INT32) :: Values(8)
 
   CALL DATE_AND_TIME(VALUES=Values)
   !Add time printing
@@ -105,7 +106,7 @@ END SUBROUTINE
 
 RECURSIVE SUBROUTINE LOG_STRING_ABNORMAL(logMsg)
   CHARACTER(LEN=*), INTENT(IN) :: logMsg
-  INTEGER*4 :: Values(8)
+  INTEGER(INT32) :: Values(8)
 
   CALL DATE_AND_TIME(VALUES=Values)
   !Add time printing
@@ -118,7 +119,7 @@ END SUBROUTINE
 
 RECURSIVE SUBROUTINE LOG_STRING_ERROR(logMsg)
   CHARACTER(LEN=*), INTENT(IN) :: logMsg
-  INTEGER*4 :: Values(8)
+  INTEGER(INT32) :: Values(8)
 
   CALL DATE_AND_TIME(VALUES=Values)
   !Add time printing

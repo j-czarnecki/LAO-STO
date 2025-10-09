@@ -23,6 +23,7 @@
 
 #include "macros_def.f90"
 PROGRAM main_postprocessing
+use, intrinsic :: iso_fortran_env, only: real64, int8, int16, int32, int64
 USE hamiltonians
 USE parameters
 USE utilities

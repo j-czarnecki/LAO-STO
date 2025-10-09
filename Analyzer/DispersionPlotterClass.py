@@ -239,7 +239,7 @@ class DispersionPlotter(DataReader):
         for colorKey in colorValuesDict.keys():
             fig = plt.figure(figsize=(5, 5), dpi=400)
             # Set up GridSpec (1 row, 1 column, with some spacing)
-            gs = gridspec.GridSpec(1, 1, figure=fig, left=0.3, right=0.95, top=0.95, bottom=0.25)
+            gs = gridspec.GridSpec(1, 1, figure=fig, left=0.3, right=0.8, top=0.95, bottom=0.25)
             ax = fig.add_subplot(gs[0,0])
             self.plotFirstBrillouinZoneBoundary()
             if colorKey == "orbital":
@@ -256,6 +256,7 @@ class DispersionPlotter(DataReader):
                     segments = np.concatenate([points[:-1], points[1:]], axis=1)
                     segmentColors = 0.5 * (P_sz[:-1] + P_sz[1:])
 
+                    norm = Normalize(vmin=P_sz.min(), vmax=P_sz.max())
                     lc = LineCollection(segments, linewidths=0.5, cmap="coolwarm")
                     lc.set_array(segmentColors)
                     ax.add_collection(lc)
@@ -273,6 +274,9 @@ class DispersionPlotter(DataReader):
                               headlength=4,
                               headaxislength=3,
                               zorder=2)
+                # Colorbar on top of entire figure
+                cbar = fig.colorbar(lc, ax=ax, orientation='vertical', pad=0.05, shrink=0.5)
+                cbar.ax.set_title(r"$\langle \sigma_z \rangle$", loc="left")
             else:
                 for _, group in groups:
                     kx = group["kx"].values

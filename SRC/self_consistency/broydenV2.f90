@@ -1,4 +1,5 @@
 MODULE broydenV2
+use, intrinsic :: iso_fortran_env, only: real64, int8, int16, int32
 CONTAINS
 ! Copyright (C) 2010-2016 Samuel Ponce', Roxana Margine, Carla Verdi, Feliciano Giustino
 !
@@ -26,24 +27,24 @@ SUBROUTINE mix_broyden(ndim, deltaout, deltain, alphamix, iter, n_iter, conv)
   INTEGER, INTENT(in) :: iter      !! Current iteration number
   INTEGER, INTENT(in) :: n_iter    !! Number of iterations used in the mixing
 
-  REAL*8, INTENT(in) :: alphamix    !! Mixing factor (0 < alphamix <= 1)
-  REAL*8, INTENT(inout) :: deltaout(ndim) !! output Delta at current iteration
-  REAL*8, INTENT(inout) :: deltain(ndim)  !! Delta at previous iteration
+  REAL(REAL64), INTENT(in) :: alphamix    !! Mixing factor (0 < alphamix <= 1)
+  REAL(REAL64), INTENT(inout) :: deltaout(ndim) !! output Delta at current iteration
+  REAL(REAL64), INTENT(inout) :: deltain(ndim)  !! Delta at previous iteration
 
   !   Here the local variables
   ! max number of iterations used in mixing: n_iter must be .le. maxter
-  INTEGER*4, PARAMETER :: maxter = 8
+  INTEGER(INT32), PARAMETER :: maxter = 8
   !
-  INTEGER*4 ::  n, i, j, iwork(maxter), info, iter_used, ipos, inext
+  INTEGER(INT32) ::  n, i, j, iwork(maxter), info, iter_used, ipos, inext
   ! work space containing info from previous iterations:
   ! must be kept in memory and saved between calls
-  REAL*8, ALLOCATABLE, SAVE :: df(:, :), dv(:, :)
-  REAL*8, ALLOCATABLE :: deltainsave(:)
-  REAL*8 :: beta(maxter, maxter), gammamix, work(maxter), norm
-  REAL*8, EXTERNAL :: DDOT, DNRM2
+  REAL(REAL64), ALLOCATABLE, SAVE :: df(:, :), dv(:, :)
+  REAL(REAL64), ALLOCATABLE :: deltainsave(:)
+  REAL(REAL64) :: beta(maxter, maxter), gammamix, work(maxter), norm
+  REAL(REAL64), EXTERNAL :: DDOT, DNRM2
 
   ! adjustable PARAMETERs as suggested in the original paper
-  REAL * 8 wg(maxter), wg0
+  REAL(REAL64) wg(maxter), wg0
   DATA wg0/0.01d0/, wg/maxter*1.d0/
 
   !IF ( iter .lt. 1 ) print *, 'mix_broyden','n_iter is smaller than 1'

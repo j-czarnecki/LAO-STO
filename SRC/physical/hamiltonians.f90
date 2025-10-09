@@ -22,6 +22,7 @@
 !! https://arxiv.org/abs/2508.05075
 
 MODULE hamiltonians
+use, intrinsic :: iso_fortran_env, only: real64, int8, int16, int32, int64
 USE utilities
 USE parameters
 USE reader
@@ -34,7 +35,7 @@ PURE RECURSIVE SUBROUTINE COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian, discretizatio
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
   TYPE(physical_params_t), INTENT(IN) :: physical_params
-  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM) !! Hamiltonian of the system that is to be filled
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM) !! Hamiltonian of the system that is to be filled
   CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian, physical_params % subband_params % delta_trigonal, discretization)
   CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian, physical_params % subband_params % lambda_SOC, discretization)
   CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian, physical_params % subband_params % v, discretization)
@@ -51,9 +52,9 @@ PURE RECURSIVE SUBROUTINE COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, discret
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
   TYPE(physical_params_t), INTENT(IN) :: physical_params
-  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM) !! Hamiltonian of the system that is to be filled
-  REAL*8, INTENT(INOUT) :: kx !! Wavevector in X direction
-  REAL*8, INTENT(INOUT) :: ky !! Wavevector in Y direction
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM) !! Hamiltonian of the system that is to be filled
+  REAL(REAL64), INTENT(INOUT) :: kx !! Wavevector in X direction
+  REAL(REAL64), INTENT(INOUT) :: ky !! Wavevector in Y direction
   CALL COMPUTE_TBA_TERM(Hamiltonian(:, :), kx, ky, physical_params % subband_params % t_D, physical_params % subband_params % t_I, discretization)
   CALL COMPUTE_TI1_TI2(Hamiltonian(:, :), kx, ky, physical_params % subband_params % eta_p, physical_params % subband_params % V_pdp, discretization)
   CALL COMPUTE_H_PI(Hamiltonian(:, :), kx, ky, physical_params % subband_params % eta_p, physical_params % subband_params % V_pdp, discretization)
@@ -64,11 +65,11 @@ END SUBROUTINE COMPUTE_K_DEPENDENT_TERMS
 PURE RECURSIVE SUBROUTINE COMPUTE_TBA_TERM(Hamiltonian, kx, ky, t_D, t_I, discretization)
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
-  REAL*8, INTENT(IN) :: t_D, t_I
-  REAL*8, INTENT(IN) :: kx, ky
-  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, &
+  REAL(REAL64), INTENT(IN) :: t_D, t_I
+  REAL(REAL64), INTENT(IN) :: kx, ky
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, &
                                           & discretization % derived % DIM) !Twice as big because of spin
-  INTEGER*4 :: spin, lat, row, col
+  INTEGER(INT32) :: spin, lat, row, col
   !Only specifying upper triangle of matrix, since Hamiltonian is hermitian
   DO spin = 0, SPINS - 1
     DO lat = 0, discretization % SUBLATTICES - 2
@@ -100,49 +101,104 @@ END SUBROUTINE COMPUTE_TBA_TERM
 PURE RECURSIVE SUBROUTINE COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian, lambda_SOC, discretization)
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
-  REAL*8, INTENT(IN) :: lambda_SOC
-  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
-  INTEGER*4 :: nambu, lat, row, col
-  REAL*8 :: sign
+  REAL(REAL64), INTENT(IN) :: lambda_SOC
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
+  INTEGER(INT32) :: nambu, lat, row, col, i_orb, j_orb, i_spin, j_spin
+  REAL(REAL64) :: sign
 
-  DO nambu = 0, 1
-    sign = (-1)**nambu
-    DO lat = 0, discretization % SUBLATTICES - 1
-      row = nambu * discretization % derived % DIM_POSITIVE_K + lat * discretization % ORBITALS + 1
-      col = nambu * discretization % derived % DIM_POSITIVE_K + lat * discretization % ORBITALS + 2
-      Hamiltonian(row, col) = Hamiltonian(row, col) + imag * lambda_SOC / 2.
-
-      row = nambu * discretization % derived % DIM_POSITIVE_K + discretization % derived % TBA_DIM + lat * discretization % ORBITALS + 1
-      col = nambu * discretization % derived % DIM_POSITIVE_K + discretization % derived % TBA_DIM + lat * discretization % ORBITALS + 2
-      Hamiltonian(row, col) = Hamiltonian(row, col) - imag * lambda_SOC / 2.
-
-      row = nambu * discretization % derived % DIM_POSITIVE_K + lat * discretization % ORBITALS + 1
-      col = nambu * discretization % derived % DIM_POSITIVE_K + discretization % derived % TBA_DIM + lat * discretization % ORBITALS + 3
-      Hamiltonian(row, col) = Hamiltonian(row, col) - sign * lambda_SOC / 2. !Only real elements change sign here
-
-      row = nambu * discretization % derived % DIM_POSITIVE_K + lat * discretization % ORBITALS + 2
-      col = nambu * discretization % derived % DIM_POSITIVE_K + discretization % derived % TBA_DIM + lat * discretization % ORBITALS + 3
-      Hamiltonian(row, col) = Hamiltonian(row, col) + imag * lambda_SOC / 2.
-
-      row = nambu * discretization % derived % DIM_POSITIVE_K + lat * discretization % ORBITALS + 3
-      col = nambu * discretization % derived % DIM_POSITIVE_K + discretization % derived % TBA_DIM + lat * discretization % ORBITALS + 1
-      Hamiltonian(row, col) = Hamiltonian(row, col) + sign * lambda_SOC / 2. !Only real elements change sign here
-
-      row = nambu * discretization % derived % DIM_POSITIVE_K + lat * discretization % ORBITALS + 3
-      col = nambu * discretization % derived % DIM_POSITIVE_K + discretization % derived % TBA_DIM + lat * discretization % ORBITALS + 2
-      Hamiltonian(row, col) = Hamiltonian(row, col) - imag * lambda_SOC / 2.
+  COMPLEX(REAL64), PARAMETER :: c_zero = (0.0d0, 0.0d0) ! So that compiler does not complain about type mismatch between 0 and imag
+  COMPLEX(REAL64), PARAMETER :: c_one = (1.0d0, 0.0d0)
+  COMPLEX(REAL64), PARAMETER :: L_x(3, 3) = TRANSPOSE(RESHAPE([c_zero, c_zero, imag, &
+                                                               c_zero, c_zero, imag, &
+                                                               -imag, -imag, c_zero], &
+                                                              [3, 3])) / SQRT(2.0d0)
+  COMPLEX(REAL64), PARAMETER :: L_y(3, 3) = TRANSPOSE(RESHAPE([c_zero, -2 * imag, -imag, &
+                                                               2 * imag, c_zero, imag, &
+                                                               imag, -imag, c_zero], &
+                                                              [3, 3])) / SQRT(6.0d0)
+  COMPLEX(REAL64), PARAMETER :: L_z(3, 3) = TRANSPOSE(RESHAPE([c_zero, -imag, imag, &
+                                                               imag, c_zero, -imag, &
+                                                               -imag, imag, c_zero], &
+                                                              [3, 3])) / SQRT(3.0d0)
+  COMPLEX(REAL64), PARAMETER :: Sigma_x(2, 2) = TRANSPOSE(RESHAPE([c_zero, c_one, &
+                                                                   c_one, c_zero], &
+                                                                  [2, 2]))
+  COMPLEX(REAL64), PARAMETER :: Sigma_y(2, 2) = TRANSPOSE(RESHAPE([c_zero, -imag, &
+                                                                   imag, c_zero], &
+                                                                  [2, 2]))
+  COMPLEX(REAL64), PARAMETER :: Sigma_z(2, 2) = TRANSPOSE(RESHAPE([c_one, c_zero, &
+                                                                   c_zero, -c_one], &
+                                                                  [2, 2]))
+  ! Implementing L \dot S interaction
+  !Electron part
+  DO i_spin = 1, SPINS
+    DO j_spin = 1, SPINS
+      DO lat = 0, discretization % SUBLATTICES - 1
+        DO i_orb = 1, discretization % ORBITALS
+          DO j_orb = 1, discretization % ORBITALS
+            row = (i_spin - 1) * discretization % derived % TBA_DIM + lat * discretization % ORBITALS + i_orb
+            col = (j_spin - 1) * discretization % derived % TBA_DIM + lat * discretization % ORBITALS + j_orb
+            Hamiltonian(row, col) = Hamiltonian(row, col) + 0.5 * lambda_SOC * &
+            & (L_x(i_orb, j_orb) * Sigma_x(i_spin, j_spin) + L_y(i_orb, j_orb) * Sigma_y(i_spin, j_spin) + L_z(i_orb, j_orb) * Sigma_z(i_spin, j_spin))
+          END DO
+        END DO
+      END DO
     END DO
   END DO
+  !Holes part
+  DO i_spin = 1, SPINS
+    DO j_spin = 1, SPINS
+      DO lat = 0, discretization % SUBLATTICES - 1
+        DO i_orb = 1, discretization % ORBITALS
+          DO j_orb = 1, discretization % ORBITALS
+            row = discretization % derived % DIM_POSITIVE_K + (i_spin - 1) * discretization % derived % TBA_DIM + lat * discretization % ORBITALS + i_orb
+            col = discretization % derived % DIM_POSITIVE_K + (j_spin - 1) * discretization % derived % TBA_DIM + lat * discretization % ORBITALS + j_orb
+            Hamiltonian(row, col) = Hamiltonian(row, col) - 0.5 * lambda_SOC * &
+            & CONJG(L_x(i_orb, j_orb) * Sigma_x(i_spin, j_spin) + L_y(i_orb, j_orb) * Sigma_y(i_spin, j_spin) + L_z(i_orb, j_orb) * Sigma_z(i_spin, j_spin))
+          END DO
+        END DO
+      END DO
+    END DO
+  END DO
+
+  ! DO nambu = 0, 1
+  !   sign = (-1)**nambu
+  !   DO lat = 0, discretization % SUBLATTICES - 1
+  !     row = nambu * discretization % derived % DIM_POSITIVE_K + lat * discretization % ORBITALS + 1
+  !     col = nambu * discretization % derived % DIM_POSITIVE_K + lat * discretization % ORBITALS + 2
+  !     Hamiltonian(row, col) = Hamiltonian(row, col) + imag * lambda_SOC / 2.
+
+  !     row = nambu * discretization % derived % DIM_POSITIVE_K + discretization % derived % TBA_DIM + lat * discretization % ORBITALS + 1
+  !     col = nambu * discretization % derived % DIM_POSITIVE_K + discretization % derived % TBA_DIM + lat * discretization % ORBITALS + 2
+  !     Hamiltonian(row, col) = Hamiltonian(row, col) - imag * lambda_SOC / 2.
+
+  !     row = nambu * discretization % derived % DIM_POSITIVE_K + lat * discretization % ORBITALS + 1
+  !     col = nambu * discretization % derived % DIM_POSITIVE_K + discretization % derived % TBA_DIM + lat * discretization % ORBITALS + 3
+  !     Hamiltonian(row, col) = Hamiltonian(row, col) - sign * lambda_SOC / 2. !Only real elements change sign here
+
+  !     row = nambu * discretization % derived % DIM_POSITIVE_K + lat * discretization % ORBITALS + 2
+  !     col = nambu * discretization % derived % DIM_POSITIVE_K + discretization % derived % TBA_DIM + lat * discretization % ORBITALS + 3
+  !     Hamiltonian(row, col) = Hamiltonian(row, col) + imag * lambda_SOC / 2.
+
+  !     row = nambu * discretization % derived % DIM_POSITIVE_K + lat * discretization % ORBITALS + 3
+  !     col = nambu * discretization % derived % DIM_POSITIVE_K + discretization % derived % TBA_DIM + lat * discretization % ORBITALS + 1
+  !     Hamiltonian(row, col) = Hamiltonian(row, col) + sign * lambda_SOC / 2. !Only real elements change sign here
+
+  !     row = nambu * discretization % derived % DIM_POSITIVE_K + lat * discretization % ORBITALS + 3
+  !     col = nambu * discretization % derived % DIM_POSITIVE_K + discretization % derived % TBA_DIM + lat * discretization % ORBITALS + 2
+  !     Hamiltonian(row, col) = Hamiltonian(row, col) - imag * lambda_SOC / 2.
+  !   END DO
+  ! END DO
 
 END SUBROUTINE COMPUTE_ATOMIC_SOC_TERMS
 
 PURE RECURSIVE SUBROUTINE COMPUTE_TRIGONAL_TERMS(Hamiltonian, delta_trigonal, discretization)
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
-  REAL*8, INTENT(IN) :: delta_trigonal
-  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
-  INTEGER*4 :: lat, spin, nambu, row, col
-  REAL*8 :: sign
+  REAL(REAL64), INTENT(IN) :: delta_trigonal
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
+  INTEGER(INT32) :: lat, spin, nambu, row, col
+  REAL(REAL64) :: sign
 
   DO nambu = 0, 1
     sign = (-1)**nambu
@@ -168,11 +224,11 @@ END SUBROUTINE COMPUTE_TRIGONAL_TERMS
 PURE RECURSIVE SUBROUTINE COMPUTE_ELECTRIC_FIELD(Hamiltonian, v, discretization)
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
-  REAL*8, INTENT(IN) :: v
-  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
-  INTEGER*4 :: nambu, orb, lat, spin
-  INTEGER*4 :: row
-  REAL*8 :: sign
+  REAL(REAL64), INTENT(IN) :: v
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
+  INTEGER(INT32) :: nambu, orb, lat, spin
+  INTEGER(INT32) :: row
+  REAL(REAL64) :: sign
 
   !! ATTENTION: This works only for two layers!!!!!
   DO nambu = 0, 1
@@ -187,35 +243,17 @@ PURE RECURSIVE SUBROUTINE COMPUTE_ELECTRIC_FIELD(Hamiltonian, v, discretization)
       END DO
     END DO
   END DO
-
-  ! DO i = 1, 3
-  !   !Ti1 atoms
-  !   Hamiltonian(i, i) = Hamiltonian(i, i) + v / 2.
-  !   Hamiltonian(i + TBA_DIM, i + TBA_DIM) = Hamiltonian(i + TBA_DIM, i + TBA_DIM) + v / 2.
-  !   !Ti2 atoms
-  !   Hamiltonian(i + ORBITALS, i + ORBITALS) = Hamiltonian(i + ORBITALS, i + ORBITALS) - v / 2.
-  !   Hamiltonian(i + TBA_DIM + ORBITALS, i + TBA_DIM + ORBITALS) = Hamiltonian(i + TBA_DIM + ORBITALS, i + TBA_DIM + ORBITALS) - v / 2
-
-  !   !Nambu space
-  !   !Ti1 atoms
-  !   Hamiltonian(DIM_POSITIVE_K + i, DIM_POSITIVE_K + i) = Hamiltonian(DIM_POSITIVE_K + i, DIM_POSITIVE_K + i) - v / 2.
-  !   Hamiltonian(i + TBA_DIM + DIM_POSITIVE_K, i + TBA_DIM + DIM_POSITIVE_K) = Hamiltonian(i + TBA_DIM + DIM_POSITIVE_K, i + TBA_DIM + DIM_POSITIVE_K) - v / 2.
-  !   !Ti2 atoms
-  !   Hamiltonian(i + ORBITALS + DIM_POSITIVE_K, i + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(i + ORBITALS + DIM_POSITIVE_K, i + ORBITALS + DIM_POSITIVE_K) + v / 2.
-  !   Hamiltonian(i + TBA_DIM + ORBITALS + DIM_POSITIVE_K, i + TBA_DIM + ORBITALS + DIM_POSITIVE_K) = Hamiltonian(i + TBA_DIM + ORBITALS + DIM_POSITIVE_K, i + TBA_DIM + ORBITALS + DIM_POSITIVE_K) + v / 2
-
-  ! END DO
 END SUBROUTINE COMPUTE_ELECTRIC_FIELD
 
 PURE RECURSIVE SUBROUTINE COMPUTE_TI1_TI2(Hamiltonian, kx, ky, eta_p, V_pdp, discretization)
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
-  REAL*8, INTENT(IN) :: eta_p, V_pdp
-  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
-  REAL*8, INTENT(INOUT) :: kx, ky
-  REAL*8 :: strength
+  REAL(REAL64), INTENT(IN) :: eta_p, V_pdp
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
+  REAL(REAL64), INTENT(INOUT) :: kx, ky
+  REAL(REAL64) :: strength
   !TODO: Generalize this for many sublattices
-  strength = eta_p * V_pdp * SQRT(2.)**(7./4.) / SQRT(15.)
+  strength = eta_p * V_pdp * SQRT(2.)**(7./2.) / SQRT(15.)
   ASSOCIATE (DIM_POSITIVE_K => discretization % derived % DIM_POSITIVE_K, &
              ORBITALS => discretization % ORBITALS, &
              TBA_DIM => discretization % derived % TBA_DIM)
@@ -261,11 +299,11 @@ END SUBROUTINE COMPUTE_TI1_TI2
 PURE RECURSIVE SUBROUTINE COMPUTE_H_PI(Hamiltonian, kx, ky, eta_p, V_pdp, discretization)
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
-  REAL*8, INTENT(IN) :: eta_p, V_pdp
-  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
-  REAL*8, INTENT(IN) :: kx, ky
-  REAL*8 :: k1, k2, k3
-  COMPLEX*16 :: strength
+  REAL(REAL64), INTENT(IN) :: eta_p, V_pdp
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
+  REAL(REAL64), INTENT(IN) :: kx, ky
+  REAL(REAL64) :: k1, k2, k3
+  COMPLEX(REAL64) :: strength
 
   !TODO: Generalize this for many sublattices
   strength = eta_p * 2 * imag * V_pdp / SQRT(15.)
@@ -321,11 +359,11 @@ END SUBROUTINE COMPUTE_H_PI
 PURE RECURSIVE SUBROUTINE COMPUTE_H_SIGMA(Hamiltonian, kx, ky, eta_p, V_pds, discretization)
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
-  REAL*8, INTENT(IN) :: eta_p, V_pds
-  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
-  REAL*8, INTENT(IN) :: kx, ky
-  REAL*8 :: k1, k2, k3
-  COMPLEX*16 :: strength
+  REAL(REAL64), INTENT(IN) :: eta_p, V_pds
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
+  REAL(REAL64), INTENT(IN) :: kx, ky
+  REAL(REAL64) :: k1, k2, k3
+  COMPLEX(REAL64) :: strength
 
   !TODO: Generalize ths for many sublattices
 
@@ -382,12 +420,12 @@ PURE RECURSIVE SUBROUTINE COMPUTE_TETRAGONAL_STRAIN(Hamiltonian, zeta_tetragonal
   IMPLICIT NONE
 
   TYPE(discretization_t), INTENT(IN) :: discretization
-  REAL*8, INTENT(IN) :: zeta_tetragonal
-  INTEGER*4, INTENT(IN) :: orb_affected_tetragonal
-  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM) !! Hamiltonian that is to be modified
+  REAL(REAL64), INTENT(IN) :: zeta_tetragonal
+  INTEGER(INT32), INTENT(IN) :: orb_affected_tetragonal
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM) !! Hamiltonian that is to be modified
 
-  INTEGER*4 :: nambu, spin, lat, row
-  REAL*8 :: sign
+  INTEGER(INT32) :: nambu, spin, lat, row
+  REAL(REAL64) :: sign
 
   DO nambu = 0, 1
     sign = (-1)**nambu
@@ -404,10 +442,10 @@ PURE SUBROUTINE COMPUTE_RASHBA_HOPPING(Hamiltonian, kx, ky, t_Rashba, discretiza
   IMPLICIT NONE
 
   TYPE(discretization_t), INTENT(IN) :: discretization
-  REAL*8, INTENT(IN) :: t_Rashba
-  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
-  REAL*8, INTENT(IN) :: kx, ky
-  INTEGER*4 :: lat, spin, row, col
+  REAL(REAL64), INTENT(IN) :: t_Rashba
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
+  REAL(REAL64), INTENT(IN) :: kx, ky
+  INTEGER(INT32) :: lat, spin, row, col
 
   ASSOCIATE (DIM_POSITIVE_K => discretization % derived % DIM_POSITIVE_K, &
             & TBA_DIM => discretization % derived % TBA_DIM, &
@@ -475,10 +513,10 @@ END SUBROUTINE COMPUTE_RASHBA_HOPPING
 PURE SUBROUTINE COMPUTE_LAYER_POTENTIAL(Hamiltonian, V_layer, discretization)
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
-  REAL*8, INTENT(IN) :: V_layer(discretization % SUBLATTICES)
-  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
-  INTEGER*4 :: nambu, spin, lat, orb, row
-  REAL*8 :: sign
+  REAL(REAL64), INTENT(IN) :: V_layer(discretization % SUBLATTICES)
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
+  INTEGER(INT32) :: nambu, spin, lat, orb, row
+  REAL(REAL64) :: sign
 
   DO nambu = 0, 1
     sign = (-1)**nambu
@@ -496,11 +534,11 @@ END SUBROUTINE COMPUTE_LAYER_POTENTIAL
 PURE SUBROUTINE COMPUTE_SUBBAND_POTENTIAL(Hamiltonian, n_band, Subband_energies, discretization)
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
-  REAL*8, INTENT(IN) :: Subband_energies(discretization % SUBBANDS)
-  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
-  INTEGER*4, INTENT(IN) :: n_band
-  INTEGER*4 :: nambu, row, i
-  REAL*8 :: sign
+  REAL(REAL64), INTENT(IN) :: Subband_energies(discretization % SUBBANDS)
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
+  INTEGER(INT32), INTENT(IN) :: n_band
+  INTEGER(INT32) :: nambu, row, i
+  REAL(REAL64) :: sign
 
   DO nambu = 0, 1
     sign = (-1)**nambu
@@ -514,10 +552,10 @@ END SUBROUTINE COMPUTE_SUBBAND_POTENTIAL
 PURE SUBROUTINE COMPUTE_FERMI_ENERGY(Hamiltonian, E_Fermi, discretization)
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
-  REAL*8, INTENT(IN) :: E_Fermi
-  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
-  INTEGER*4 :: nambu, i, row
-  REAL*8 :: sign
+  REAL(REAL64), INTENT(IN) :: E_Fermi
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
+  INTEGER(INT32) :: nambu, i, row
+  REAL(REAL64) :: sign
 
   DO nambu = 0, 1
     sign = (-1)**nambu
@@ -532,11 +570,11 @@ PURE RECURSIVE SUBROUTINE COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC, discretizati
     !! Computes the superconducting coupling at given (kx,ky) point
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
-  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM) !! Hamiltonian of the system that is to be filled
-  COMPLEX*16, INTENT(IN) :: Gamma_SC(discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, discretization % derived % LAYER_COUPLINGS) !! Superconducting energies
-  REAL*8, INTENT(IN) :: kx !! Wavevector in X direction
-  REAL*8, INTENT(IN) :: ky !! Wavevector in Y direction
-  INTEGER*4 :: orb, lat, spin1, spin2, row, col, gamma_lat_index
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM) !! Hamiltonian of the system that is to be filled
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_SC(discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, discretization % derived % LAYER_COUPLINGS) !! Superconducting energies
+  REAL(REAL64), INTENT(IN) :: kx !! Wavevector in X direction
+  REAL(REAL64), INTENT(IN) :: ky !! Wavevector in Y direction
+  INTEGER(INT32) :: orb, lat, spin1, spin2, row, col, gamma_lat_index
   !TODO: Change it so that it can use triplet couplings
   !Nearest neighbours pairing
   DO orb = 1, discretization % ORBITALS
@@ -593,11 +631,11 @@ END SUBROUTINE COMPUTE_SC
 PURE RECURSIVE SUBROUTINE COMPUTE_HUBBARD(Hamiltonian, Charge_dens, U_HUB, V_HUB, discretization)
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
-  REAL*8, INTENT(IN) :: U_HUB, V_HUB
-  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
-  REAL*8, INTENT(IN) :: Charge_dens(discretization % derived % DIM_POSITIVE_K)
-  INTEGER*4 :: orb, lat, orb_prime, spin, nambu, row
-  REAL*8 :: sign
+  REAL(REAL64), INTENT(IN) :: U_HUB, V_HUB
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
+  REAL(REAL64), INTENT(IN) :: Charge_dens(discretization % derived % DIM_POSITIVE_K)
+  INTEGER(INT32) :: orb, lat, orb_prime, spin, nambu, row
+  REAL(REAL64) :: sign
 
   DO nambu = 0, 1
     sign = (-1)**nambu
@@ -622,12 +660,12 @@ END SUBROUTINE COMPUTE_HUBBARD
 PURE RECURSIVE SUBROUTINE COMPUTE_ZEEMAN(B, g_factor, Hamiltonian, discretization)
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
-  REAL*8, INTENT(IN) :: B(3)
-  REAL*8, INTENT(IN) :: g_factor
-  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
-  REAL*8, PARAMETER :: muB = 0.5
-  INTEGER*4 :: i, spin, nambu, row, col
-  REAL*8 :: sign_nambu, sign_spin
+  REAL(REAL64), INTENT(IN) :: B(3)
+  REAL(REAL64), INTENT(IN) :: g_factor
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
+  REAL(REAL64), PARAMETER :: muB = 0.5
+  INTEGER(INT32) :: i, spin, nambu, row, col
+  REAL(REAL64) :: sign_nambu, sign_spin
 
   DO nambu = 0, 1
     sign_nambu = (-1)**nambu
@@ -657,25 +695,25 @@ PURE RECURSIVE SUBROUTINE COMPUTE_ORBITAL_MAGNETIC_COUPLING(B, Hamiltonian, disc
   !! Computes L \cdot B coupling, taking into account d orbitals
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
-  REAL*8, INTENT(IN) :: B(3) !! Magnetic field
-  COMPLEX*16, INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM) !! Hamiltonian to be updated
+  REAL(REAL64), INTENT(IN) :: B(3) !! Magnetic field
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM) !! Hamiltonian to be updated
 
-  INTEGER*4 :: i_orb, j_orb, lat, spin, nambu, row, col
-  REAL*8 :: sign_nambu
-  REAL*8, PARAMETER :: muB = 0.5
-  COMPLEX*16, PARAMETER :: c_zero = (0.0d0, 0.0d0) ! So that compiler does not complain about type mismatch between 0 and imag
-  COMPLEX*16, PARAMETER :: L_x(3, 3) = TRANSPOSE(RESHAPE([c_zero, c_zero, imag, &
-                                                          c_zero, c_zero, imag, &
-                                                          -imag, -imag, c_zero], &
-                                                         [3, 3])) / SQRT(2.0d0)
-  COMPLEX*16, PARAMETER :: L_y(3, 3) = TRANSPOSE(RESHAPE([c_zero, -2 * imag, -imag, &
-                                                          2 * imag, c_zero, imag, &
-                                                          imag, -imag, c_zero], &
-                                                         [3, 3])) / SQRT(6.0d0)
-  COMPLEX*16, PARAMETER :: L_z(3, 3) = TRANSPOSE(RESHAPE([c_zero, -imag, imag, &
-                                                          imag, c_zero, -imag, &
-                                                          -imag, imag, c_zero], &
-                                                         [3, 3])) / SQRT(3.0d0)
+  INTEGER(INT32) :: i_orb, j_orb, lat, spin, nambu, row, col
+  REAL(REAL64) :: sign_nambu
+  REAL(REAL64), PARAMETER :: muB = 0.5
+  COMPLEX(REAL64), PARAMETER :: c_zero = (0.0d0, 0.0d0) ! So that compiler does not complain about type mismatch between 0 and imag
+  COMPLEX(REAL64), PARAMETER :: L_x(3, 3) = TRANSPOSE(RESHAPE([c_zero, c_zero, imag, &
+                                                               c_zero, c_zero, imag, &
+                                                               -imag, -imag, c_zero], &
+                                                              [3, 3])) / SQRT(2.0d0)
+  COMPLEX(REAL64), PARAMETER :: L_y(3, 3) = TRANSPOSE(RESHAPE([c_zero, -2 * imag, -imag, &
+                                                               2 * imag, c_zero, imag, &
+                                                               imag, -imag, c_zero], &
+                                                              [3, 3])) / SQRT(6.0d0)
+  COMPLEX(REAL64), PARAMETER :: L_z(3, 3) = TRANSPOSE(RESHAPE([c_zero, -imag, imag, &
+                                                               imag, c_zero, -imag, &
+                                                               -imag, imag, c_zero], &
+                                                              [3, 3])) / SQRT(3.0d0)
 
   DO nambu = 0, 1
     sign_nambu = (-1)**nambu

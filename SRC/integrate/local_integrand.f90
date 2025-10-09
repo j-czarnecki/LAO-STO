@@ -22,6 +22,7 @@
 !! https://arxiv.org/abs/2508.05075
 
 MODULE local_integrand
+use, intrinsic :: iso_fortran_env, only: real64, int8, int16, int32, int64
 USE parameters
 USE utilities
 USE hamiltonians
@@ -35,37 +36,37 @@ SUBROUTINE GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge_dens, 
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
   TYPE(physical_params_t), INTENT(IN) :: physical_params
-  COMPLEX*16, INTENT(IN) :: Hamiltonian_const(discretization % derived % DIM, &
+  COMPLEX(REAL64), INTENT(IN) :: Hamiltonian_const(discretization % derived % DIM, &
                                              & discretization % derived % DIM)
-  REAL*8, INTENT(IN) :: k1, k2
-  COMPLEX*16, INTENT(IN) :: Gamma_SC(discretization % ORBITALS, &
+  REAL(REAL64), INTENT(IN) :: k1, k2
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_SC(discretization % ORBITALS, &
                                     & N_ALL_NEIGHBOURS, &
                                     & SPINS, &
                                     & SPINS, &
                                     & discretization % derived % LAYER_COUPLINGS)
-  REAL*8, INTENT(IN) :: Charge_dens(discretization % derived % DIM_POSITIVE_K)
+  REAL(REAL64), INTENT(IN) :: Charge_dens(discretization % derived % DIM_POSITIVE_K)
 
-  COMPLEX*16, INTENT(OUT) :: Delta_local(discretization % ORBITALS, &
+  COMPLEX(REAL64), INTENT(OUT) :: Delta_local(discretization % ORBITALS, &
                                         & N_ALL_NEIGHBOURS, &
                                         & SPINS, &
                                         & SPINS, &
                                         & discretization % derived % LAYER_COUPLINGS)
-  REAL*8, INTENT(OUT) :: Charge_dens_local(discretization % derived % DIM_POSITIVE_K)
+  REAL(REAL64), INTENT(OUT) :: Charge_dens_local(discretization % derived % DIM_POSITIVE_K)
 
-  COMPLEX*16 :: Hamiltonian(discretization % derived % DIM, &
+  COMPLEX(REAL64) :: Hamiltonian(discretization % derived % DIM, &
                             & discretization % derived % DIM)
-  COMPLEX*16 :: U_transformation(discretization % derived % DIM, &
+  COMPLEX(REAL64) :: U_transformation(discretization % derived % DIM, &
                                 & discretization % derived % DIM)
-  REAL*8 :: Energies(discretization % derived % DIM)
-  REAL*8 :: kx, ky
+  REAL(REAL64) :: Energies(discretization % derived % DIM)
+  REAL(REAL64) :: kx, ky
 
   !Transform from graphene reciprocal lattice to kx and ky
   kx = k1 * COS(k2)
   ky = k1 * SIN(k2)
 
   Energies(:) = 0.
-  Hamiltonian(:, :) = DCMPLX(0., 0.)
-  U_transformation(:, :) = DCMPLX(0., 0.)
+  Hamiltonian(:, :) = CMPLX(0., 0., KIND=REAL64)
+  U_transformation(:, :) = CMPLX(0., 0., KIND=REAL64)
   CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, discretization, physical_params)
   CALL COMPUTE_HUBBARD(Hamiltonian, &
                       & Charge_dens, &
@@ -86,7 +87,7 @@ SUBROUTINE GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge_dens, 
   !After DIAGONALIZE HERMITIAN, U contains eigenvectors, so it corresponds to transformation matrix U
 
   !Here it has to be set to zero, to avoid artifacts from previous iteration / chunk
-  Delta_local = DCMPLX(0., 0.)
+  Delta_local = CMPLX(0., 0., KIND=REAL64)
   !Self - consistent delta calculation
   CALL ACCUMULATE_NEAREST_NEIGHBOURS_DELTA(Delta_local, physical_params % subband_params % J_SC_tensor, U_transformation, Energies, kx, ky, discretization, physical_params % external % T)
   CALL ACCUMULATE_NEXT_NEIGHBOURS_DELTA(Delta_local, physical_params % subband_params % J_SC_NNN_tensor, U_transformation, Energies, kx, ky, discretization, physical_params % external % T)
@@ -108,33 +109,33 @@ PURE SUBROUTINE ACCUMULATE_NEAREST_NEIGHBOURS_DELTA(Delta, J_tensor, U, Energies
   !! For i,j sites being nearest neighbours.
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
-  COMPLEX*16, INTENT(INOUT) :: Delta(discretization % ORBITALS, &
+  COMPLEX(REAL64), INTENT(INOUT) :: Delta(discretization % ORBITALS, &
                                     & N_ALL_NEIGHBOURS, &
                                     & SPINS, &
                                     & SPINS, &
                                     discretization % derived % LAYER_COUPLINGS) !! Accumulator for integrand
-  REAL*8, INTENT(IN) :: J_tensor(SPINS, SPINS, SPINS, SPINS)
-  COMPLEX*16, INTENT(IN) :: U(discretization % derived % DIM, &
+  REAL(REAL64), INTENT(IN) :: J_tensor(SPINS, SPINS, SPINS, SPINS)
+  COMPLEX(REAL64), INTENT(IN) :: U(discretization % derived % DIM, &
                              & discretization % derived % DIM) !! Unitary matrix that diagonalizes the Hamiltonian - from ZGEEV
-  REAL*8, INTENT(IN) :: Energies(discretization % derived % DIM) !! Energies for given wavevector
-  REAL*8, INTENT(IN) :: kx, ky !! Wavevector coordinates
-  REAL*8, INTENT(IN) :: T !! Temperature
+  REAL(REAL64), INTENT(IN) :: Energies(discretization % derived % DIM) !! Energies for given wavevector
+  REAL(REAL64), INTENT(IN) :: kx, ky !! Wavevector coordinates
+  REAL(REAL64), INTENT(IN) :: T !! Temperature
 
-  INTEGER*4 :: orb, lat, spin1, spin2 !! Degrees of freedom of the Hamiltonian
-  INTEGER*4 :: spin3, spin4 !! Spin degrees of freedom integrated-out in the mean-field approach
-  INTEGER*4 :: neigh !! neighbor index for phases array
-  INTEGER*4 :: n !! Index for summation of U transformation matrix
-  INTEGER*4 :: row, col !! Postion in the Hamiltonian based on degrees of freedom indeces
-  INTEGER*4 :: row_inv, col_inv !! Postion in the Hamiltonian for opposite lattice hopping based on degrees of freedom indeces
-  INTEGER*4 :: lat_block_1, lat_block_2 !! Shift in hamiltonian indeces from the lattice degree of freedom
-  INTEGER*4 :: spin3_block !! Shift in hamiltonian indeces from the spin degree of freedom
-  INTEGER*4 :: spin4_block !! Shift in hamiltonian indeces from the spin degree of freedom
-  INTEGER*4 :: lat_idx_inv
-  REAL*8 :: occupation_electron, occupation_hole !! Occupation of a given (n-th) energy level
-  REAL*8 :: j_elem !! Energy of nearest neighbour superconducting pairing
-  COMPLEX*16 :: average_pairing, average_energy
-  COMPLEX*16 :: average_pairing_inv, average_energy_inv
-  COMPLEX*16 :: phases(3) !! Phase factors for nearest neighbours
+  INTEGER(INT32) :: orb, lat, spin1, spin2 !! Degrees of freedom of the Hamiltonian
+  INTEGER(INT32) :: spin3, spin4 !! Spin degrees of freedom integrated-out in the mean-field approach
+  INTEGER(INT32) :: neigh !! neighbor index for phases array
+  INTEGER(INT32) :: n !! Index for summation of U transformation matrix
+  INTEGER(INT32) :: row, col !! Postion in the Hamiltonian based on degrees of freedom indeces
+  INTEGER(INT32) :: row_inv, col_inv !! Postion in the Hamiltonian for opposite lattice hopping based on degrees of freedom indeces
+  INTEGER(INT32) :: lat_block_1, lat_block_2 !! Shift in hamiltonian indeces from the lattice degree of freedom
+  INTEGER(INT32) :: spin3_block !! Shift in hamiltonian indeces from the spin degree of freedom
+  INTEGER(INT32) :: spin4_block !! Shift in hamiltonian indeces from the spin degree of freedom
+  INTEGER(INT32) :: lat_idx_inv
+  REAL(REAL64) :: occupation_electron, occupation_hole !! Occupation of a given (n-th) energy level
+  REAL(REAL64) :: j_elem !! Energy of nearest neighbour superconducting pairing
+  COMPLEX(REAL64) :: average_pairing, average_energy
+  COMPLEX(REAL64) :: average_pairing_inv, average_energy_inv
+  COMPLEX(REAL64) :: phases(3) !! Phase factors for nearest neighbours
 
   phases(1) = pairing_1(ky)
   phases(2) = pairing_2(kx, ky)
@@ -191,31 +192,31 @@ PURE SUBROUTINE ACCUMULATE_NEXT_NEIGHBOURS_DELTA(Delta, J_tensor, U, Energies, k
   !! For i,j sites being next-nearest neighbours.
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
-  COMPLEX*16, INTENT(INOUT) :: Delta(discretization % ORBITALS, &
+  COMPLEX(REAL64), INTENT(INOUT) :: Delta(discretization % ORBITALS, &
                                     & N_ALL_NEIGHBOURS, &
                                     & SPINS, &
                                     & SPINS, &
                                     & discretization % derived % LAYER_COUPLINGS) !! Accumulator for integrand
-  REAL*8, INTENT(IN) :: J_tensor(SPINS, SPINS, SPINS, SPINS)
-  COMPLEX*16, INTENT(IN) :: U(discretization % derived % DIM, &
+  REAL(REAL64), INTENT(IN) :: J_tensor(SPINS, SPINS, SPINS, SPINS)
+  COMPLEX(REAL64), INTENT(IN) :: U(discretization % derived % DIM, &
                              & discretization % derived % DIM) !! Unitary matrix that diagonalizes the Hamiltonian - from ZGEEV
-  REAL*8, INTENT(IN) :: Energies(discretization % derived % DIM) !! Energies for given wavevector
-  REAL*8, INTENT(IN) :: kx, ky !! Wavevector coordinates
-  REAL*8, INTENT(IN) :: T !! Temperature
+  REAL(REAL64), INTENT(IN) :: Energies(discretization % derived % DIM) !! Energies for given wavevector
+  REAL(REAL64), INTENT(IN) :: kx, ky !! Wavevector coordinates
+  REAL(REAL64), INTENT(IN) :: T !! Temperature
 
-  INTEGER*4 :: orb, lat, spin1, spin2 !! Degrees of freedom of the Hamiltonian
-  INTEGER*4 :: spin3, spin4 !! Spin degrees of freedom integrated-out in the mean-field approach
-  INTEGER*4 :: neigh !! neighbor index for phases array
-  INTEGER*4 :: n !! Index for summation of U transformation matrix
-  INTEGER*4 :: row, col !! Postion in the Hamiltonian based on degrees of freedom indeces
-  INTEGER*4 :: lat_block !! Shift in hamiltonian indeces from the lattice degree of freedom
-  INTEGER*4 :: spin3_block !! Shift in hamiltonian indeces from the spin degree of freedom
-  INTEGER*4 :: spin4_block !! Shift in hamiltonian indeces from the spin degree of freedom
-  INTEGER*4 :: lat_idx
-  REAL*8 :: occupation_electron, occupation_hole !! Occupation of a given (n-th) energy level
-  REAL*8 :: j_elem !! Energy of nearest neighbour superconducting pairing
-  COMPLEX*16 :: average_pairing, average_energy
-  COMPLEX*16 :: phases(6) !! Phase factors for next nearest neighbours
+  INTEGER(INT32) :: orb, lat, spin1, spin2 !! Degrees of freedom of the Hamiltonian
+  INTEGER(INT32) :: spin3, spin4 !! Spin degrees of freedom integrated-out in the mean-field approach
+  INTEGER(INT32) :: neigh !! neighbor index for phases array
+  INTEGER(INT32) :: n !! Index for summation of U transformation matrix
+  INTEGER(INT32) :: row, col !! Postion in the Hamiltonian based on degrees of freedom indeces
+  INTEGER(INT32) :: lat_block !! Shift in hamiltonian indeces from the lattice degree of freedom
+  INTEGER(INT32) :: spin3_block !! Shift in hamiltonian indeces from the spin degree of freedom
+  INTEGER(INT32) :: spin4_block !! Shift in hamiltonian indeces from the spin degree of freedom
+  INTEGER(INT32) :: lat_idx
+  REAL(REAL64) :: occupation_electron, occupation_hole !! Occupation of a given (n-th) energy level
+  REAL(REAL64) :: j_elem !! Energy of nearest neighbour superconducting pairing
+  COMPLEX(REAL64) :: average_pairing, average_energy
+  COMPLEX(REAL64) :: phases(6) !! Phase factors for next nearest neighbours
 
   phases(1) = CONJG(pairing_nnn_1(kx))
   phases(2) = CONJG(pairing_nnn_2(kx, ky))
@@ -269,12 +270,12 @@ SUBROUTINE ACCUMULATE_CHARGE_DENSITY(Charge, U, Energies, discretization, T)
   !! <c_{kl\sigma}^\dag c_{kl\sigma}>
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
-  REAL*8, INTENT(INOUT) :: Charge(discretization % derived % DIM_POSITIVE_K)
-  COMPLEX*16, INTENT(IN) :: U(discretization % derived % DIM, discretization % derived % DIM) !! Unitary matrix that diagonalizes the Hamiltonian - from ZGEEV
-  REAL*8, INTENT(IN) :: Energies(discretization % derived % DIM) !! Energies for given wavevector
-  REAL*8, INTENT(IN) :: T !! Temperature
+  REAL(REAL64), INTENT(INOUT) :: Charge(discretization % derived % DIM_POSITIVE_K)
+  COMPLEX(REAL64), INTENT(IN) :: U(discretization % derived % DIM, discretization % derived % DIM) !! Unitary matrix that diagonalizes the Hamiltonian - from ZGEEV
+  REAL(REAL64), INTENT(IN) :: Energies(discretization % derived % DIM) !! Energies for given wavevector
+  REAL(REAL64), INTENT(IN) :: T !! Temperature
 
-  INTEGER*4 :: n, m !! Index for summation of U transformation matrix
+  INTEGER(INT32) :: n, m !! Index for summation of U transformation matrix
 
   DO m = 1, discretization % derived % DIM_POSITIVE_K
     DO n = 1, discretization % derived % DIM_POSITIVE_K

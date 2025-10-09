@@ -22,6 +22,7 @@
 !! https://arxiv.org/abs/2508.05075
 
 MODULE integrate
+use, intrinsic :: iso_fortran_env, only: real64, int8, int16, int32, int64
 USE parameters
 USE local_integrand
 USE logger
@@ -40,38 +41,38 @@ RECURSIVE SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, i_r, k1
 
   IMPLICIT NONE
   TYPE(sc_input_params_t), INTENT(IN) :: sc_input
-  COMPLEX*16, INTENT(IN) :: Hamiltonian_const(sc_input % discretization % derived % DIM, &
+  COMPLEX(REAL64), INTENT(IN) :: Hamiltonian_const(sc_input % discretization % derived % DIM, &
                                              & sc_input % discretization % derived % DIM)
-  INTEGER*4, INTENT(IN) :: i_r, k1_steps
-  REAL*8, INTENT(IN) :: k2_chunk_min, k2_chunk_max
-  COMPLEX*16, INTENT(IN) :: Gamma_SC(sc_input % discretization % ORBITALS, &
+  INTEGER(INT32), INTENT(IN) :: i_r, k1_steps
+  REAL(REAL64), INTENT(IN) :: k2_chunk_min, k2_chunk_max
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_SC(sc_input % discretization % ORBITALS, &
                                     & N_ALL_NEIGHBOURS, &
                                     & SPINS, &
                                     & SPINS, &
                                     & sc_input % discretization % derived % LAYER_COUPLINGS)
-  REAL*8, INTENT(IN) :: Charge_dens(sc_input % discretization % derived % DIM_POSITIVE_K)
-  COMPLEX*16, INTENT(OUT) :: Delta_local(sc_input % discretization % ORBITALS, &
+  REAL(REAL64), INTENT(IN) :: Charge_dens(sc_input % discretization % derived % DIM_POSITIVE_K)
+  COMPLEX(REAL64), INTENT(OUT) :: Delta_local(sc_input % discretization % ORBITALS, &
                                         & N_ALL_NEIGHBOURS, &
                                         & SPINS, &
                                         & SPINS, &
                                         & sc_input % discretization % derived % LAYER_COUPLINGS)
-  REAL*8, INTENT(OUT) :: Charge_dens_local(sc_input % discretization % derived % DIM_POSITIVE_K)
+  REAL(REAL64), INTENT(OUT) :: Charge_dens_local(sc_input % discretization % derived % DIM_POSITIVE_K)
   !Parameters for Romberg integration
 
-  COMPLEX*16 :: stepsize(sc_input % romberg % max_grid_refinements_y + 1)
-  COMPLEX*16 :: Delta_iterations(sc_input % discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, sc_input % discretization % derived % LAYER_COUPLINGS, sc_input % romberg % max_grid_refinements_y + 1)
-  REAL*8 :: Charge_dens_iterations(sc_input % discretization % derived % DIM_POSITIVE_K, sc_input % romberg % max_grid_refinements_y + 1)
-  COMPLEX*16 :: Delta_sum(sc_input % discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, sc_input % discretization % derived % LAYER_COUPLINGS)
-  REAL*8 :: Charge_dens_sum(sc_input % discretization % derived % DIM_POSITIVE_K)
-  COMPLEX*16 :: result_error, result
-  INTEGER*4 :: n, i, j, spin1, spin2, orb, lat
-  REAL*8 :: dk2_trap, k2_trap
+  COMPLEX(REAL64) :: stepsize(sc_input % romberg % max_grid_refinements_y + 1)
+  COMPLEX(REAL64) :: Delta_iterations(sc_input % discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, sc_input % discretization % derived % LAYER_COUPLINGS, sc_input % romberg % max_grid_refinements_y + 1)
+  REAL(REAL64) :: Charge_dens_iterations(sc_input % discretization % derived % DIM_POSITIVE_K, sc_input % romberg % max_grid_refinements_y + 1)
+  COMPLEX(REAL64) :: Delta_sum(sc_input % discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, sc_input % discretization % derived % LAYER_COUPLINGS)
+  REAL(REAL64) :: Charge_dens_sum(sc_input % discretization % derived % DIM_POSITIVE_K)
+  COMPLEX(REAL64) :: result_error, result
+  INTEGER(INT32) :: n, i, j, spin1, spin2, orb, lat
+  REAL(REAL64) :: dk2_trap, k2_trap
   LOGICAL :: convergence
-  REAL*8 :: r_max_local, k1_chunk_min, k1_chunk_max
+  REAL(REAL64) :: r_max_local, k1_chunk_min, k1_chunk_max
 
-  stepsize = DCMPLX(0., 0.)
-  Delta_iterations = DCMPLX(0., 0.)
-  Charge_dens_iterations = DCMPLX(0., 0.)
+  stepsize = CMPLX(0., 0., KIND=REAL64)
+  Delta_iterations = CMPLX(0., 0., KIND=REAL64)
+  Charge_dens_iterations = CMPLX(0., 0., KIND=REAL64)
 
   convergence = .FALSE.
   !stepsize(1) = k2_chunk_max - k2_chunk_min
@@ -107,10 +108,10 @@ RECURSIVE SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, i_r, k1
       i = 2**(j - 2)
       dk2_trap = (k2_chunk_max - k2_chunk_min) / i
       k2_trap = k2_chunk_min + 0.5 * dk2_trap
-      Delta_sum = DCMPLX(0., 0.)
+      Delta_sum = CMPLX(0., 0., KIND=REAL64)
       Charge_dens_sum(:) = 0.
-      ! Delta_iterations(:,:,:,:,j) = DCMPLX(0. , 0.)
-      ! Charge_dens_iterations(:,j) = DCMPLX(0. , 0.)
+      ! Delta_iterations(:,:,:,:,j) = CMPLX(0. , 0., KIND=REAL64)
+      ! Charge_dens_iterations(:,j) = CMPLX(0. , 0., KIND=REAL64)
       DO n = 1, i
         !Here we pass k1_trap as actual k1 point
         r_max_local = r_max_phi(MOD(ABS(k2_trap), PI / 3))
@@ -140,7 +141,7 @@ RECURSIVE SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, i_r, k1
               DO n = 1, N_NEIGHBOURS
                 DO lat = 1, sc_input % discretization % derived % LAYER_COUPLINGS
                   CALL POLINT(stepsize((j - sc_input % romberg % interpolation_deg_y + 1):j), Delta_iterations(orb, n, spin1, spin2, lat, (j - sc_input % romberg % interpolation_deg_y + 1):j), &
-                              & sc_input % romberg % interpolation_deg_y, DCMPLX(0., 0.), result, result_error)
+                              & sc_input % romberg % interpolation_deg_y, CMPLX(0., 0., KIND=REAL64), result, result_error)
                   Delta_local(orb, n, spin1, spin2, lat) = result
                   IF (ABS(result_error) > sc_input % romberg % romb_eps_y * ABS(result)) THEN
                     convergence = .FALSE.
@@ -150,7 +151,7 @@ RECURSIVE SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, i_r, k1
               DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
                 DO lat = 1, sc_input % discretization % SUBLATTICES
                   CALL POLINT(stepsize((j - sc_input % romberg % interpolation_deg_y + 1):j), Delta_iterations(orb, n, spin1, spin2, lat, (j - sc_input % romberg % interpolation_deg_y + 1):j), &
-                              & sc_input % romberg % interpolation_deg_y, DCMPLX(0., 0.), result, result_error)
+                              & sc_input % romberg % interpolation_deg_y, CMPLX(0., 0., KIND=REAL64), result, result_error)
                   Delta_local(orb, n, spin1, spin2, lat) = result
                   IF (ABS(result_error) > sc_input % romberg % romb_eps_y * ABS(result)) THEN
                     convergence = .FALSE.
@@ -163,8 +164,8 @@ RECURSIVE SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, i_r, k1
 
         !Checking Charge_dens convergence
         DO n = 1, sc_input % discretization % derived % DIM_POSITIVE_K
-          CALL POLINT(stepsize((j - sc_input % romberg % interpolation_deg_y + 1):j), DCMPLX(Charge_dens_iterations(n, (j - sc_input % romberg % interpolation_deg_y + 1):j), 0.), &
-                      & sc_input % romberg % interpolation_deg_y, DCMPLX(0., 0.), result, result_error)
+          CALL POLINT(stepsize((j - sc_input % romberg % interpolation_deg_y + 1):j), CMPLX(Charge_dens_iterations(n, (j - sc_input % romberg % interpolation_deg_y + 1):j), 0.0_REAL64, KIND=REAL64), &
+                      & sc_input % romberg % interpolation_deg_y, CMPLX(0., 0., KIND=REAL64), result, result_error)
           Charge_dens_local(n) = REAL(result)
           IF (ABS(result_error) > sc_input % romberg % romb_eps_y * ABS(result)) THEN
             convergence = .FALSE.
@@ -194,27 +195,27 @@ END SUBROUTINE ROMBERG_Y
 RECURSIVE SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chunk_min, k1_chunk_max, k2_actual, Delta_local, Charge_dens_local, sc_input)
   IMPLICIT NONE
   TYPE(sc_input_params_t), INTENT(IN) :: sc_input
-  COMPLEX*16, INTENT(IN) :: Hamiltonian_const(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
-  REAL*8, INTENT(IN) :: k1_chunk_min, k1_chunk_max, k2_actual
-  COMPLEX*16, INTENT(IN) :: Gamma_SC(sc_input % discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, sc_input % discretization % derived % LAYER_COUPLINGS)
-  REAL*8, INTENT(IN) :: Charge_dens(sc_input % discretization % derived % DIM_POSITIVE_K)
+  COMPLEX(REAL64), INTENT(IN) :: Hamiltonian_const(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  REAL(REAL64), INTENT(IN) :: k1_chunk_min, k1_chunk_max, k2_actual
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_SC(sc_input % discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, sc_input % discretization % derived % LAYER_COUPLINGS)
+  REAL(REAL64), INTENT(IN) :: Charge_dens(sc_input % discretization % derived % DIM_POSITIVE_K)
 
-  COMPLEX*16, INTENT(OUT) :: Delta_local(sc_input % discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, sc_input % discretization % derived % LAYER_COUPLINGS)
-  REAL*8, INTENT(OUT) :: Charge_dens_local(sc_input % discretization % derived % DIM_POSITIVE_K)
+  COMPLEX(REAL64), INTENT(OUT) :: Delta_local(sc_input % discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, sc_input % discretization % derived % LAYER_COUPLINGS)
+  REAL(REAL64), INTENT(OUT) :: Charge_dens_local(sc_input % discretization % derived % DIM_POSITIVE_K)
 
-  COMPLEX*16 :: stepsize(sc_input % romberg % max_grid_refinements_x + 1)
-  COMPLEX*16 :: Delta_iterations(sc_input % discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, sc_input % discretization % derived % LAYER_COUPLINGS, sc_input % romberg % max_grid_refinements_x + 1)
-  REAL*8 :: Charge_dens_iterations(sc_input % discretization % derived % DIM_POSITIVE_K, sc_input % romberg % max_grid_refinements_x + 1)
-  COMPLEX*16 :: Delta_sum(sc_input % discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, sc_input % discretization % derived % LAYER_COUPLINGS)
-  REAL*8 :: Charge_dens_sum(sc_input % discretization % derived % DIM_POSITIVE_K)
-  COMPLEX*16 :: result_error, result
-  INTEGER*4 :: n, i, j, spin1, spin2, orb, lat
-  REAL*8 :: dk1_trap, k1_trap
+  COMPLEX(REAL64) :: stepsize(sc_input % romberg % max_grid_refinements_x + 1)
+  COMPLEX(REAL64) :: Delta_iterations(sc_input % discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, sc_input % discretization % derived % LAYER_COUPLINGS, sc_input % romberg % max_grid_refinements_x + 1)
+  REAL(REAL64) :: Charge_dens_iterations(sc_input % discretization % derived % DIM_POSITIVE_K, sc_input % romberg % max_grid_refinements_x + 1)
+  COMPLEX(REAL64) :: Delta_sum(sc_input % discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, sc_input % discretization % derived % LAYER_COUPLINGS)
+  REAL(REAL64) :: Charge_dens_sum(sc_input % discretization % derived % DIM_POSITIVE_K)
+  COMPLEX(REAL64) :: result_error, result
+  INTEGER(INT32) :: n, i, j, spin1, spin2, orb, lat
+  REAL(REAL64) :: dk1_trap, k1_trap
   LOGICAL :: convergence
 
-  stepsize = DCMPLX(0., 0.)
-  Delta_iterations = DCMPLX(0., 0.)
-  Charge_dens_iterations = DCMPLX(0., 0.)
+  stepsize = CMPLX(0., 0., KIND=REAL64)
+  Delta_iterations = CMPLX(0., 0., KIND=REAL64)
+  Charge_dens_iterations = CMPLX(0., 0., KIND=REAL64)
 
   convergence = .FALSE.
   !stepsize(1) = k1_chunk_max - k1_chunk_min
@@ -245,7 +246,7 @@ RECURSIVE SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chun
       i = 2**(j - 2)
       dk1_trap = (k1_chunk_max - k1_chunk_min) / i
       k1_trap = k1_chunk_min + 0.5 * dk1_trap
-      Delta_sum = DCMPLX(0., 0.)
+      Delta_sum = CMPLX(0., 0., KIND=REAL64)
       Charge_dens_sum = 0.
       DO n = 1, i
         !Here we pass k1_trap as actual k1 point
@@ -272,7 +273,7 @@ RECURSIVE SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chun
               DO n = 1, N_NEIGHBOURS
                 DO lat = 1, sc_input % discretization % derived % LAYER_COUPLINGS
                   CALL POLINT(stepsize((j - sc_input % romberg % interpolation_deg_x + 1):j), Delta_iterations(orb, n, spin1, spin2, lat, (j - sc_input % romberg % interpolation_deg_x + 1):j), &
-                              & sc_input % romberg % interpolation_deg_x, DCMPLX(0., 0.), result, result_error)
+                              & sc_input % romberg % interpolation_deg_x, CMPLX(0., 0., KIND=REAL64), result, result_error)
                   Delta_local(orb, n, spin1, spin2, lat) = result
                   IF (ABS(result_error) > sc_input % romberg % romb_eps_x * ABS(result)) THEN
                     convergence = .FALSE.
@@ -282,7 +283,7 @@ RECURSIVE SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chun
               DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
                 DO lat = 1, sc_input % discretization % SUBLATTICES
                   CALL POLINT(stepsize((j - sc_input % romberg % interpolation_deg_x + 1):j), Delta_iterations(orb, n, spin1, spin2, lat, (j - sc_input % romberg % interpolation_deg_x + 1):j), &
-                              & sc_input % romberg % interpolation_deg_x, DCMPLX(0., 0.), result, result_error)
+                              & sc_input % romberg % interpolation_deg_x, CMPLX(0., 0., KIND=REAL64), result, result_error)
                   Delta_local(orb, n, spin1, spin2, lat) = result
                   IF (ABS(result_error) > sc_input % romberg % romb_eps_x * ABS(result)) THEN
                     convergence = .FALSE.
@@ -294,8 +295,8 @@ RECURSIVE SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chun
         END DO
         !Checking Charge_dens convergence
         DO n = 1, sc_input % discretization % derived % DIM_POSITIVE_K
-          CALL POLINT(stepsize((j - sc_input % romberg % interpolation_deg_x + 1):j), DCMPLX(Charge_dens_iterations(n, (j - sc_input % romberg % interpolation_deg_x + 1):j), 0.), &
-                      & sc_input % romberg % interpolation_deg_x, DCMPLX(0., 0.), result, result_error)
+          CALL POLINT(stepsize((j - sc_input % romberg % interpolation_deg_x + 1):j), CMPLX(Charge_dens_iterations(n, (j - sc_input % romberg % interpolation_deg_x + 1):j), 0.0_REAL64, KIND=REAL64), &
+                      & sc_input % romberg % interpolation_deg_x, CMPLX(0., 0., KIND=REAL64), result, result_error)
           Charge_dens_local(n) = REAL(result)
           IF (ABS(result_error) > sc_input % romberg % romb_eps_x * ABS(result)) THEN
             convergence = .FALSE.
@@ -325,14 +326,14 @@ END SUBROUTINE ROMBERG_X
 
 !See Section 3.1
 RECURSIVE SUBROUTINE POLINT(X, Y, deg, x_target, y_approx, dy)
-  INTEGER*4, INTENT(IN) :: deg
-  COMPLEX*16, INTENT(IN) :: X(deg), Y(deg), x_target
-  COMPLEX*16, INTENT(OUT) :: y_approx, dy
+  INTEGER(INT32), INTENT(IN) :: deg
+  COMPLEX(REAL64), INTENT(IN) :: X(deg), Y(deg), x_target
+  COMPLEX(REAL64), INTENT(OUT) :: y_approx, dy
 
-  INTEGER*4 :: i, m, nearest
-  COMPLEX*16 :: dx_left, dx_right, w, den
-  REAL*8 :: diff, diff_temp
-  COMPLEX*16 :: C(deg), D(deg)
+  INTEGER(INT32) :: i, m, nearest
+  COMPLEX(REAL64) :: dx_left, dx_right, w, den
+  REAL(REAL64) :: diff, diff_temp
+  COMPLEX(REAL64) :: C(deg), D(deg)
 
   nearest = 1
   diff = ABS(x_target - X(1))
@@ -378,17 +379,17 @@ END SUBROUTINE
 ! !See section 4.3
 ! !Romberg integration
 ! SUBROUTINE QROMB(func, x_min, x_max, result)
-!     COMPLEX*16, INTENT(IN) :: x_min, x_max
-!     COMPLEX*16, EXTERNAL :: func
-!     COMPLEX*16, INTENT(OUT) :: result
+!     COMPLEX(REAL64), INTENT(IN) :: x_min, x_max
+!     COMPLEX(REAL64), EXTERNAL :: func
+!     COMPLEX(REAL64), INTENT(OUT) :: result
 
-!     REAL*8, PARAMETER :: EPS = 1e-6
-!     INTEGER*4, PARAMETER :: JMAX = 20
-!     INTEGER*4, PARAMETER :: K = 5
+!     REAL(REAL64), PARAMETER :: EPS = 1e-6
+!     INTEGER(INT32), PARAMETER :: JMAX = 20
+!     INTEGER(INT32), PARAMETER :: K = 5
 
-!     COMPLEX*16 :: stepsize(JMAX + 1), integral(JMAX + 1)
-!     COMPLEX*16 :: result_error
-!     INTEGER*4 :: j
+!     COMPLEX(REAL64) :: stepsize(JMAX + 1), integral(JMAX + 1)
+!     COMPLEX(REAL64) :: result_error
+!     INTEGER(INT32) :: j
 
 !     stepsize(1) = 1.
 !     !Maximum number of splittings to half
@@ -397,7 +398,7 @@ END SUBROUTINE
 !         IF (j >= K) THEN
 !             !Really smart - based on previous iterations we want to extrapolate value of integral when stepsize would be 0.
 !             !Passing last K steps
-!             CALL POLINT(stepsize(j - K + 1), integral(j - K + 1), K, DCMPLX(0. , 0.), result, result_error)
+!             CALL POLINT(stepsize(j - K + 1), integral(j - K + 1), K, CMPLX(0. , 0., KIND=REAL64), result, result_error)
 !             IF (ABS(result_error) < EPS*ABS(result)) RETURN
 !         END IF
 !         integral(j + 1) = integral(j)
@@ -409,13 +410,13 @@ END SUBROUTINE
 ! !See Section 4.2
 ! !Extended trapezoidal rule
 ! SUBROUTINE TRAPZD(func, x_min, x_max, result, n)
-!     COMPLEX*16, INTENT(IN) :: x_max, x_min
-!     INTEGER*4, INTENT(IN) :: n
-!     COMPLEX*16, INTENT(OUT) :: result
-!     COMPLEX*16, EXTERNAL :: func
+!     COMPLEX(REAL64), INTENT(IN) :: x_max, x_min
+!     INTEGER(INT32), INTENT(IN) :: n
+!     COMPLEX(REAL64), INTENT(OUT) :: result
+!     COMPLEX(REAL64), EXTERNAL :: func
 
-!     INTEGER*4 :: i,j
-!     COMPLEX*16 :: dx, x, sum
+!     INTEGER(INT32) :: i,j
+!     COMPLEX(REAL64) :: dx, x, sum
 
 !     !First approximation of integral
 !     IF (n == 1) THEN

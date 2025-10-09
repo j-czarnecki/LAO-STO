@@ -23,14 +23,14 @@
 
 test_suite hamiltonians
 
-REAL*8, PARAMETER :: muB = 0.5
-REAL*8, PARAMETER :: s = 0.5
+REAL(REAL64), PARAMETER :: muB = 0.5
+REAL(REAL64), PARAMETER :: s = 0.5
 
 TYPE(sc_input_params_t) :: sc_input
 
 setup
-INTEGER*4 :: sublats = 2
-INTEGER*4 :: n_subbands = 2
+INTEGER(INT32) :: sublats = 2
+INTEGER(INT32) :: n_subbands = 2
 CALL SET_HAMILTONIAN_PARAMS(sublats, n_subbands, sc_input % discretization)
 
 end setup
@@ -40,13 +40,13 @@ end teardown
 
 test test_compute_tba_term
 
-REAL*8 :: kx, ky, dk
-COMPLEX*16 :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
-INTEGER*4 :: i, j, ik, jk
+REAL(REAL64) :: kx, ky, dk
+COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+INTEGER(INT32) :: i, j, ik, jk
 
 !Set variables that would have been set by reding input
-REAL*8 :: t_D = .5
-REAL*8 :: t_I = .04
+REAL(REAL64) :: t_D = .5
+REAL(REAL64) :: t_I = .04
 dk = 0.5
 
 ASSOCIATE (DIM => sc_input % discretization % derived % DIM, &
@@ -55,7 +55,7 @@ ASSOCIATE (DIM => sc_input % discretization % derived % DIM, &
            LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS)
   DO ik = -2, 2
     DO jk = -2, 2
-      Hamiltonian(:, :) = DCMPLX(0., 0.)
+      Hamiltonian(:, :) = CMPLX(0., 0., KIND=REAL64)
       kx = ik * dk
       ky = jk * dk
 
@@ -114,12 +114,12 @@ end test
 
 test test_compute_atomic_soc_terms
 
-COMPLEX*16 :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
-INTEGER*4 :: i, j
+COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+INTEGER(INT32) :: i, j
 
-REAL*8 :: lambda_SOC = 1.
+REAL(REAL64) :: lambda_SOC = 1.
 
-Hamiltonian(:, :) = DCMPLX(0, 0)
+Hamiltonian(:, :) = CMPLX(0, 0, KIND=REAL64)
 CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian, lambda_SOC, sc_input % discretization)
 
 DO i = 1, sc_input % discretization % derived % DIM
@@ -171,10 +171,10 @@ end test
 
 test test_compute_trigonal_terms
 
-COMPLEX*16 :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
-INTEGER*4 :: i, j
+COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+INTEGER(INT32) :: i, j
 
-REAL*8 :: delta_trigonal = 1.
+REAL(REAL64) :: delta_trigonal = 1.
 Hamiltonian(:, :) = 0.0d0
 
 CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian, delta_trigonal, sc_input % discretization)
@@ -276,12 +276,12 @@ END ASSOCIATE
 end test
 
 test test_compute_rashba_hopping
+USE writers
+COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+REAL(REAL64) :: kx, ky, dk
+INTEGER(INT32) :: i, j, ik, jk
 
-COMPLEX*16 :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
-REAL*8 :: kx, ky, dk
-INTEGER*4 :: i, j, ik, jk
-
-REAL*8 :: t_Rashba = 1.
+REAL(REAL64) :: t_Rashba = 1.
 dk = 0.5
 
 ASSOCIATE (DIM => sc_input % discretization % derived % DIM, &
@@ -297,6 +297,7 @@ ASSOCIATE (DIM => sc_input % discretization % derived % DIM, &
 
       Hamiltonian(:, :) = 0.0d0
       CALL COMPUTE_RASHBA_HOPPING(Hamiltonian, kx, ky, t_Rashba, sc_input % discretization)
+      CALL PRINT_HAMILTONIAN(Hamiltonian, sc_input % discretization % derived % DIM, "H_rashba")
 
       DO i = 1, DIM
         DO j = 1, DIM
@@ -386,10 +387,68 @@ ASSOCIATE (DIM => sc_input % discretization % derived % DIM, &
 END ASSOCIATE
 end test
 
+test test_compute_fermi_energy
+!This test has bad name, it is not dedicated to some particular hamiltonian, rather checking the whole symmetry
+USE writers
+USE utilities
+COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+COMPLEX(REAL64) :: Hamiltonian_rotated(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+
+REAL(REAL64) :: kx, ky, kx_rotated, ky_rotated
+REAL(REAL64) :: r_k = 1
+REAL(REAL64) :: phi_k = 2
+REAL(REAL64) :: rotation_angle = PI / 3
+INTEGER(INT32) :: n_pi_3_rotations = 2
+INTEGER(INT32) :: i, j, ik, jk
+
+REAL(REAL64) :: t_Rashba = 1.
+REAL(REAL64) :: t_D = .5
+REAL(REAL64) :: t_I = .04
+REAL(REAL64) :: lambda_soc = 1.
+COMPLEX(REAL64) :: trace = 0.
+
+kx = r_k * COS(phi_k)
+ky = r_k * SIN(phi_k)
+
+kx_rotated = r_k * COS(phi_k + n_pi_3_rotations * rotation_angle)
+ky_rotated = r_k * SIN(phi_k + n_pi_3_rotations * rotation_angle)
+
+Hamiltonian = CMPLX(0., 0., KIND=REAL64)
+Hamiltonian_rotated = CMPLX(0., 0., KIND=REAL64)
+
+ASSOCIATE (DIM => sc_input % discretization % derived % DIM, &
+           DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+           TBA_DIM => sc_input % discretization % derived % TBA_DIM, &
+           LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS, &
+           ORBITALS => sc_input % discretization % ORBITALS)
+
+  ! Compute initial hamiltonian
+  CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian, lambda_soc, sc_input % discretization)
+  !CALL COMPUTE_RASHBA_HOPPING(Hamiltonian, kx, ky, t_Rashba, sc_input % discretization)
+  !CALL COMPUTE_TBA_TERM(Hamiltonian, kx, ky, t_D, t_I, sc_input % discretization)
+  CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM)
+  CALL PRINT_HAMILTONIAN(Hamiltonian, sc_input % discretization % derived % DIM, "H_rashba_original")
+
+  ! Compute rotated hamiltonian
+  CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_rotated, lambda_soc, sc_input % discretization)
+  !CALL COMPUTE_RASHBA_HOPPING(Hamiltonian_rotated, kx_rotated, ky_rotated, t_Rashba, sc_input % discretization)
+  !CALL COMPUTE_TBA_TERM(Hamiltonian_rotated, kx_rotated, ky_rotated, t_D, t_I, sc_input % discretization)
+  CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_rotated, sc_input % discretization % derived % DIM)
+  CALL PRINT_HAMILTONIAN(Hamiltonian_rotated, sc_input % discretization % derived % DIM, "H_rashba_rotated")
+
+  ! Check that when I rotate by pi/3, the Hamiltonian is invariant
+  DO i = 1, n_pi_3_rotations
+    CALL ROTATE_HAMILTONIAN_60_DEG(Hamiltonian, sc_input % discretization % derived % DIM)
+  END DO
+  CALL PRINT_HAMILTONIAN(Hamiltonian, sc_input % discretization % derived % DIM, "H_rashba_original_rotated")
+
+END ASSOCIATE
+end test
+
 test test_compute_layer_potential
-COMPLEX*16 :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
-INTEGER*4 :: i, j
-REAL*8, ALLOCATABLE :: V_layer(:)
+COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+INTEGER(INT32) :: i, j
+REAL(REAL64), ALLOCATABLE :: V_layer(:)
 ALLOCATE (V_layer(sc_input % discretization % SUBLATTICES))
 
 Hamiltonian = 0.0d0
@@ -430,10 +489,10 @@ DEALLOCATE (V_layer)
 end test
 
 test test_compute_zeeman
-COMPLEX*16 :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
-INTEGER*4 :: i, j, nambu_sign, spin_sign
-REAL*8 :: B(3) = [1, 2, 3]
-REAL*8 :: g_factor = 6.0
+COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+INTEGER(INT32) :: i, j, nambu_sign, spin_sign
+REAL(REAL64) :: B(3) = [1, 2, 3]
+REAL(REAL64) :: g_factor = 6.0
 
 Hamiltonian = 0.0d0
 CALL COMPUTE_ZEEMAN(B, g_factor, Hamiltonian, sc_input % discretization)
@@ -470,24 +529,24 @@ end test
 test test_compute_orbital_magnetic_coupling
 USE writers
 
-COMPLEX*16 :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
-REAL*8, PARAMETER :: muB = 0.5
-INTEGER*4 :: i, j, nambu_sign, spin_sign
-REAL*8 :: B(3) = [1, 9, 18]
-COMPLEX*16 :: elem
-COMPLEX*16, PARAMETER :: c_zero = (0.0d0, 0.0d0) ! So that compiler does not complain about type mismatch between 0 and imag
-COMPLEX*16, PARAMETER :: L_x(3, 3) = TRANSPOSE(RESHAPE([c_zero, c_zero, imag, &
-                                                        c_zero, c_zero, imag, &
-                                                        -imag, -imag, c_zero], &
-                                                       [3, 3])) / SQRT(2.0d0)
-COMPLEX*16, PARAMETER :: L_y(3, 3) = TRANSPOSE(RESHAPE([c_zero, -2 * imag, -imag, &
-                                                        2 * imag, c_zero, imag, &
-                                                        imag, -imag, c_zero], &
-                                                       [3, 3])) / SQRT(6.0d0)
-COMPLEX*16, PARAMETER :: L_z(3, 3) = TRANSPOSE(RESHAPE([c_zero, -imag, imag, &
-                                                        imag, c_zero, -imag, &
-                                                        -imag, imag, c_zero], &
-                                                       [3, 3])) / SQRT(3.0d0)
+COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+REAL(REAL64), PARAMETER :: muB = 0.5
+INTEGER(INT32) :: i, j, nambu_sign, spin_sign
+REAL(REAL64) :: B(3) = [1, 9, 18]
+COMPLEX(REAL64) :: elem
+COMPLEX(REAL64), PARAMETER :: c_zero = (0.0d0, 0.0d0) ! So that compiler does not complain about type mismatch between 0 and imag
+COMPLEX(REAL64), PARAMETER :: L_x(3, 3) = TRANSPOSE(RESHAPE([c_zero, c_zero, imag, &
+                                                             c_zero, c_zero, imag, &
+                                                             -imag, -imag, c_zero], &
+                                                            [3, 3])) / SQRT(2.0d0)
+COMPLEX(REAL64), PARAMETER :: L_y(3, 3) = TRANSPOSE(RESHAPE([c_zero, -2 * imag, -imag, &
+                                                             2 * imag, c_zero, imag, &
+                                                             imag, -imag, c_zero], &
+                                                            [3, 3])) / SQRT(6.0d0)
+COMPLEX(REAL64), PARAMETER :: L_z(3, 3) = TRANSPOSE(RESHAPE([c_zero, -imag, imag, &
+                                                             imag, c_zero, -imag, &
+                                                             -imag, imag, c_zero], &
+                                                            [3, 3])) / SQRT(3.0d0)
 
 Hamiltonian = 0.0d0
 CALL COMPUTE_ORBITAL_MAGNETIC_COUPLING(B, Hamiltonian, sc_input % discretization)
@@ -539,22 +598,22 @@ end test
 test test_compute_sc
 USE writers
 
-COMPLEX*16 :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
-COMPLEX*16 :: Gamma_SC(sc_input % discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, sc_input % discretization % derived % LAYER_COUPLINGS) !! Superconducting energies
-REAL*8 :: kx, ky, dk
-INTEGER*4 :: i, j, ik, jk
+COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+COMPLEX(REAL64) :: Gamma_SC(sc_input % discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, sc_input % discretization % derived % LAYER_COUPLINGS) !! Superconducting energies
+REAL(REAL64) :: kx, ky, dk
+INTEGER(INT32) :: i, j, ik, jk
 
-REAL*8 :: gamma_nearest = 1.
-REAL*8 :: gamma_next = 3.
+REAL(REAL64) :: gamma_nearest = 1.
+REAL(REAL64) :: gamma_next = 3.
 
 dk = 0.
 
 Gamma_SC = 0.
-Gamma_SC(:, :N_NEIGHBOURS, 1, 1, :) = DCMPLX(gamma_nearest, 0.)
-Gamma_SC(:, :N_NEIGHBOURS, 2, 2, :) = DCMPLX(-gamma_nearest, 0.)
+Gamma_SC(:, :N_NEIGHBOURS, 1, 1, :) = CMPLX(gamma_nearest, 0., KIND=REAL64)
+Gamma_SC(:, :N_NEIGHBOURS, 2, 2, :) = CMPLX(-gamma_nearest, 0., KIND=REAL64)
 !coupling for next nearest neighbours
-Gamma_SC(:, (N_NEIGHBOURS + 1):, 1, 1, :) = DCMPLX(gamma_next, 0.)
-Gamma_SC(:, (N_NEIGHBOURS + 1):, 2, 2, :) = DCMPLX(-gamma_next, 0.)
+Gamma_SC(:, (N_NEIGHBOURS + 1):, 1, 1, :) = CMPLX(gamma_next, 0., KIND=REAL64)
+Gamma_SC(:, (N_NEIGHBOURS + 1):, 2, 2, :) = CMPLX(-gamma_next, 0., KIND=REAL64)
 
 DO ik = -2, 2
   DO jk = -2, 2

@@ -23,6 +23,7 @@
 
 #include "macros_def.f90"
 MODULE postprocessing
+use, intrinsic :: iso_fortran_env, only: real64, int8, int16, int32, int64
 USE hamiltonians
 USE parameters
 USE utilities
@@ -40,27 +41,27 @@ SUBROUTINE CALCULATE_DOS(dos_params)
 
   TYPE(sc_input_params_t) :: sc_input
 
-  REAL*8 :: E0
-  INTEGER*4 :: DOS_steps
-  INTEGER*4 :: hamiltonian_dim
+  REAL(REAL64) :: E0
+  INTEGER(INT32) :: DOS_steps
+  INTEGER(INT32) :: hamiltonian_dim
 
-  COMPLEX*16, ALLOCATABLE :: Hamiltonian(:, :), Hamiltonian_const(:, :), Hamiltonian_const_band(:, :), U_transformation(:, :)
-  REAL*8, ALLOCATABLE :: Energies(:)
+  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian(:, :), Hamiltonian_const(:, :), Hamiltonian_const_band(:, :), U_transformation(:, :)
+  REAL(REAL64), ALLOCATABLE :: Energies(:)
 
-  COMPLEX*16, ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :)
-  REAL*8, ALLOCATABLE :: Charge_dens(:, :)
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :)
+  REAL(REAL64), ALLOCATABLE :: Charge_dens(:, :)
 
-  REAL*8, ALLOCATABLE :: DOS(:), DOS_local(:)
+  REAL(REAL64), ALLOCATABLE :: DOS(:), DOS_local(:)
   CHARACTER(LEN=20) :: output_format
 
-  REAL*8 :: k1, k2, kx, ky, dk1, dk2
-  REAL*8 :: sc_multiplier
-  INTEGER*4 :: i, j, k, n, lat, orb, orb_prime, spin, band
+  REAL(REAL64) :: k1, k2, kx, ky, dk1, dk2
+  REAL(REAL64) :: sc_multiplier
+  INTEGER(INT32) :: i, j, k, n, lat, orb, orb_prime, spin, band
 
-  INTEGER*4 :: i_ref, j_ref
-  REAL*8 :: dk1_ref, dk2_ref
+  INTEGER(INT32) :: i_ref, j_ref
+  REAL(REAL64) :: dk1_ref, dk2_ref
 
-  INTEGER*4 :: points_within_energy_range, points_within_energy_range_local
+  INTEGER(INT32) :: points_within_energy_range, points_within_energy_range_local
 
   LOGICAL :: fileExists
 
@@ -100,10 +101,10 @@ SUBROUTINE CALCULATE_DOS(dos_params)
     ALLOCATE (DOS(0:DOS_steps))
     ALLOCATE (DOS_local(0:DOS_steps))
   END ASSOCIATE
-  Hamiltonian = DCMPLX(0., 0.)
-  Hamiltonian_const = DCMPLX(0., 0.)
+  Hamiltonian = CMPLX(0., 0., KIND=REAL64)
+  Hamiltonian_const = CMPLX(0., 0., KIND=REAL64)
   Energies = 0.
-  Gamma_SC = DCMPLX(0., 0.)
+  Gamma_SC = CMPLX(0., 0., KIND=REAL64)
   Charge_dens = 0.
   DOS = 0.0d0
   DOS_local = 0.0d0
@@ -136,7 +137,7 @@ SUBROUTINE CALCULATE_DOS(dos_params)
 
         kx = 2.*PI / (SQRT(3.0d0)) * k1
         ky = -2.*PI / 3.*k1 + 4.*PI / 3.*k2
-        Hamiltonian(:, :) = DCMPLX(0., 0.)
+        Hamiltonian(:, :) = CMPLX(0., 0., KIND=REAL64)
         CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
         CALL COMPUTE_HUBBARD(Hamiltonian, &
                             & Charge_dens(:, band), &
@@ -172,7 +173,7 @@ SUBROUTINE CALCULATE_DOS(dos_params)
               k2 = j * dk2 + j_ref * dk2_ref
               kx = 2.*PI / (SQRT(3.0d0)) * k1
               ky = -2.*PI / 3.*k1 + 4.*PI / 3.*k2
-              Hamiltonian(:, :) = DCMPLX(0., 0.)
+              Hamiltonian(:, :) = CMPLX(0., 0., KIND=REAL64)
               CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
               CALL COMPUTE_HUBBARD(Hamiltonian, &
                                   & Charge_dens(:, band), &
@@ -205,7 +206,7 @@ SUBROUTINE CALCULATE_DOS(dos_params)
             k2 = j * dk2 + j_ref * dk2_ref
             kx = 2.*PI / (SQRT(3.0d0)) * k1
             ky = -2.*PI / 3.*k1 + 4.*PI / 3.*k2
-            Hamiltonian(:, :) = DCMPLX(0., 0.)
+            Hamiltonian(:, :) = CMPLX(0., 0., KIND=REAL64)
             CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
             CALL COMPUTE_HUBBARD(Hamiltonian, &
                                 & Charge_dens(:, band), &
@@ -237,7 +238,7 @@ SUBROUTINE CALCULATE_DOS(dos_params)
             k2 = j * dk2
             kx = 2.*PI / (SQRT(3.0d0)) * k1
             ky = -2.*PI / 3.*k1 + 4.*PI / 3.*k2
-            Hamiltonian(:, :) = DCMPLX(0., 0.)
+            Hamiltonian(:, :) = CMPLX(0., 0., KIND=REAL64)
             CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
             CALL COMPUTE_HUBBARD(Hamiltonian, &
                                 & Charge_dens(:, band), &
@@ -313,34 +314,34 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
   !! Takes physical parameters from input.nml from a directory specified by inputPath.
   TYPE(post_dispersion_relation_t), INTENT(INOUT) :: dispersion
   ! CHARACTER(LEN=*), INTENT(IN) :: inputPath
-  ! INTEGER*4, INTENT(IN) :: Nk_points
+  ! INTEGER(INT32), INTENT(IN) :: Nk_points
   ! LOGICAL, INTENT(IN) :: include_sc
 
   TYPE(sc_input_params_t) :: sc_input
   CHARACTER(LEN=20) :: output_format
 
-  COMPLEX*16, ALLOCATABLE :: Hamiltonian(:, :), Hamiltonian_const(:, :), Hamiltonian_const_band(:, :)
-  REAL*8, ALLOCATABLE :: Energies(:)
+  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian(:, :), Hamiltonian_const(:, :), Hamiltonian_const_band(:, :)
+  REAL(REAL64), ALLOCATABLE :: Energies(:)
 
-  COMPLEX*16, ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :)
-  REAL*8, ALLOCATABLE :: Charge_dens(:, :)
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :)
+  REAL(REAL64), ALLOCATABLE :: Charge_dens(:, :)
 
-  REAL*8 :: kx, ky
-  REAL*8 :: phi_k, r_max, dr, r_k
-  REAL*8 :: sc_multiplier
-  INTEGER*4 :: i, j, k, n, lat, orb, orb_prime, spin, l, m, band
-  INTEGER*4 :: i_r, j_phi, n_triangle
-  INTEGER*4 :: s_up_idx, s_down_idx
-  INTEGER*4 :: kx_steps, ky_steps
-  REAL*8 :: yz_contribution, zx_contribution, xy_contribution
-  REAL*8 :: lat1_contribution, lat2_contribution
-  REAL*8, ALLOCATABLE :: Lat_contributions(:)
-  REAL*8 :: spin_x_contribution, spin_y_contribution, spin_z_contribution
-  REAL*8 :: electron_contribution, hole_contribution
-  REAL*8 :: brillouinZoneVertices(6, 2)
+  REAL(REAL64) :: kx, ky
+  REAL(REAL64) :: phi_k, r_max, dr, r_k
+  REAL(REAL64) :: sc_multiplier
+  INTEGER(INT32) :: i, j, k, n, lat, orb, orb_prime, spin, l, m, band
+  INTEGER(INT32) :: i_r, j_phi, n_triangle
+  INTEGER(INT32) :: s_up_idx, s_down_idx
+  INTEGER(INT32) :: kx_steps, ky_steps
+  REAL(REAL64) :: yz_contribution, zx_contribution, xy_contribution
+  REAL(REAL64) :: lat1_contribution, lat2_contribution
+  REAL(REAL64), ALLOCATABLE :: Lat_contributions(:)
+  REAL(REAL64) :: spin_x_contribution, spin_y_contribution, spin_z_contribution
+  REAL(REAL64) :: electron_contribution, hole_contribution
+  REAL(REAL64) :: brillouinZoneVertices(6, 2)
 
   LOGICAL :: fileExists
-  INTEGER*4 :: hamiltonian_dim
+  INTEGER(INT32) :: hamiltonian_dim
 
   brillouinZoneVertices(:, 1) = (/4.*PI / (3 * SQRT(3.0d0)), 2.*PI / (3 * SQRT(3.0d0)), -2.*PI / (3 * SQRT(3.0d0)), -4.*PI / (3 * SQRT(3.0d0)), -2.*PI / (3 * SQRT(3.0d0)), 2.*PI / (3 * SQRT(3.0d0))/)
   brillouinZoneVertices(:, 2) = (/0.0d0, -2.*PI / 3.0d0, -2.*PI / 3.0d0, 0.0d0, 2.*PI / 3.0d0, 2.*PI / 3.0d0/)
@@ -379,10 +380,10 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
     ALLOCATE (Lat_contributions(SUBLATTICES))
   END ASSOCIATE
 
-  Hamiltonian = DCMPLX(0., 0.)
-  Hamiltonian_const = DCMPLX(0., 0.)
+  Hamiltonian = CMPLX(0., 0., KIND=REAL64)
+  Hamiltonian_const = CMPLX(0., 0., KIND=REAL64)
   Energies = 0.
-  Gamma_SC = DCMPLX(0., 0.) * meV2au
+  Gamma_SC = CMPLX(0., 0., KIND=REAL64) * meV2au
   Charge_dens = 0.
   Lat_contributions = 0.
 
@@ -399,7 +400,7 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
   CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const, sc_input % discretization, sc_input % physical)
 
   OPEN (unit=9, FILE=TRIM(dispersion % path)//"OutputData/Energies.dat", FORM="FORMATTED", ACTION="WRITE")
-  WRITE (9, '(A)') "#N kx[1/a] ky[1/a] Energy[meV] P(yz) P(zx) P(xy) P(lat1) P(lat2) ... P(latN) P(s_up) P(sigma_x) P(sigma_y) P(sigma_z) P(electron) P(hole)"
+  WRITE (9, '(A)') "#N kx[1/a] ky[1/a] Energy[meV] P(yz) P(zx) P(xy) P(lat1) P(lat2) ... P(latN) P(sigma_x) P(sigma_y) P(sigma_z) P(electron) P(hole)"
 
   DO band = 1, sc_input % discretization % SUBBANDS
     WRITE (log_string, *) "Band: ", band
@@ -409,7 +410,10 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
     Hamiltonian_const_band = Hamiltonian_const
     CALL COMPUTE_SUBBAND_POTENTIAL(Hamiltonian_const_band, band, sc_input % physical % subband_params % Subband_energies, sc_input % discretization)
 
-    !$omp parallel do collapse(3) schedule(dynamic, 1) private(phi_k, r_k, r_max, dr, kx, ky, n_triangle, j_phi, i_r, orb, n, Energies, Hamiltonian)
+    !$omp parallel do collapse(3) schedule(dynamic, 1) private(phi_k, r_k, r_max, dr, kx, ky, n_triangle, j_phi, i_r, orb, n, &
+    !$omp                                                     & Energies, Hamiltonian, yz_contribution, zx_contribution, xy_contribution, &
+    !$omp                                                     & Lat_contributions, spin_x_contribution, spin_y_contribution, spin_z_contribution, &
+    !$omp                                                     & electron_contribution, hole_contribution, s_up_idx, s_down_idx, l, m, spin, lat)
     DO n_triangle = -N_BZ_SECTIONS / 2, N_BZ_SECTIONS / 2 - 1
       DO j_phi = 0, dispersion % Nphi_points - 1
         DO i_r = 0, dispersion % Nr_points
@@ -422,7 +426,7 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
           kx = r_k * COS(phi_k)
           ky = r_k * SIN(phi_k)
 
-          Hamiltonian(:, :) = DCMPLX(0., 0.)
+          Hamiltonian(:, :) = CMPLX(0., 0., KIND=REAL64)
           CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
           CALL COMPUTE_HUBBARD(Hamiltonian, &
                               & Charge_dens(:, band), &
@@ -536,20 +540,20 @@ SUBROUTINE CALCULATE_CHERN_PARAMS(chern)
   !! Calculates Chern Params, based on https://arxiv.org/abs/cond-mat/0503172
   !! Not adapted to multiband systems
   TYPE(post_chern_number_t), INTENT(IN) :: chern
-  ! INTEGER*4, INTENT(IN) :: Nk1 !! Number of divisions along k1
-  ! INTEGER*4, INTENT(IN) :: Nk2 !! Number of divisions along k2
-  !INTEGER*4, INTENT(IN) :: HamDim !! DImension of the hamiltonian to be diagonalized (e.g. 4 for simple hellical, 24 for LAO-STO)
+  ! INTEGER(INT32), INTENT(IN) :: Nk1 !! Number of divisions along k1
+  ! INTEGER(INT32), INTENT(IN) :: Nk2 !! Number of divisions along k2
+  !INTEGER(INT32), INTENT(IN) :: HamDim !! DImension of the hamiltonian to be diagonalized (e.g. 4 for simple hellical, 24 for LAO-STO)
   !CHARACTER(LEN=*) :: inputPath
   TYPE(sc_input_params_t) :: sc_input
-  COMPLEX*16, ALLOCATABLE :: Psi(:, :, :, :)
-  COMPLEX*16, ALLOCATABLE :: U1_chern(:, :), U2_chern(:, :), U3_chern(:, :), U4_chern(:, :)
-  !COMPLEX*16 :: U1_chern(DIM / 2, DIM / 2), U2_chern(DIM / 2, DIM / 2), U3_chern(DIM / 2, DIM / 2), U4_chern(DIM / 2, DIM / 2)
-  INTEGER*4 :: i, j, a, b, m, n
-  REAL*8 :: potChem
-  REAL*8 :: Bfield(3)
-  COMPLEX*16 :: links
+  COMPLEX(REAL64), ALLOCATABLE :: Psi(:, :, :, :)
+  COMPLEX(REAL64), ALLOCATABLE :: U1_chern(:, :), U2_chern(:, :), U3_chern(:, :), U4_chern(:, :)
+  !COMPLEX(REAL64) :: U1_chern(DIM / 2, DIM / 2), U2_chern(DIM / 2, DIM / 2), U3_chern(DIM / 2, DIM / 2), U4_chern(DIM / 2, DIM / 2)
+  INTEGER(INT32) :: i, j, a, b, m, n
+  REAL(REAL64) :: potChem
+  REAL(REAL64) :: Bfield(3)
+  COMPLEX(REAL64) :: links
 
-  COMPLEX*16 :: f_12, det1, det2, det3, det4
+  COMPLEX(REAL64) :: f_12, det1, det2, det3, det4
 
   CALL GET_INPUT(TRIM(chern % path)//"input.nml", sc_input)
 
@@ -575,7 +579,7 @@ SUBROUTINE CALCULATE_CHERN_PARAMS(chern)
   !PRINT*, "Ham dim ", DIM
   !PRINT*, "DIM/2", DIM/2
   !PRINT*, "Nk1/2", Nk1/2
-  f_12 = DCMPLX(0., 0.)
+  f_12 = CMPLX(0., 0., KIND=REAL64)
   !Calculate Chern numbers
   DO j = -chern % Nk_points / 2, chern % Nk_points / 2 - 1
     !This is for memory optimization. I dont have to keep all values of Psi over Brillouin Zone.
@@ -620,10 +624,10 @@ SUBROUTINE CALCULATE_CHERN_PARAMS(chern)
     DO i = -chern % Nk_points / 2, chern % Nk_points / 2 - 1
       !PRINT*, i, j
       !Calculate U matrices for chern numbers
-      U1_chern = DCMPLX(0.0, 0.)
-      U2_chern = DCMPLX(0.0, 0.)
-      U3_chern = DCMPLX(0.0, 0.)
-      U4_chern = DCMPLX(0.0, 0.)
+      U1_chern = CMPLX(0.0, 0., KIND=REAL64)
+      U2_chern = CMPLX(0.0, 0., KIND=REAL64)
+      U3_chern = CMPLX(0.0, 0., KIND=REAL64)
+      U4_chern = CMPLX(0.0, 0., KIND=REAL64)
 
       DO a = 1, sc_input % discretization % derived % DIM_POSITIVE_K
         DO b = 1, sc_input % discretization % derived % DIM_POSITIVE_K
@@ -679,28 +683,28 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(gap)
 
   TYPE(post_sc_gap_t) :: gap
   ! CHARACTER(LEN=*), INTENT(IN) :: inputPath !! This should be a path to folder where input.nml resides
-  ! REAL*8, INTENT(IN) :: dE
-  ! INTEGER*4, INTENT(IN) :: nBrillouinPoints
+  ! REAL(REAL64), INTENT(IN) :: dE
+  ! INTEGER(INT32), INTENT(IN) :: nBrillouinPoints
   TYPE(sc_input_params_t) :: sc_input
   CHARACTER(LEN=20) :: output_format
 
-  COMPLEX*16, ALLOCATABLE :: Hamiltonian(:, :), Hamiltonian_const(:, :), Hamiltonian_const_band(:, :)
-  REAL*8, ALLOCATABLE :: Energies(:)
+  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian(:, :), Hamiltonian_const(:, :), Hamiltonian_const_band(:, :)
+  REAL(REAL64), ALLOCATABLE :: Energies(:)
 
-  COMPLEX*16, ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :)
-  REAL*8, ALLOCATABLE :: Charge_dens(:, :)
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :)
+  REAL(REAL64), ALLOCATABLE :: Charge_dens(:, :)
 
-  INTEGER*1, ALLOCATABLE :: IsFermiSurface(:, :) !! This indicates whether given (kx,ky) point is at Fermi surface
-  INTEGER*2, ALLOCATABLE :: OrbitalAtFermiSurface(:, :) !! This indicates which state consitutes to the Fermi surface.
+  INTEGER(INT8), ALLOCATABLE :: IsFermiSurface(:, :) !! This indicates whether given (kx,ky) point is at Fermi surface
+  INTEGER(INT16), ALLOCATABLE :: OrbitalAtFermiSurface(:, :) !! This indicates which state consitutes to the Fermi surface.
                                                          !! Because ZHEEV is used, energies are sorted from lowest to highest.
                                                          !! This implies that we do not recognize which spin, orbital etc.
                                                          !! constitutes to the Fermi surface, only "lowest", "second lowest" and so on.
 
-  REAL*8 :: brillouinZoneVertices(6, 2)
+  REAL(REAL64) :: brillouinZoneVertices(6, 2)
 
-  REAL*8 :: k1, k2, kx, ky, dkx, dky
-  INTEGER*4 :: i, j, n, m, band
-  INTEGER*4 :: kx_steps, ky_steps
+  REAL(REAL64) :: k1, k2, kx, ky, dkx, dky
+  INTEGER(INT32) :: i, j, n, m, band
+  INTEGER(INT32) :: kx_steps, ky_steps
 
   LOGICAL :: fileExists
 
@@ -732,10 +736,10 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(gap)
     ALLOCATE (Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, LAYER_COUPLINGS, SUBBANDS))
     ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
   END ASSOCIATE
-  Hamiltonian(:, :) = DCMPLX(0., 0.)
-  Hamiltonian_const(:, :) = DCMPLX(0., 0.)
+  Hamiltonian(:, :) = CMPLX(0., 0., KIND=REAL64)
+  Hamiltonian_const(:, :) = CMPLX(0., 0., KIND=REAL64)
   Energies(:) = 0.
-  Gamma_SC = DCMPLX(0., 0.) * meV2au
+  Gamma_SC = CMPLX(0., 0., KIND=REAL64) * meV2au
   Charge_dens = 0.
 
   output_format = '(3E15.5, I10)'
@@ -769,7 +773,7 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(gap)
 
         IF (is_inside_polygon(brillouinZoneVertices, 6, kx, ky)) THEN
 
-          Hamiltonian(:, :) = DCMPLX(0., 0.)
+          Hamiltonian(:, :) = CMPLX(0., 0., KIND=REAL64)
           Energies(:) = 0.
           CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
           CALL COMPUTE_HUBBARD(Hamiltonian, &
@@ -808,7 +812,7 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(gap)
           kx = i * dkx
           ky = j * dky
 
-          Hamiltonian(:, :) = DCMPLX(0., 0.)
+          Hamiltonian(:, :) = CMPLX(0., 0., KIND=REAL64)
           Energies(:) = 0.
           CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
           CALL COMPUTE_HUBBARD(Hamiltonian, &
@@ -842,35 +846,35 @@ SUBROUTINE CALCULATE_GAMMA_K(gamma)
   TYPE(post_gamma_k_t), INTENT(IN) :: gamma
   TYPE(sc_input_params_t) :: sc_input
   ! CHARACTER(LEN=*), INTENT(IN) :: input_path !! This should be a path to folder where input.nml resides
-  ! INTEGER*4, INTENT(IN) :: n_brillouin_points !! Number of steps taken in k-space.
+  ! INTEGER(INT32), INTENT(IN) :: n_brillouin_points !! Number of steps taken in k-space.
   !                                               !! Integration is over interval -KX_MAX < ----- n_brillouin_points ----- 0 ----- n_brillouin_points ----- > KX_MAX
   !                                               !! So effectively 2N + 1 steps are taken in each direction
 
-  COMPLEX*16, ALLOCATABLE :: Hamiltonian_const(:, :) !! k-indepndent and band-independent part of the Hamiltonian
-  COMPLEX*16, ALLOCATABLE :: Hamiltonian_const_band(:, :) !! k-independent, band-dependent Hamiltonian
-  COMPLEX*16, ALLOCATABLE :: Hamiltonian_dummy(:, :) !! This is only used to get matrix elements gamma that show up in the Hamiltonian
-  COMPLEX*16, ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :) !! Supercondicting pairings read from a simulation
-  COMPLEX*16, ALLOCATABLE :: Gamma_K(:, :, :, :, :, :) !! Superconducting pairing, determined at given k point
-  REAL*8, ALLOCATABLE :: Charge_dens(:, :) !! Charge density read from a simulation
-  COMPLEX*16, ALLOCATABLE :: Delta_local(:, :, :, :, :, :) !! Delta (pairing amplitudes) for given k point, integrand
-  REAL*8, ALLOCATABLE :: Charge_dens_local(:, :) !! Charge density for given k point, integrand
+  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian_const(:, :) !! k-indepndent and band-independent part of the Hamiltonian
+  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian_const_band(:, :) !! k-independent, band-dependent Hamiltonian
+  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian_dummy(:, :) !! This is only used to get matrix elements gamma that show up in the Hamiltonian
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :) !! Supercondicting pairings read from a simulation
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_K(:, :, :, :, :, :) !! Superconducting pairing, determined at given k point
+  REAL(REAL64), ALLOCATABLE :: Charge_dens(:, :) !! Charge density read from a simulation
+  COMPLEX(REAL64), ALLOCATABLE :: Delta_local(:, :, :, :, :, :) !! Delta (pairing amplitudes) for given k point, integrand
+  REAL(REAL64), ALLOCATABLE :: Charge_dens_local(:, :) !! Charge density for given k point, integrand
 
-  REAL*8 :: k1, k2, kx, ky, dkx, dky
-  INTEGER*4 :: i, j, n, m, band
-  INTEGER*4 :: kx_steps, ky_steps
-  INTEGER*4 :: orb, neigh, spin1, spin2, layer, lat, file_count
-  INTEGER*4 :: orb_prime, band_prime
-  INTEGER*4 :: row, col, row_inverse, col_inverse, row_nnn, col_nnn
-  INTEGER*4 :: gamma_lat_index, gamma_spin_index
+  REAL(REAL64) :: k1, k2, kx, ky, dkx, dky
+  INTEGER(INT32) :: i, j, n, m, band
+  INTEGER(INT32) :: kx_steps, ky_steps
+  INTEGER(INT32) :: orb, neigh, spin1, spin2, layer, lat, file_count
+  INTEGER(INT32) :: orb_prime, band_prime
+  INTEGER(INT32) :: row, col, row_inverse, col_inverse, row_nnn, col_nnn
+  INTEGER(INT32) :: gamma_lat_index, gamma_spin_index
 
-  COMPLEX*16 :: gamma_nn_12, gamma_nn_21, gamma_nnn
+  COMPLEX(REAL64) :: gamma_nn_12, gamma_nn_21, gamma_nnn
 
   CHARACTER(LEN=200) :: filename
-  COMPLEX*16, ALLOCATABLE :: File_unit_mapping(:, :, :, :, :)
+  COMPLEX(REAL64), ALLOCATABLE :: File_unit_mapping(:, :, :, :, :)
 
   LOGICAL :: file_exists
 
-  REAL*8 :: Brillouin_zone_vertices(6, 2)
+  REAL(REAL64) :: Brillouin_zone_vertices(6, 2)
 
   Brillouin_zone_vertices(:, 1) = (/4.*PI / (3 * SQRT(3.0d0)), 2.*PI / (3 * SQRT(3.0d0)), -2.*PI / (3 * SQRT(3.0d0)), -4.*PI / (3 * SQRT(3.0d0)), -2.*PI / (3 * SQRT(3.0d0)), 2.*PI / (3 * SQRT(3.0d0))/)
   Brillouin_zone_vertices(:, 2) = (/0.0d0, -2.*PI / 3.0d0, -2.*PI / 3.0d0, 0.0d0, 2.*PI / 3.0d0, 2.*PI / 3.0d0/)
@@ -901,9 +905,9 @@ SUBROUTINE CALCULATE_GAMMA_K(gamma)
     ALLOCATE (File_unit_mapping(ORBITALS, SPINS, SPINS, LAYER_COUPLINGS, SUBBANDS))
   END ASSOCIATE
 
-  Hamiltonian_const = DCMPLX(0., 0.)
-  Hamiltonian_const_band = DCMPLX(0., 0.)
-  Gamma_SC = DCMPLX(0., 0.)
+  Hamiltonian_const = CMPLX(0., 0., KIND=REAL64)
+  Hamiltonian_const_band = CMPLX(0., 0., KIND=REAL64)
+  Gamma_SC = CMPLX(0., 0., KIND=REAL64)
   Charge_dens = 0.
 
   CALL GET_SAFE_GAMMA_SC(Gamma_SC, gamma % path, sc_input % discretization)
@@ -960,7 +964,7 @@ SUBROUTINE CALCULATE_GAMMA_K(gamma)
 
       !Write result for given k point to file
       DO band = 1, sc_input % discretization % SUBBANDS
-        Hamiltonian_dummy = DCMPLX(0.0d0, 0.0d0)
+        Hamiltonian_dummy = CMPLX(0.0d0, 0.0d0, KIND=REAL64)
         CALL COMPUTE_SC(Hamiltonian_dummy, kx, ky, Gamma_SC(:, :, :, :, :, band), sc_input % discretization)
 
         DO orb = 1, sc_input % discretization % ORBITALS
@@ -985,7 +989,7 @@ SUBROUTINE CALCULATE_GAMMA_K(gamma)
                       & (spin2 - 1) * sc_input % discretization % derived % TBA_DIM + sc_input % discretization % derived % DIM_POSITIVE_K
                   gamma_nnn = Hamiltonian_dummy(row, col)
                 ELSE
-                  gamma_nnn = DCMPLX(0.0d0, 0.0d0)
+                  gamma_nnn = CMPLX(0.0d0, 0.0d0, KIND=REAL64)
                 END IF
 
                 file_count = File_unit_mapping(orb, spin1, spin2, gamma_lat_index, band)
@@ -1009,7 +1013,7 @@ SUBROUTINE CALCULATE_GAMMA_K(gamma)
                       & (spin2 - 1) * sc_input % discretization % derived % TBA_DIM + sc_input % discretization % derived % DIM_POSITIVE_K
                   gamma_nnn = Hamiltonian_dummy(row, col)
                 ELSE
-                  gamma_nnn = DCMPLX(0.0d0, 0.0d0)
+                  gamma_nnn = CMPLX(0.0d0, 0.0d0, KIND=REAL64)
                 END IF
 
                 file_count = File_unit_mapping(orb, spin1, spin2, gamma_lat_index, band)
@@ -1063,41 +1067,42 @@ SUBROUTINE CALCULATE_PROJECTIONS(projections)
   ! INTEGER, INTENT(IN) :: n_r_points !! Number of steps in radial direction
   ! INTEGER, INTENT(IN) :: n_phi_points !! Number of steps taken in angular direction in one of six triangles that make up the hexagon
 
-  COMPLEX*16, ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :) !! Supercondicting pairings read from a simulation
-  REAL*8, ALLOCATABLE :: Charge_dens(:, :) !! Charge density read from a simulation
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :) !! Supercondicting pairings read from a simulation
+  REAL(REAL64), ALLOCATABLE :: Charge_dens(:, :) !! Charge density read from a simulation
 
-  REAL*8 :: Kappa_nearest(3) !! K-variables aligned with orbital's directions for nearest neighbours
-  REAL*8 :: Kappa_next(3) !! K-variables aligned with orbital's directions for next nearest neighbours
-  COMPLEX*16 :: C_l(3) !! Shape functions for each orbital
-  COMPLEX*16 :: Gamma_nearest_orb(3) !! Fourier transformed Gamma for given orbital at current k-point for nearest neighbour
-  COMPLEX*16 :: Gamma_next_orb(3) !! Fourier transformed Gamma for given orbital at current k-point for next nearest neighbour
-  INTEGER*8, PARAMETER :: N_PROJECTIONS = 18 !! Number of distict projections in orbital \otimes spatial basis
-  COMPLEX*16 :: Projections_k_space_nearest(N_PROJECTIONS) = DCMPLX(0.0d0, 0.0d0) !! Accumulator for integrated projections over k-space for nearest neighbours
-  COMPLEX*16 :: Projections_k_space_next(N_PROJECTIONS) = DCMPLX(0.0d0, 0.0d0) !! Accumulator for integrated projections over k-space for next nearest neighbours
-  COMPLEX*16 :: Projections_real_space(N_PROJECTIONS) = DCMPLX(0.0d0, 0.0d0) !! Projections onto irreducible representations from real-space Gammas
-  COMPLEX*16 :: Gamma_flat(N_PROJECTIONS)!! Flattened array of gammas in real space, to be used in real-space resolved symmetries
-  COMPLEX*16 :: Active_orbital(3) !! Orbital for which to write projection. Used to utilize projection callbacks in writing basis functions for each orbital
+  REAL(REAL64) :: Kappa_nearest(3) !! K-variables aligned with orbital's directions for nearest neighbours
+  REAL(REAL64) :: Kappa_next(3) !! K-variables aligned with orbital's directions for next nearest neighbours
+  COMPLEX(REAL64) :: C_l(3) !! Shape functions for each orbital
+  COMPLEX(REAL64) :: Gamma_nearest_orb(3) !! Fourier transformed Gamma for given orbital at current k-point for nearest neighbour
+  COMPLEX(REAL64) :: Gamma_next_orb(3) !! Fourier transformed Gamma for given orbital at current k-point for next nearest neighbour
+  INTEGER(INT64), PARAMETER :: N_PROJECTIONS = 18 !! Number of distict projections in orbital \otimes spatial basis
+  COMPLEX(REAL64) :: Projections_k_space_nearest(N_PROJECTIONS) = CMPLX(0.0d0, 0.0d0, KIND=REAL64) !! Accumulator for integrated projections over k-space for nearest neighbours
+  COMPLEX(REAL64) :: Projections_k_space_next(N_PROJECTIONS) = CMPLX(0.0d0, 0.0d0, KIND=REAL64) !! Accumulator for integrated projections over k-space for next nearest neighbours
+  COMPLEX(REAL64) :: Projections_real_space(N_PROJECTIONS) = CMPLX(0.0d0, 0.0d0, KIND=REAL64) !! Projections onto irreducible representations from real-space Gammas
+  COMPLEX(REAL64) :: Gamma_flat(N_PROJECTIONS)!! Flattened array of gammas in real space, to be used in real-space resolved symmetries
+  COMPLEX(REAL64) :: Active_orbital(3) !! Orbital for which to write projection. Used to utilize projection callbacks in writing basis functions for each orbital
 
   !File operations
   CHARACTER(LEN=200) :: filename
-  INTEGER*4, PARAMETER:: FIRST_FILE_UNIT = 10
-  INTEGER*4 :: file_count, gamma_nearest_weighted_file, gamma_next_weighted_file
+  INTEGER(INT32), PARAMETER:: FIRST_FILE_UNIT = 10
+  INTEGER(INT32) :: file_count, gamma_nearest_weighted_file, gamma_next_weighted_file
   CHARACTER(LEN=4) :: Projections_name_mapping(N_PROJECTIONS)
 
   !K-space variables
-  INTEGER*4 :: n_triangle, i_r, j_phi
-  REAL*8 :: phi_k, r_k, r_max, dr
-  REAL*8 :: kx, ky
+  INTEGER(INT32) :: n_triangle, i_r, j_phi
+  REAL(REAL64) :: phi_k, r_k, r_max, dr
+  REAL(REAL64) :: kx, ky
 
   !Iterators
-  INTEGER*4 :: n, neigh, orb, spin, layer, band
+  INTEGER(INT32) :: n, neigh, orb, spin, layer, band
 
   ! Interface for basis functions
   ABSTRACT INTERFACE
     FUNCTION projection_interface(K_orb, Gamma_projected) RESULT(projection)
-      REAL*8, INTENT(IN) :: K_orb(3)
-      COMPLEX*16, INTENT(IN) :: Gamma_projected(3)
-      COMPLEX*16 :: projection
+      USE, INTRINSIC :: iso_fortran_env, ONLY: real64
+      REAL(REAL64), INTENT(IN) :: K_orb(3)
+      COMPLEX(REAL64), INTENT(IN) :: Gamma_projected(3)
+      COMPLEX(REAL64) :: projection
     END FUNCTION projection_interface
   END INTERFACE
   ! Define a pointer to function type
@@ -1183,8 +1188,8 @@ SUBROUTINE CALCULATE_PROJECTIONS(projections)
         C_l(2) = (1 + Kappa_nearest(1) * Kappa_nearest(3)) / (1 + kx**2 + ky**2)
         C_l(3) = (1 + Kappa_nearest(1) * Kappa_nearest(2)) / (1 + kx**2 + ky**2)
 
-        Gamma_nearest_orb = DCMPLX(0.0d0, 0.0d0)
-        Gamma_next_orb = DCMPLX(0.0d0, 0.0d0)
+        Gamma_nearest_orb = CMPLX(0.0d0, 0.0d0, KIND=REAL64)
+        Gamma_next_orb = CMPLX(0.0d0, 0.0d0, KIND=REAL64)
         !Performing simple Fourier transform of Gamma in each orbital
         DO orb = 1, sc_input % discretization % ORBITALS
           !Nearest neighbours
@@ -1309,15 +1314,15 @@ CONTAINS
 
   SUBROUTINE GET_REAL_SPACE_PROJECTIONS(Projections_real_space, Gamma_SC)
     IMPLICIT NONE
-    COMPLEX*16, INTENT(OUT) :: Projections_real_space(N_PROJECTIONS) !! Array of projections in real space
-    COMPLEX*16, INTENT(IN) :: Gamma_SC(sc_input % discretization % ORBITALS, &
+    COMPLEX(REAL64), INTENT(OUT) :: Projections_real_space(N_PROJECTIONS) !! Array of projections in real space
+    COMPLEX(REAL64), INTENT(IN) :: Gamma_SC(sc_input % discretization % ORBITALS, &
                                       & N_ALL_NEIGHBOURS, &
                                       & SPINS, &
                                       & SPINS, &
                                       & sc_input % discretization % derived % LAYER_COUPLINGS, &
                                       & sc_input % discretization % SUBBANDS)
-    COMPLEX*16 :: Gamma_flat(N_PROJECTIONS)
-    INTEGER*4 :: orb, neigh, n
+    COMPLEX(REAL64) :: Gamma_flat(N_PROJECTIONS)
+    INTEGER(INT32) :: orb, neigh, n
     n = 1
     DO orb = 1, sc_input % discretization % ORBITALS
       DO neigh = 1, N_NEIGHBOURS
@@ -1353,284 +1358,284 @@ CONTAINS
   END SUBROUTINE GET_REAL_SPACE_PROJECTIONS
 
   !dir$ attributes forceinline :: a1_1_proj
-  PURE COMPLEX * 16 FUNCTION a1_1_proj(k_orb, Gamma_projected)
+  PURE FUNCTION a1_1_proj(k_orb, Gamma_projected) RESULT(proj)
     !! Project Gamma_projected onto A1_1 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(3) !! Basis function for each orbital at given irreducible representation
+    COMPLEX(REAL64) :: proj
+    REAL(REAL64), INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX(REAL64), INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX(REAL64) :: F_orb(3) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = 2 * COS(K_orb(1))
     F_orb(2) = 2 * COS(K_orb(2))
     F_orb(3) = 2 * COS(K_orb(3))
-    a1_1_proj = DOT_PRODUCT(F_orb, Gamma_projected)
-    RETURN
+    proj = DOT_PRODUCT(F_orb, Gamma_projected)
   END FUNCTION a1_1_proj
 
   !dir$ attributes forceinline :: a1_2_proj
-  PURE COMPLEX * 16 FUNCTION a1_2_proj(K_orb, Gamma_projected)
+  PURE FUNCTION a1_2_proj(K_orb, Gamma_projected) RESULT(proj)
     !! Project Gamma_projected onto A1_2 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS)
+    COMPLEX(REAL64) :: proj
+    REAL(REAL64), INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX(REAL64), INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX(REAL64) :: F_orb(sc_input % discretization % ORBITALS)
     F_orb(1) = 2 * (COS(K_orb(2)) + COS(K_orb(3)))
     F_orb(2) = 2 * (COS(K_orb(1)) + COS(K_orb(3)))
     F_orb(3) = 4 * COS(K_orb(3) / 2.0d0) * COS((K_orb(1) - K_orb(2)) / 2.0d0)
-    a1_2_proj = DOT_PRODUCT(F_orb, Gamma_projected)
-    RETURN
+    proj = DOT_PRODUCT(F_orb, Gamma_projected)
   END FUNCTION a1_2_proj
 
   !dir$ attributes forceinline :: a2_1_proj
-  PURE COMPLEX * 16 FUNCTION a2_1_proj(K_orb, Gamma_projected)
+  PURE FUNCTION a2_1_proj(K_orb, Gamma_projected) RESULT(proj)
     !! Project Gamma_projected onto A2_1 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
+    COMPLEX(REAL64) :: proj
+    REAL(REAL64), INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX(REAL64), INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX(REAL64) :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = 2 * (COS(K_orb(2)) - COS(K_orb(3)))
     F_orb(2) = 2 * (-COS(K_orb(1)) + COS(K_orb(3)))
     F_orb(3) = 4 * SIN(K_orb(3) / 2.0d0) * SIN((K_orb(1) - K_orb(2)) / 2.0d0)
-    a2_1_proj = DOT_PRODUCT(F_orb, Gamma_projected)
-    RETURN
+    proj = DOT_PRODUCT(F_orb, Gamma_projected)
   END FUNCTION a2_1_proj
 
   !dir$ attributes forceinline :: b1_1_proj
-  PURE COMPLEX * 16 FUNCTION b1_1_proj(K_orb, Gamma_projected)
+  PURE FUNCTION b1_1_proj(K_orb, Gamma_projected) RESULT(proj)
     !! Project Gamma_projected onto B1_1 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
+    COMPLEX(REAL64) :: proj
+    REAL(REAL64), INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX(REAL64), INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX(REAL64) :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = 2 * imag * SIN(K_orb(1))
     F_orb(2) = 2 * imag * SIN(K_orb(2))
     F_orb(3) = 2 * imag * SIN(K_orb(3))
-    b1_1_proj = DOT_PRODUCT(F_orb, Gamma_projected)
-    RETURN
+    proj = DOT_PRODUCT(F_orb, Gamma_projected)
   END FUNCTION b1_1_proj
 
   !dir$ attributes forceinline :: b1_2_proj
-  PURE COMPLEX * 16 FUNCTION b1_2_proj(K_orb, Gamma_projected)
+  PURE FUNCTION b1_2_proj(K_orb, Gamma_projected) RESULT(proj)
     !! Project Gamma_projected onto B1_2 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
+    COMPLEX(REAL64) :: proj
+    REAL(REAL64), INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX(REAL64), INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX(REAL64) :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = 2 * imag * (SIN(K_orb(2)) + SIN(K_orb(3)))
     F_orb(2) = 2 * imag * (SIN(K_orb(1)) + SIN(K_orb(3)))
     F_orb(3) = -4 * imag * SIN(K_orb(3) / 2.0d0) * COS((K_orb(1) - K_orb(2)) / 2.0d0)
-    b1_2_proj = DOT_PRODUCT(F_orb, Gamma_projected)
-    RETURN
+    proj = DOT_PRODUCT(F_orb, Gamma_projected)
   END FUNCTION b1_2_proj
 
   !dir$ attributes forceinline :: b2_1_proj
-  PURE COMPLEX * 16 FUNCTION b2_1_proj(K_orb, Gamma_projected)
+  PURE FUNCTION b2_1_proj(K_orb, Gamma_projected) RESULT(proj)
     !! Project Gamma_projected onto B2_1 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
+    COMPLEX(REAL64) :: proj
+    REAL(REAL64), INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX(REAL64), INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX(REAL64) :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = 2 * imag * (SIN(K_orb(2)) - SIN(K_orb(3)))
     F_orb(2) = 2 * imag * (-SIN(K_orb(1)) + SIN(K_orb(3)))
     F_orb(3) = 4 * imag * COS(K_orb(3) / 2.0d0) * SIN((K_orb(1) - K_orb(2)) / 2.0d0)
-    b2_1_proj = DOT_PRODUCT(F_orb, Gamma_projected)
-    RETURN
+    proj = DOT_PRODUCT(F_orb, Gamma_projected)
   END FUNCTION b2_1_proj
 
   !dir$ attributes forceinline :: e1_1_proj
-  PURE COMPLEX * 16 FUNCTION e1_1_proj(K_orb, Gamma_projected)
+  PURE FUNCTION e1_1_proj(K_orb, Gamma_projected) RESULT(proj)
     !! Project Gamma_projected onto E1_1 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
+    COMPLEX(REAL64) :: proj
+    REAL(REAL64), INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX(REAL64), INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX(REAL64) :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = -2 * imag * SIN(K_orb(2))
     F_orb(2) = 2 * imag * SIN(K_orb(3))
     F_orb(3) = 0.d0
-    e1_1_proj = DOT_PRODUCT(F_orb, Gamma_projected)
-    RETURN
+    proj = DOT_PRODUCT(F_orb, Gamma_projected)
   END FUNCTION e1_1_proj
 
   !dir$ attributes forceinline :: e1_2_proj
-  PURE COMPLEX * 16 FUNCTION e1_2_proj(K_orb, Gamma_projected)
+  PURE FUNCTION e1_2_proj(K_orb, Gamma_projected) RESULT(proj)
     !! Project Gamma_projected onto E1_2 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
+    COMPLEX(REAL64) :: proj
+    REAL(REAL64), INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX(REAL64), INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX(REAL64) :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = 2 * imag * SIN(K_orb(1))
     F_orb(2) = -2 * imag * SIN(K_orb(2))
     F_orb(3) = 0.d0
-    e1_2_proj = DOT_PRODUCT(F_orb, Gamma_projected)
-    RETURN
+    proj = DOT_PRODUCT(F_orb, Gamma_projected)
   END FUNCTION e1_2_proj
 
   !dir$ attributes forceinline :: e1_3_proj
-  PURE COMPLEX * 16 FUNCTION e1_3_proj(K_orb, Gamma_projected)
+  PURE FUNCTION e1_3_proj(K_orb, Gamma_projected) RESULT(proj)
     !! Project Gamma_projected onto E1_3 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
+    COMPLEX(REAL64) :: proj
+    REAL(REAL64), INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX(REAL64), INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX(REAL64) :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = -2 * imag * SIN(K_orb(3))
     F_orb(2) = 2 * imag * SIN(K_orb(1))
     F_orb(3) = 0.d0
-    e1_3_proj = DOT_PRODUCT(F_orb, Gamma_projected)
-    RETURN
+    proj = DOT_PRODUCT(F_orb, Gamma_projected)
   END FUNCTION e1_3_proj
 
   !dir$ attributes forceinline :: e1_4_proj
-  PURE COMPLEX * 16 FUNCTION e1_4_proj(K_orb, Gamma_projected)
+  PURE FUNCTION e1_4_proj(K_orb, Gamma_projected) RESULT(proj)
     !! Project Gamma_projected onto E1_4 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
+    COMPLEX(REAL64) :: proj
+    REAL(REAL64), INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX(REAL64), INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX(REAL64) :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = -2 * imag * SIN(K_orb(1))
     F_orb(2) = 0.d0
     F_orb(3) = 2 * imag * SIN(K_orb(3))
-    e1_4_proj = DOT_PRODUCT(F_orb, Gamma_projected)
-    RETURN
+    proj = DOT_PRODUCT(F_orb, Gamma_projected)
   END FUNCTION e1_4_proj
 
   !dir$ attributes forceinline :: e1_5_proj
-  PURE COMPLEX * 16 FUNCTION e1_5_proj(K_orb, Gamma_projected)
+  PURE FUNCTION e1_5_proj(K_orb, Gamma_projected) RESULT(proj)
     !! Project Gamma_projected onto E1_5 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
+    COMPLEX(REAL64) :: proj
+    REAL(REAL64), INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX(REAL64), INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX(REAL64) :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = 2 * imag * SIN(K_orb(3))
     F_orb(2) = 0.d0
     F_orb(3) = -2 * imag * SIN(K_orb(2))
-    e1_5_proj = DOT_PRODUCT(F_orb, Gamma_projected)
-    RETURN
+    proj = DOT_PRODUCT(F_orb, Gamma_projected)
   END FUNCTION e1_5_proj
 
   !dir$ attributes forceinline :: e1_6_proj
-  PURE COMPLEX * 16 FUNCTION e1_6_proj(K_orb, Gamma_projected)
+  PURE FUNCTION e1_6_proj(K_orb, Gamma_projected) RESULT(proj)
     !! Project Gamma_projected onto E1_6 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
+    COMPLEX(REAL64) :: proj
+    REAL(REAL64), INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX(REAL64), INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX(REAL64) :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = -2 * imag * SIN(K_orb(2))
     F_orb(2) = 0.d0
     F_orb(3) = 2 * imag * SIN(K_orb(1))
-    e1_6_proj = DOT_PRODUCT(F_orb, Gamma_projected)
-    RETURN
+    proj = DOT_PRODUCT(F_orb, Gamma_projected)
   END FUNCTION e1_6_proj
 
   !dir$ attributes forceinline :: e2_1_proj
-  PURE COMPLEX * 16 FUNCTION e2_1_proj(K_orb, Gamma_projected)
+  PURE FUNCTION e2_1_proj(K_orb, Gamma_projected) RESULT(proj)
     !! Project Gamma_projected onto E2_1 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
+    COMPLEX(REAL64) :: proj
+    REAL(REAL64), INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX(REAL64), INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX(REAL64) :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = -2 * COS(K_orb(2))
     F_orb(2) = 2 * COS(K_orb(3))
     F_orb(3) = 0.d0
-    e2_1_proj = DOT_PRODUCT(F_orb, Gamma_projected)
-    RETURN
+    proj = DOT_PRODUCT(F_orb, Gamma_projected)
   END FUNCTION e2_1_proj
 
   !dir$ attributes forceinline :: e2_2_proj
-  PURE COMPLEX * 16 FUNCTION e2_2_proj(K_orb, Gamma_projected)
+  PURE FUNCTION e2_2_proj(K_orb, Gamma_projected) RESULT(proj)
     !! Project Gamma_projected onto E2_2 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
+    COMPLEX(REAL64) :: proj
+    REAL(REAL64), INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX(REAL64), INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX(REAL64) :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = -2 * COS(K_orb(1))
     F_orb(2) = 2 * COS(K_orb(2))
     F_orb(3) = 0.d0
-    e2_2_proj = DOT_PRODUCT(F_orb, Gamma_projected)
-    RETURN
+    proj = DOT_PRODUCT(F_orb, Gamma_projected)
   END FUNCTION e2_2_proj
 
   !dir$ attributes forceinline :: e2_3_proj
-  PURE COMPLEX * 16 FUNCTION e2_3_proj(K_orb, Gamma_projected)
+  PURE FUNCTION e2_3_proj(K_orb, Gamma_projected) RESULT(proj)
     !! Project Gamma_projected onto E2_3 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
+    COMPLEX(REAL64) :: proj
+    REAL(REAL64), INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX(REAL64), INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX(REAL64) :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = -2 * COS(K_orb(3))
     F_orb(2) = 2 * COS(K_orb(1))
     F_orb(3) = 0.d0
-    e2_3_proj = DOT_PRODUCT(F_orb, Gamma_projected)
-    RETURN
+    proj = DOT_PRODUCT(F_orb, Gamma_projected)
   END FUNCTION e2_3_proj
 
   !dir$ attributes forceinline :: e2_4_proj
-  PURE COMPLEX * 16 FUNCTION e2_4_proj(K_orb, Gamma_projected)
+  PURE FUNCTION e2_4_proj(K_orb, Gamma_projected) RESULT(proj)
     !! Project Gamma_projected onto E2_4 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
+    COMPLEX(REAL64) :: proj
+    REAL(REAL64), INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX(REAL64), INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX(REAL64) :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = -2 * COS(K_orb(1))
     F_orb(2) = 0.d0
     F_orb(3) = 2 * COS(K_orb(3))
-    e2_4_proj = DOT_PRODUCT(F_orb, Gamma_projected)
-    RETURN
+    proj = DOT_PRODUCT(F_orb, Gamma_projected)
   END FUNCTION e2_4_proj
 
   !dir$ attributes forceinline :: e2_5_proj
-  PURE COMPLEX * 16 FUNCTION e2_5_proj(K_orb, Gamma_projected)
+  PURE FUNCTION e2_5_proj(K_orb, Gamma_projected) RESULT(proj)
     !! Project Gamma_projected onto E2_5 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
+    COMPLEX(REAL64) :: proj
+    REAL(REAL64), INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX(REAL64), INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX(REAL64) :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = -2 * COS(K_orb(3))
     F_orb(2) = 0.d0
     F_orb(3) = 2 * COS(K_orb(2))
-    e2_5_proj = DOT_PRODUCT(F_orb, Gamma_projected)
-    RETURN
+    proj = DOT_PRODUCT(F_orb, Gamma_projected)
   END FUNCTION e2_5_proj
 
   !dir$ attributes forceinline :: e2_6_proj
-  PURE COMPLEX * 16 FUNCTION e2_6_proj(K_orb, Gamma_projected)
+  PURE FUNCTION e2_6_proj(K_orb, Gamma_projected) RESULT(proj)
     !! Project Gamma_projected onto E2_6 irreducible representation
     IMPLICIT NONE
-    REAL*8, INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
-    COMPLEX*16, INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
-    COMPLEX*16 :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
+    COMPLEX(REAL64) :: proj
+    REAL(REAL64), INTENT(IN) :: K_orb(sc_input % discretization % ORBITALS) !! Set of orbital-aligned k-space coordinates
+    COMPLEX(REAL64), INTENT(IN) :: Gamma_projected(sc_input % discretization % ORBITALS) !! Set of k-dependent Gammas to be projected
+    COMPLEX(REAL64) :: F_orb(sc_input % discretization % ORBITALS) !! Basis function for each orbital at given irreducible representation
     F_orb(1) = -2 * COS(K_orb(2))
     F_orb(2) = 0.d0
     F_orb(3) = 2 * COS(K_orb(1))
-    e2_6_proj = DOT_PRODUCT(F_orb, Gamma_projected)
-    RETURN
+    proj = DOT_PRODUCT(F_orb, Gamma_projected)
   END FUNCTION e2_6_proj
 
 END SUBROUTINE CALCULATE_PROJECTIONS
 
 SUBROUTINE HELLICAL_TEST_CHERN(potChem, B, Nk1, Nk2, i, j, U_transformation)
-  INTEGER*4, PARAMETER :: HamDim = 4
-  REAL*8, PARAMETER :: g = 5.0d0
-  REAL*8, PARAMETER :: tHop = 200 * meV2au
-  REAL*8, PARAMETER :: alphaSOC = 100 * meV2au
-  REAL*8, PARAMETER :: gammaSC = DCMPLX(0.5 * meV2au, 0.0d0)
-  REAL*8, PARAMETER :: muB = 0.5d0
+  INTEGER(INT32), PARAMETER :: HamDim = 4
+  REAL(REAL64), PARAMETER :: g = 5.0d0
+  REAL(REAL64), PARAMETER :: tHop = 200 * meV2au
+  REAL(REAL64), PARAMETER :: alphaSOC = 100 * meV2au
+  REAL(REAL64), PARAMETER :: gammaSC = CMPLX(0.5 * meV2au, 0.0d0, KIND=REAL64)
+  REAL(REAL64), PARAMETER :: muB = 0.5d0
 
-  REAL*8, INTENT(IN) :: potChem
-  REAL*8, INTENT(IN) :: B(3) ![Bx, By, Bz]
-  INTEGER*4, INTENT(IN) :: Nk1, Nk2, i, j
+  REAL(REAL64), INTENT(IN) :: potChem
+  REAL(REAL64), INTENT(IN) :: B(3) ![Bx, By, Bz]
+  INTEGER(INT32), INTENT(IN) :: Nk1, Nk2, i, j
 
-  COMPLEX*16, INTENT(INOUT) :: U_transformation(HamDim, HamDim)
-  REAL*8 :: Energies(HamDim)
-  REAL*8 :: dkx, dky
-  REAL*8 :: kx, ky
-  INTEGER*4 :: m, n
+  COMPLEX(REAL64), INTENT(INOUT) :: U_transformation(HamDim, HamDim)
+  REAL(REAL64) :: Energies(HamDim)
+  REAL(REAL64) :: dkx, dky
+  REAL(REAL64) :: kx, ky
+  INTEGER(INT32) :: m, n
 
-  COMPLEX*16 :: Hamiltonian(HamDim, HamDim)
+  COMPLEX(REAL64) :: Hamiltonian(HamDim, HamDim)
 
   dkx = 2.0d0 * PI / Nk1
   dky = 2.0d0 * PI / Nk2
 
   Energies(:) = 0.0d0
-  U_transformation(:, :) = DCMPLX(0.0d0, 0.0d0)
+  U_transformation(:, :) = CMPLX(0.0d0, 0.0d0, KIND=REAL64)
   Hamiltonian(:, :) = 0.0d0
   !Calculate all points in Brillouin zone
   kx = i * dkx
@@ -1638,16 +1643,16 @@ SUBROUTINE HELLICAL_TEST_CHERN(potChem, B, Nk1, Nk2, i, j, U_transformation)
 
   !Diagonal terms
   !Electrons H(k)
-  Hamiltonian(1, 1) = 2.0 * tHop * (1.-DCOS(kx)) + 2.0 * tHop * (1 - DCOS(ky)) - potChem + 0.5 * muB * g * B(3)
-  Hamiltonian(2, 2) = 2.0 * tHop * (1.-DCOS(kx)) + 2.0 * tHop * (1 - DCOS(ky)) - potChem - 0.5 * muB * g * B(3)
+  Hamiltonian(1, 1) = 2.0 * tHop * (1.-COS(kx)) + 2.0 * tHop * (1 - COS(ky)) - potChem + 0.5 * muB * g * B(3)
+  Hamiltonian(2, 2) = 2.0 * tHop * (1.-COS(kx)) + 2.0 * tHop * (1 - COS(ky)) - potChem - 0.5 * muB * g * B(3)
 
   !Holes -H*(-k)
-  Hamiltonian(3, 3) = -(2.0 * tHop * (1.-DCOS(-kx)) + 2.0 * tHop * (1 - DCOS(-ky)) - potChem + 0.5 * muB * g * B(3))
-  Hamiltonian(4, 4) = -(2.0 * tHop * (1.-DCOS(-kx)) + 2.0 * tHop * (1 - DCOS(-ky)) - potChem - 0.5 * muB * g * B(3))
+  Hamiltonian(3, 3) = -(2.0 * tHop * (1.-COS(-kx)) + 2.0 * tHop * (1 - COS(-ky)) - potChem + 0.5 * muB * g * B(3))
+  Hamiltonian(4, 4) = -(2.0 * tHop * (1.-COS(-kx)) + 2.0 * tHop * (1 - COS(-ky)) - potChem - 0.5 * muB * g * B(3))
 
   !Spin-orbit coupling
-  Hamiltonian(1, 2) = 0.5 * mub * g * (B(1) - imag * B(2)) + alphaSOC * (DSIN(kx) + imag * DSIN(ky))
-  Hamiltonian(3, 4) = -(0.5 * mub * g * (B(1) + imag * B(2)) + alphaSOC * (DSIN(-kx) - imag * DSIN(-ky)))
+  Hamiltonian(1, 2) = 0.5 * mub * g * (B(1) - imag * B(2)) + alphaSOC * (SIN(kx) + imag * SIN(ky))
+  Hamiltonian(3, 4) = -(0.5 * mub * g * (B(1) + imag * B(2)) + alphaSOC * (SIN(-kx) - imag * SIN(-ky)))
 
   !Superconductivity
   Hamiltonian(1, 4) = gammaSC
@@ -1665,42 +1670,42 @@ END SUBROUTINE HELLICAL_TEST_CHERN
 SUBROUTINE LAO_STO_CHERN_ENERGIES(Nk1, Nk2, i, j, inputPath, sc_input, U_transformation)
     !! This subroutine calculates energies and wavefunctions of LAO-STO in [111] direction.
     !! Returns sorted wavefunctions in (i,j) point of the Brillouin zone.
-  INTEGER*4, INTENT(IN) :: Nk1 !! Number of divisions of Brillouin zone in direction k1.
-  INTEGER*4, INTENT(IN) :: Nk2 !! Number of divisions of Brillouin zone in direction k2.
-  INTEGER*4, INTENT(IN) :: i !! Curent point k1_i in the Brillouin zone
-  INTEGER*4, INTENT(IN) :: j !! Curent point k2_j in the Brillouin zone
+  INTEGER(INT32), INTENT(IN) :: Nk1 !! Number of divisions of Brillouin zone in direction k1.
+  INTEGER(INT32), INTENT(IN) :: Nk2 !! Number of divisions of Brillouin zone in direction k2.
+  INTEGER(INT32), INTENT(IN) :: i !! Curent point k1_i in the Brillouin zone
+  INTEGER(INT32), INTENT(IN) :: j !! Curent point k2_j in the Brillouin zone
   CHARACTER(LEN=*), INTENT(IN) :: inputPath !! Directory of the run, where input.nml should be placed.
                                             !! It contains material information and physical parameter of calculation:
                                             !! Fermi energy, temperature etc.
 
   TYPE(sc_input_params_t), INTENT(IN) :: sc_input
-  COMPLEX*16, INTENT(OUT) :: U_transformation(sc_input % discretization % derived % DIM, &
+  COMPLEX(REAL64), INTENT(OUT) :: U_transformation(sc_input % discretization % derived % DIM, &
                                              & sc_input % discretization % derived % DIM) !! Matrix containing eigenvectors stored in consecutive columns.
                                                                                           !! On output sorted based on energies from lowest to highest.
 
-  REAL*8 :: Energies(sc_input % discretization % derived % DIM) !! Eigenvalues of the hamiltonian
+  REAL(REAL64) :: Energies(sc_input % discretization % derived % DIM) !! Eigenvalues of the hamiltonian
 
-  COMPLEX*16 :: Hamiltonian(sc_input % discretization % derived % DIM,&
+  COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM,&
                                         & sc_input % discretization % derived % DIM)
-  COMPLEX*16 :: Hamiltonian_const(sc_input % discretization % derived % DIM,&
+  COMPLEX(REAL64) :: Hamiltonian_const(sc_input % discretization % derived % DIM,&
                                               & sc_input % discretization % derived % DIM)
-  COMPLEX*16 :: Gamma_SC(sc_input % discretization % ORBITALS,&
+  COMPLEX(REAL64) :: Gamma_SC(sc_input % discretization % ORBITALS,&
                                     & N_ALL_NEIGHBOURS,&
                                     & SPINS,&
                                     & SPINS,&
                                     & sc_input % discretization % derived % LAYER_COUPLINGS,&
                                     & sc_input % discretization % SUBBANDS)
-  REAL*8 :: Charge_dens(sc_input % discretization % derived % DIM_POSITIVE_K)
-  REAL*8 :: k1, k2, kx, ky
-  REAL*8 :: dk1_Chern, dk2_Chern
-  INTEGER*4 :: n
+  REAL(REAL64) :: Charge_dens(sc_input % discretization % derived % DIM_POSITIVE_K)
+  REAL(REAL64) :: k1, k2, kx, ky
+  REAL(REAL64) :: dk1_Chern, dk2_Chern
+  INTEGER(INT32) :: n
   LOGICAL :: fileExists
 
   !PRINT*, "Allocation ended"
   dk1_Chern = K1_MAX / Nk1
   dk2_Chern = K2_MAX / Nk2
 
-  U_transformation = DCMPLX(0., 0.)
+  U_transformation = CMPLX(0., 0., KIND=REAL64)
   Energies = 0.
   Gamma_SC = 0.
   Charge_dens = 0.
@@ -1715,7 +1720,7 @@ SUBROUTINE LAO_STO_CHERN_ENERGIES(Nk1, Nk2, i, j, inputPath, sc_input, U_transfo
   !Gamma_SC(:,:,2,:) = -100.0d0 * meV2au
 
   !Computing k-independent terms
-  Hamiltonian_const = DCMPLX(0., 0.)
+  Hamiltonian_const = CMPLX(0., 0., KIND=REAL64)
   CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const, sc_input % discretization, sc_input % physical)
 
   !Calculate eigenvalues and eigenvectors to later compute chern numbers
@@ -1724,7 +1729,7 @@ SUBROUTINE LAO_STO_CHERN_ENERGIES(Nk1, Nk2, i, j, inputPath, sc_input, U_transfo
 
   kx = 2.*PI / (SQRT(3.0d0)) * k1
   ky = -2.*PI / 3.*k1 + 4.*PI / 3.*k2
-  Hamiltonian(:, :) = DCMPLX(0., 0.)
+  Hamiltonian(:, :) = CMPLX(0., 0., KIND=REAL64)
   CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
   CALL COMPUTE_HUBBARD(Hamiltonian, &
                       & Charge_dens, &
@@ -1744,13 +1749,13 @@ END SUBROUTINE LAO_STO_CHERN_ENERGIES
 
 !########################### HELPER FUNCTIONS ###########################
 SUBROUTINE SORT_ENERGIES_AND_WAVEFUNCTIONS(Energies, Psi, HamDim)
-  INTEGER*4, INTENT(IN) :: HamDim
-  COMPLEX*16, INTENT(INOUT) :: Psi(HamDim, HamDim)
-  REAL*8, INTENT(INOUT) :: Energies(HamDim)
+  INTEGER(INT32), INTENT(IN) :: HamDim
+  COMPLEX(REAL64), INTENT(INOUT) :: Psi(HamDim, HamDim)
+  REAL(REAL64), INTENT(INOUT) :: Energies(HamDim)
 
-  INTEGER*4 :: i, j
-  REAL*8 :: tmpEnergy
-  COMPLEX*16 :: tmpPsi(HamDim)
+  INTEGER(INT32) :: i, j
+  REAL(REAL64) :: tmpEnergy
+  COMPLEX(REAL64) :: tmpPsi(HamDim)
 
   DO i = 1, HamDim
     DO j = 1, HamDim - 1
@@ -1779,20 +1784,21 @@ SUBROUTINE SORT_ENERGIES_AND_WAVEFUNCTIONS(Energies, Psi, HamDim)
 
 END SUBROUTINE SORT_ENERGIES_AND_WAVEFUNCTIONS
 
-COMPLEX * 16 FUNCTION det(matrix, n)
+RECURSIVE FUNCTION det(matrix, n) RESULT(determinant)
   IMPLICIT NONE
-  INTEGER*4, INTENT(IN) :: n
-  COMPLEX*16, INTENT(IN) :: matrix(n, n)
-  INTEGER*4 :: IPIV(n)
-  INTEGER*4 :: info, i
+  COMPLEX(REAL64) :: determinant
+  INTEGER(INT32), INTENT(IN) :: n
+  COMPLEX(REAL64), INTENT(IN) :: matrix(n, n)
+  INTEGER(INT32) :: IPIV(n)
+  INTEGER(INT32) :: info, i
 
   IPIV(:) = 0.0d0
 
   CALL ZGETRF(n, n, matrix, n, IPIV, info)
   CALL ZLAPMT(.TRUE., n, n, matrix, n, IPIV)
-  det = 1.0d0
+  determinant = 1.0d0
   DO i = 1, n
-    det = det * matrix(i, i)
+    determinant = determinant * matrix(i, i)
   END DO
   RETURN
 
@@ -1803,11 +1809,11 @@ LOGICAL FUNCTION is_inside_polygon(verticesArray, nVertices, pointX, pointY)
     !! Where vertices are defined in array verticesArray, containing X and Y coordinates.
     !! The assumption is that the polygon is two-dimensional
   IMPLICIT NONE
-  INTEGER*4, INTENT(IN) :: nVertices !! Number of vertices of polygon
-  REAL*8, INTENT(IN) :: verticesArray(nVertices, 2) !! X and Y coordinates of vertices
-  REAL*8, INTENT(IN) :: pointX, pointY !! X and Y coordinates of point to be tested
-  INTEGER*4 :: i, j
-  REAL*8 :: xIntersection
+  INTEGER(INT32), INTENT(IN) :: nVertices !! Number of vertices of polygon
+  REAL(REAL64), INTENT(IN) :: verticesArray(nVertices, 2) !! X and Y coordinates of vertices
+  REAL(REAL64), INTENT(IN) :: pointX, pointY !! X and Y coordinates of point to be tested
+  INTEGER(INT32) :: i, j
+  REAL(REAL64) :: xIntersection
 
   is_inside_polygon = .FALSE.
 

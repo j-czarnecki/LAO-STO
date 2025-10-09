@@ -24,7 +24,7 @@
 #include "macros_def.f90"
 
 PROGRAM MAIN
-
+use, intrinsic :: iso_fortran_env, only: real64, int8, int16, int32, int64
 USE logger
 USE hamiltonians
 USE parameters
@@ -40,28 +40,28 @@ USE omp_lib
 
 IMPLICIT NONE
 
-COMPLEX*16, ALLOCATABLE :: Hamiltonian(:, :), Hamiltonian_const(:, :), Hamiltonian_const_band(:, :), U_transformation(:, :)
-REAL*8, ALLOCATABLE :: Energies(:)
-COMPLEX*16, ALLOCATABLE :: Delta_local(:, :, :, :, :, :), Delta_new(:, :, :, :, :, :)
-REAL*8, ALLOCATABLE :: Delta_broyden(:), Delta_new_broyden(:)
-COMPLEX*16, ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :), Gamma_SC_new(:, :, :, :, :, :)
-REAL*8, ALLOCATABLE :: Charge_dens(:, :), Charge_dens_new(:, :), Charge_dens_local(:, :)
+COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian(:, :), Hamiltonian_const(:, :), Hamiltonian_const_band(:, :), U_transformation(:, :)
+REAL(REAL64), ALLOCATABLE :: Energies(:)
+COMPLEX(REAL64), ALLOCATABLE :: Delta_local(:, :, :, :, :, :), Delta_new(:, :, :, :, :, :)
+REAL(REAL64), ALLOCATABLE :: Delta_broyden(:), Delta_new_broyden(:)
+COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :), Gamma_SC_new(:, :, :, :, :, :)
+REAL(REAL64), ALLOCATABLE :: Charge_dens(:, :), Charge_dens_new(:, :), Charge_dens_local(:, :)
 
 TYPE(sc_input_params_t) :: sc_input
 
-REAL*8 :: gamma_max_error, charge_max_error
-REAL*8 :: gamma_max_error_prev, charge_max_error_prev
-REAL*8 :: phi_k_min
+REAL(REAL64) :: gamma_max_error, charge_max_error
+REAL(REAL64) :: gamma_max_error_prev, charge_max_error_prev
+REAL(REAL64) :: phi_k_min
 
-INTEGER*4 :: band
-INTEGER*4 :: n_triangle, i_r, j_phi
-INTEGER*4 :: sc_iter
+INTEGER(INT32) :: band
+INTEGER(INT32) :: n_triangle, i_r, j_phi
+INTEGER(INT32) :: sc_iter
 LOGICAL :: sc_flag
 
-INTEGER*4 :: delta_real_elems
+INTEGER(INT32) :: delta_real_elems
 
 !OMP specific
-INTEGER*4 :: max_num_threads
+INTEGER(INT32) :: max_num_threads
 
 max_num_threads = omp_get_max_threads()
 
@@ -112,14 +112,14 @@ ASSOCIATE (SUBLATTICES => sc_input % discretization % SUBLATTICES, &
 END ASSOCIATE
 
 !Initializations
-Hamiltonian = DCMPLX(0., 0.)
-Hamiltonian_const = DCMPLX(0., 0.)
-Hamiltonian_const_band = DCMPLX(0., 0.)
-U_transformation = DCMPLX(0., 0.)
+Hamiltonian = CMPLX(0., 0., KIND=REAL64)
+Hamiltonian_const = CMPLX(0., 0., KIND=REAL64)
+Hamiltonian_const_band = CMPLX(0., 0., KIND=REAL64)
+U_transformation = CMPLX(0., 0., KIND=REAL64)
 Energies = 0.
 
-Delta_local = DCMPLX(0., 0.)
-Delta_new = DCMPLX(0., 0.)
+Delta_local = CMPLX(0., 0., KIND=REAL64)
+Delta_new = CMPLX(0., 0., KIND=REAL64)
 
 ASSOCIATE (sc => sc_input % self_consistency, &
           & sb => sc_input % physical % subband_params)
@@ -136,7 +136,7 @@ ASSOCIATE (sc => sc_input % self_consistency, &
                           & sc_input % discretization)
   END IF
 
-  Gamma_SC_new = DCMPLX(0., 0.)
+  Gamma_SC_new = CMPLX(0., 0., KIND=REAL64)
 
   IF (sc % read_charge_from_file) THEN
     LOG_INFO("Reading charge from file: "//TRIM(sc % path_to_charge_start))
@@ -232,8 +232,8 @@ DO sc_iter = 1, sc_input % self_consistency % max_sc_iter
   ! END IF
 
   !Gamma_SC(:,:,:,2) = CONJG(Gamma_SC(:,:,:,1)) !This is valid in asbence of magnetic field
-  Delta_new = DCMPLX(0., 0.)
-  Gamma_SC_new = DCMPLX(0., 0.)
+  Delta_new = CMPLX(0., 0., KIND=REAL64)
+  Gamma_SC_new = CMPLX(0., 0., KIND=REAL64)
   Charge_dens_new = 0.
 
   !To check the state of the simulation

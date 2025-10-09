@@ -24,6 +24,7 @@
 #include "macros_def.f90"
 
 MODULE reader
+use, intrinsic :: iso_fortran_env, only: real64, int8, int16, int32, int64
 USE types
 USE parameters
 USE logger
@@ -37,113 +38,113 @@ PUBLIC :: GET_SAFE_GAMMA_SC, GET_GAMMA_SC, GET_SAFE_CHARGE_DENS, GET_CHARGE_DENS
 
 !Default values, overwritten in get_input
 !Discretization
-INTEGER*4 :: k1_steps = 0
-INTEGER*4 :: k2_steps = 0
-INTEGER*4 :: SUBLATTICES = 2
-INTEGER*4 :: SUBBANDS = 1
+INTEGER(INT32) :: k1_steps = 0
+INTEGER(INT32) :: k2_steps = 0
+INTEGER(INT32) :: SUBLATTICES = 2
+INTEGER(INT32) :: SUBBANDS = 1
 
 !Those parameters are in fact derived and recalculated if needed at GET_INPUT
 !(see SET_HAMILTONIAN_PARAMS)
-INTEGER*4 :: ORBITALS = 0
-INTEGER*4 :: TBA_DIM = 0
-INTEGER*4 :: DIM_POSITIVE_K = 0  !Hamiltonian for positive k i.e half of the Nambu space, *2 due to spin
-INTEGER*4 :: DIM = 0    !*2 to transform to Nambu Space.
-INTEGER*4 :: LAYER_COUPLINGS = 0 !This determines how many layer-related superconducting parameters have to be calculated.
+INTEGER(INT32) :: ORBITALS = 0
+INTEGER(INT32) :: TBA_DIM = 0
+INTEGER(INT32) :: DIM_POSITIVE_K = 0  !Hamiltonian for positive k i.e half of the Nambu space, *2 due to spin
+INTEGER(INT32) :: DIM = 0    !*2 to transform to Nambu Space.
+INTEGER(INT32) :: LAYER_COUPLINGS = 0 !This determines how many layer-related superconducting parameters have to be calculated.
 
 !Physical parameters
-REAL*8 :: T = 0.
-REAL*8 :: t_D = 0.
-REAL*8 :: t_I = 0.
-REAL*8 :: t_Rashba = 0.
-REAL*8 :: lambda_SOC = 0.
-REAL*8 :: delta_trigonal = 0.
-REAL*8 :: zeta_tetragonal = 0.
-INTEGER*4 :: orb_affected_tetragonal = 1
-REAL*8 :: v = 0.
-REAL*8 :: V_pdp = 0.
-REAL*8 :: V_pds = 0.
-REAL*8 :: J_SC_tensor(SPINS, SPINS, SPINS, SPINS) = 0.0d0
-REAL*8 :: nearest_interorb_multiplier = 0.0d0
-REAL*8 :: J_SC_NNN_tensor(SPINS, SPINS, SPINS, SPINS) = 0.0d0
-REAL*8 :: next_interorb_multiplier = 0.0d0
-REAL*8 :: U_HUB = 0.
-REAL*8 :: V_HUB = 0.
-REAL*8 :: E_Fermi = 0.
-REAL*8, ALLOCATABLE :: V_layer(:)
-REAL*8, ALLOCATABLE :: Subband_energies(:)
-REAL*8 :: g_factor = 0.
-REAL*8 :: B_magnitude = 0 !! Magnitude of magnetic field [T]
-REAL*8 :: B_theta = 0 !! Angle of magnetic field defined with respect to Z axis [deg]
-REAL*8 :: B_phi = 0 !! Angle of magnetic field defined with respect to X axis [deg]
+REAL(REAL64) :: T = 0.
+REAL(REAL64) :: t_D = 0.
+REAL(REAL64) :: t_I = 0.
+REAL(REAL64) :: t_Rashba = 0.
+REAL(REAL64) :: lambda_SOC = 0.
+REAL(REAL64) :: delta_trigonal = 0.
+REAL(REAL64) :: zeta_tetragonal = 0.
+INTEGER(INT32) :: orb_affected_tetragonal = 1
+REAL(REAL64) :: v = 0.
+REAL(REAL64) :: V_pdp = 0.
+REAL(REAL64) :: V_pds = 0.
+REAL(REAL64) :: J_SC_tensor(SPINS, SPINS, SPINS, SPINS) = 0.0d0
+REAL(REAL64) :: nearest_interorb_multiplier = 0.0d0
+REAL(REAL64) :: J_SC_NNN_tensor(SPINS, SPINS, SPINS, SPINS) = 0.0d0
+REAL(REAL64) :: next_interorb_multiplier = 0.0d0
+REAL(REAL64) :: U_HUB = 0.
+REAL(REAL64) :: V_HUB = 0.
+REAL(REAL64) :: E_Fermi = 0.
+REAL(REAL64), ALLOCATABLE :: V_layer(:)
+REAL(REAL64), ALLOCATABLE :: Subband_energies(:)
+REAL(REAL64) :: g_factor = 0.
+REAL(REAL64) :: B_magnitude = 0 !! Magnitude of magnetic field [T]
+REAL(REAL64) :: B_theta = 0 !! Angle of magnetic field defined with respect to Z axis [deg]
+REAL(REAL64) :: B_phi = 0 !! Angle of magnetic field defined with respect to X axis [deg]
 
 !Self-consistency
 LOGICAL :: read_gamma_from_file = .FALSE.
 CHARACTER(1000) :: path_to_gamma_start
 LOGICAL :: read_charge_from_file = .FALSE.
 CHARACTER(1000) :: path_to_charge_start
-REAL*8 :: gamma_start = 0.
-REAL*8 :: gamma_nnn_start = 0.
-REAL*8 :: charge_start = 0.
-INTEGER*4 :: max_sc_iter = 0
-REAL*8 :: sc_alpha = 0.
-REAL*8 :: sc_alpha_adapt = 0.
-REAL*8 :: gamma_eps_convergence = 0.
-REAL*8 :: charge_eps_convergence = 0.
+REAL(REAL64) :: gamma_start = 0.
+REAL(REAL64) :: gamma_nnn_start = 0.
+REAL(REAL64) :: charge_start = 0.
+INTEGER(INT32) :: max_sc_iter = 0
+REAL(REAL64) :: sc_alpha = 0.
+REAL(REAL64) :: sc_alpha_adapt = 0.
+REAL(REAL64) :: gamma_eps_convergence = 0.
+REAL(REAL64) :: charge_eps_convergence = 0.
 
 !Romberg integration
-REAL*8 :: romb_eps_x = 0.
-INTEGER*4 :: interpolation_deg_x = 0
-INTEGER*4 :: max_grid_refinements_x = 0
-REAL*8 :: romb_eps_y = 0.
-INTEGER*4 :: interpolation_deg_y = 0
-INTEGER*4 :: max_grid_refinements_y = 0
+REAL(REAL64) :: romb_eps_x = 0.
+INTEGER(INT32) :: interpolation_deg_x = 0
+INTEGER(INT32) :: max_grid_refinements_x = 0
+REAL(REAL64) :: romb_eps_y = 0.
+INTEGER(INT32) :: interpolation_deg_y = 0
+INTEGER(INT32) :: max_grid_refinements_y = 0
 
 !Derived
-REAL * 8 eta_p
-REAL*8 :: dr_k, dphi_k, domega
-REAL*8 :: B_field(3)
+REAL(REAL64) :: eta_p
+REAL(REAL64) :: dr_k, dphi_k, domega
+REAL(REAL64) :: B_field(3)
 
 !Used for postprocessing
 !Superconducting gap calculation
 LOGICAL :: enable_sc_gap_calc = .FALSE.
 CHARACTER(1000) :: path_to_run_dir_sc_gap = ""
-REAL*8 :: dE_sc_gap = 0.
-INTEGER*4 :: Nk_points_sc_gap = 0
-INTEGER*4 :: Nk_points_sc_gap_refined = 0
+REAL(REAL64) :: dE_sc_gap = 0.
+INTEGER(INT32) :: Nk_points_sc_gap = 0
+INTEGER(INT32) :: Nk_points_sc_gap_refined = 0
 
 !For chern number calculation
 LOGICAL :: enable_chern_number_calc = .FALSE.
 CHARACTER(1000) :: path_to_run_dir_chern_number = ""
-INTEGER*4 :: Nk_points_chern_number = 0
+INTEGER(INT32) :: Nk_points_chern_number = 0
 
 !Dispersion relation calculation
 LOGICAL :: enable_dispersion_relation_calc = .FALSE.
 CHARACTER(1000) :: path_to_run_dir_dispersion_relation = ""
 LOGICAL :: include_sc_in_dispersion = .FALSE.
-INTEGER*4 :: Nr_points_dispersion = 0
-INTEGER*4 :: Nphi_points_dispersion = 0
+INTEGER(INT32) :: Nr_points_dispersion = 0
+INTEGER(INT32) :: Nphi_points_dispersion = 0
 
 !DOS calculation
 LOGICAL :: enable_dos_calc = .FALSE.
 CHARACTER(1000) :: path_to_run_dir_dos = ""
-REAL*8 :: E_DOS_min = 0
-REAL*8 :: E_DOS_max = 0
-REAL*8 :: dE0 = 0
-REAL*8 :: zeta_DOS = 0
+REAL(REAL64) :: E_DOS_min = 0
+REAL(REAL64) :: E_DOS_max = 0
+REAL(REAL64) :: dE0 = 0
+REAL(REAL64) :: zeta_DOS = 0
 LOGICAL :: include_sc_in_dos = .FALSE.
-INTEGER*4 :: Nk_points_dos = 0
-INTEGER*4 :: Nk_points_dos_refined = 0
+INTEGER(INT32) :: Nk_points_dos = 0
+INTEGER(INT32) :: Nk_points_dos_refined = 0
 
 !Gamma as a map of k-vector calculation
 LOGICAL :: enable_gamma_k_calc = .FALSE.
 CHARACTER(1000) :: path_to_run_dir_gamma_k = ""
-INTEGER*4 :: Nk_points_gamma_k = 0
+INTEGER(INT32) :: Nk_points_gamma_k = 0
 
 !Projections calculation
 LOGICAL :: enable_projections_calc = .FALSE.
 CHARACTER(1000) :: path_to_run_dir_projections = ""
-INTEGER*4 :: Nr_points_projections
-INTEGER*4 :: Nphi_points_projections
+INTEGER(INT32) :: Nr_points_projections
+INTEGER(INT32) :: Nphi_points_projections
 
 NAMELIST /physical_params/     &
 & T,                           &
@@ -245,8 +246,8 @@ SUBROUTINE GET_INPUT(nmlfile, sc_input)
   IMPLICIT NONE
   CHARACTER(LEN=*), INTENT(IN) :: nmlfile !! Path to .nml file
   TYPE(sc_input_params_t), INTENT(OUT) :: sc_input !! Structure to be initialized with input parameters
-  INTEGER*4 :: i, j, k, l
-  INTEGER*4 :: io_status
+  INTEGER(INT32) :: i, j, k, l
+  INTEGER(INT32) :: io_status
 
   OPEN (unit=9, FILE=nmlfile, FORM="FORMATTED", ACTION="READ", STATUS="OLD")
 
@@ -316,9 +317,9 @@ SUBROUTINE GET_INPUT(nmlfile, sc_input)
   LOG_INFO(log_string)
 
   sc_input % physical % external % T = T
-  sc_input % physical % external % B_field(1) = COSD(B_phi) * SIND(B_theta) * B_magnitude * T2au
-  sc_input % physical % external % B_field(2) = SIND(B_phi) * SIND(B_theta) * B_magnitude * T2au
-  sc_input % physical % external % B_field(3) = COSD(B_theta) * B_magnitude * T2au
+  sc_input % physical % external % B_field(1) = COS(deg2rad(B_phi)) * SIN(deg2rad(B_theta)) * B_magnitude * T2au
+  sc_input % physical % external % B_field(2) = SIN(deg2rad(B_phi)) * SIN(deg2rad(B_theta)) * B_magnitude * T2au
+  sc_input % physical % external % B_field(3) = COS(deg2rad(B_theta)) * B_magnitude * T2au
 
   WRITE (log_string, *) "V_layer: ", (V_layer(i), i=1, SUBLATTICES)
   LOG_INFO(log_string)
@@ -535,7 +536,7 @@ SUBROUTINE GET_SAFE_GAMMA_SC(Gamma_SC, input_path, discretization)
   !! This subroutine tries to read the Gamma_SC file from self-consistent simulation, checking for final result first,
   !! then checking the latest iteration file, and logging an error if neither is found.
   TYPE(discretization_t), INTENT(IN) :: discretization
-  COMPLEX*16, INTENT(OUT) :: Gamma_SC(discretization % ORBITALS, &
+  COMPLEX(REAL64), INTENT(OUT) :: Gamma_SC(discretization % ORBITALS, &
                                      & N_ALL_NEIGHBOURS, &
                                      & SPINS, &
                                      & SPINS, &
@@ -568,15 +569,15 @@ SUBROUTINE GET_GAMMA_SC(Gamma_SC, path, discretization)
   !! User should check if the file exists before calling this subroutine
   CHARACTER(LEN=*), INTENT(IN) :: path !! path from which to read Gamma file
   TYPE(discretization_t), INTENT(IN) :: discretization
-  COMPLEX*16, INTENT(OUT) :: Gamma_SC(discretization % ORBITALS, &
+  COMPLEX(REAL64), INTENT(OUT) :: Gamma_SC(discretization % ORBITALS, &
                                       & N_ALL_NEIGHBOURS, &
                                       & SPINS, &
                                       & SPINS, &
                                       & discretization % derived % LAYER_COUPLINGS, &
                                       & discretization % SUBBANDS) !! Gamma to be filled
-  INTEGER*4 :: n, lat, orb, spin1, spin2, band
-  INTEGER*4 :: n_read, lat_read, orb_read, spin1_read, spin2_read, band_read
-  REAL*8 :: Gamma_re, Gamma_im
+  INTEGER(INT32) :: n, lat, orb, spin1, spin2, band
+  INTEGER(INT32) :: n_read, lat_read, orb_read, spin1_read, spin2_read, band_read
+  REAL(REAL64) :: Gamma_re, Gamma_im
   CHARACTER(LEN=20) :: output_format
 
 #ifdef READ_NO_BAND
@@ -598,10 +599,10 @@ SUBROUTINE GET_GAMMA_SC(Gamma_SC, path, discretization)
           DO orb = 1, discretization % ORBITALS
 #ifdef READ_NO_TRIPLET
             READ (9, output_format) band_read, spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
-            Gamma_SC(orb_read, n_read, spin_read, MOD(spin_read, SPINS) + 1, lat_read, band_read) = DCMPLX(Gamma_re, Gamma_im) * meV2au
+            Gamma_SC(orb_read, n_read, spin_read, MOD(spin_read, SPINS) + 1, lat_read, band_read) = CMPLX(Gamma_re, Gamma_im, KIND=REAL64) * meV2au
 #elif defined(READ_NO_BAND)
             READ (9, output_format) spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
-            Gamma_SC(orb_read, n_read, spin_read, MOD(spin_read, SPINS) + 1, lat_read, band) = DCMPLX(Gamma_re, Gamma_im) * meV2au
+            Gamma_SC(orb_read, n_read, spin_read, MOD(spin_read, SPINS) + 1, lat_read, band) = CMPLX(Gamma_re, Gamma_im, KIND=REAL64) * meV2au
 #endif
           END DO
         END DO
@@ -613,10 +614,10 @@ SUBROUTINE GET_GAMMA_SC(Gamma_SC, path, discretization)
           DO orb = 1, discretization % ORBITALS
 #ifdef READ_NO_TRIPLET
             READ (9, output_format) band_read, spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
-            Gamma_SC(orb_read, n_read, spin_read, MOD(spin_read, SPINS) + 1, lat_read, band_read) = DCMPLX(Gamma_re, Gamma_im) * meV2au
+            Gamma_SC(orb_read, n_read, spin_read, MOD(spin_read, SPINS) + 1, lat_read, band_read) = CMPLX(Gamma_re, Gamma_im, KIND=REAL64) * meV2au
 #elif defined(READ_NO_BAND)
             READ (9, output_format) spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
-            Gamma_SC(orb_read, n_read, spin_read, MOD(spin_read, SPINS) + 1, lat_read, band) = DCMPLX(Gamma_re, Gamma_im) * meV2au
+            Gamma_SC(orb_read, n_read, spin_read, MOD(spin_read, SPINS) + 1, lat_read, band) = CMPLX(Gamma_re, Gamma_im, KIND=REAL64) * meV2au
 #endif
           END DO
         END DO
@@ -638,7 +639,7 @@ SUBROUTINE GET_GAMMA_SC(Gamma_SC, path, discretization)
           DO lat = 1, discretization % derived % LAYER_COUPLINGS
             DO orb = 1, discretization % ORBITALS
               READ (9, output_format) band_read, spin1_read, spin2_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
-              Gamma_SC(orb_read, n_read, spin1_read, spin2_read, lat_read, band_read) = DCMPLX(Gamma_re, Gamma_im) * meV2au
+              Gamma_SC(orb_read, n_read, spin1_read, spin2_read, lat_read, band_read) = CMPLX(Gamma_re, Gamma_im, KIND=REAL64) * meV2au
             END DO
           END DO
           READ (9, *)
@@ -648,7 +649,7 @@ SUBROUTINE GET_GAMMA_SC(Gamma_SC, path, discretization)
           DO lat = 1, discretization % SUBLATTICES
             DO orb = 1, discretization % ORBITALS
               READ (9, output_format) band_read, spin1_read, spin2_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
-              Gamma_SC(orb_read, n_read, spin1_read, spin2_read, lat_read, band_read) = DCMPLX(Gamma_re, Gamma_im) * meV2au
+              Gamma_SC(orb_read, n_read, spin1_read, spin2_read, lat_read, band_read) = CMPLX(Gamma_re, Gamma_im, KIND=REAL64) * meV2au
             END DO
           END DO
           READ (9, *)
@@ -667,7 +668,7 @@ SUBROUTINE GET_SAFE_CHARGE_DENS(Charge_dens, input_path, discretization)
   !! This subroutine tries to read the Chargen_dens file from self-consistent simulation, checking for final result first,
   !! then checking the latest iteration file, and logging an error if neither is found.
   TYPE(discretization_t), INTENT(IN) :: discretization
-  REAL*8, INTENT(OUT) :: Charge_dens(discretization % derived % DIM_POSITIVE_K, discretization % SUBBANDS) !! Charge density to be filled
+  REAL(REAL64), INTENT(OUT) :: Charge_dens(discretization % derived % DIM_POSITIVE_K, discretization % SUBBANDS) !! Charge density to be filled
   CHARACTER(LEN=*), INTENT(IN) :: input_path !! Input path in which to look for Charge file
   LOGICAL :: file_exists !! Whether the file exists or not
   !Read charges
@@ -689,8 +690,8 @@ SUBROUTINE GET_CHARGE_DENS(Charge_dens, path, discretization)
   !! Read a file containing the charge density from given path. Whether file exists has to be checked before.
   TYPE(discretization_t), INTENT(IN) :: discretization
   CHARACTER(LEN=*), INTENT(IN) :: path !! Path to file
-  REAL*8, INTENT(OUT) :: Charge_dens(discretization % derived % DIM_POSITIVE_K, discretization % SUBBANDS) !! Charge density to be filled
-  INTEGER*4 :: spin, lat, orb, n, band, band_read
+  REAL(REAL64), INTENT(OUT) :: Charge_dens(discretization % derived % DIM_POSITIVE_K, discretization % SUBBANDS) !! Charge density to be filled
+  INTEGER(INT32) :: spin, lat, orb, n, band, band_read
   CHARACTER(LEN=20) :: output_format
 
 #ifndef READ_OLD
@@ -718,8 +719,8 @@ END SUBROUTINE GET_CHARGE_DENS
 SUBROUTINE SET_HAMILTONIAN_PARAMS(sublats, n_subbands, discretization)
     !! This subroutine sets global variables that define dimension of hamiltonian in calculation
     !! SUBLATTICES should have been set beffore at reading input.nml
-  INTEGER*4, INTENT(IN) :: sublats
-  INTEGER*4, INTENT(IN) :: n_subbands
+  INTEGER(INT32), INTENT(IN) :: sublats
+  INTEGER(INT32), INTENT(IN) :: n_subbands
   TYPE(discretization_t), INTENT(INOUT) :: discretization
 
   discretization % SUBLATTICES = sublats
@@ -731,5 +732,11 @@ SUBROUTINE SET_HAMILTONIAN_PARAMS(sublats, n_subbands, discretization)
   discretization % derived % DIM = discretization % derived % DIM_POSITIVE_K * 2    !*2 to transform to Nambu Space.
   discretization % derived % LAYER_COUPLINGS = 2 * (sublats - 1)
 END SUBROUTINE
+
+PURE RECURSIVE FUNCTION deg2rad(deg) RESULT(rad)
+  REAL(REAL64), INTENT(IN) :: deg
+  REAL(REAL64) :: rad
+  rad = deg * (PI / 180.0d0)
+END FUNCTION
 
 END MODULE reader

@@ -76,7 +76,7 @@ def plotGammas():
 
 def plotDispersions():
     #eMin = -1053
-    dispersionPlotter = DispersionPlotter(sublattices=3, subbands=1)
+    dispersionPlotter = DispersionPlotter(sublattices=2, subbands=1)
 
     dispersionPlotter.LoadDispersion("../OutputData/Energies.dat")
     dispersionPlotter.GetStatistics()
