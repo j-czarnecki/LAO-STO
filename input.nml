@@ -1,30 +1,30 @@
 &discretization
     k1_steps = 100
     k2_steps = 100
-    sublattices = 2
+    sublattices = 3
     subbands = 1
 /
 
 &physical_params
     t = 0.
-    t_d = 500.0
-    t_i = 40.0
-    t_rashba = 30.0
-    lambda_soc = 100.0
-    delta_trigonal = 0.0
+    t_d = 650.0
+    t_i = 50.0
+    t_rashba = 4.0
+    lambda_soc = 265.0
+    delta_trigonal = 10.0
     zeta_tetragonal = 0.0
     orb_affected_tetragonal = 1
     v = 0.0
     v_pdp = 28.0
     v_pds = -65.0
-    j_sc_tensor = 0.0, 0.0, 0.0, 0.0, 0.0, 350., -350., 0.0, 0.0, -350., 350., 0.0, 0.0, 0.0, 0.0, 0.0
+    j_sc_tensor = 0.0, 0.0, 0.0, 0.0, 0.0, 0.,350., 0.0, 0.0,350., 0., 0.0, 0.0, 0.0, 0.0, 0.0
     nearest_interorb_multiplier = 0.1
     j_sc_nnn_tensor = 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
     next_interorb_multiplier = 0.1
     u_hub = 0.0
     v_hub = 0.0
-    e_fermi = 40
-    v_layer = 1053.0, 1053.0
+    e_fermi = 0.0
+    v_layer = 1946.0, 1946.0, 1946.0
     subband_energies = 0.,
     g_factor = 8.0,
     B_magnitude = 0.0,

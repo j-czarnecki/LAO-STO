@@ -195,7 +195,11 @@ class DataReader:
                 nml = f90nml.read(nmlFile)
                 paramsValuesList = []
                 for xKey in xKeywords:
-                    paramsValuesList.append(nml["physical_params"][xKey])
+                    param = nml["physical_params"][xKey]
+                    if type(param) is list:
+                        ind = [i for i, x in enumerate(param) if x != 0]
+                        param = param[ind[0]]
+                    paramsValuesList.append(param)
                 self.params.append(tuple(paramsValuesList))
 
             firstIter = False
@@ -332,7 +336,7 @@ class DataReader:
         """
         Extracts proper key from simulation files, converts gamma back to complex value and writes do dict
         """
-        if len(pandasFile.spin) == 0:
+        if len(pandasFile.spin1) == 0:
             logger.error("Empty gamma file")
             for key in list(self.gamma.keys()):
                 self.gamma[key].append(np.nan)

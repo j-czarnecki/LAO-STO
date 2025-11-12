@@ -43,7 +43,7 @@ def plotGammas():
     #eMin = -1480
     eMin = 0
     gammaAndFillingPlotter = GammaAndFillingPlotter(
-        runsPath=os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-J_SC_NNN_B_critical"),
+        runsPath=os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-E_Fermi_J_SC_tensor"),
         # runsPath=os.path.join(
         #     "/home", "jczarnecki", "LAO-STO-results", "LAO-STO-E_Fermi_J_SC_J_SC_NNN"
         # ),
@@ -57,15 +57,15 @@ def plotGammas():
     )
 
     gammaAndFillingPlotter.LoadFilling(loadUnfinished=True)
-    gammaAndFillingPlotter.LoadGamma(xKeywords=("b_magnitude", "b_phi"), loadUnfinished=True)
+    gammaAndFillingPlotter.LoadGamma(xKeywords=("e_fermi", "j_sc_tensor"), loadUnfinished=True)
     gammaAndFillingPlotter.sortData()
     gammaAndFillingPlotter.CalculateSymmetryGamma()
     gammaAndFillingPlotter.getMaxvalSymmetrizedGamma()
-    gammaAndFillingPlotter.plotGammasTwoParam2d(firstXLabel=r"$|B|$ (T)",
-                                                neighborsToPlot=("next", ),
+    gammaAndFillingPlotter.plotGammasTwoParam2d(firstXLabel=r"$\mu$ (meV)",
+                                                neighborsToPlot=("nearest", ),
                                                 plotSecondX=False,
                                                 secondXLabel=r"$n$ (10\textsuperscript{14} cm\textsuperscript{-2})",
-                                                legendTitles=(r"$\varphi$ ($\pi$)",),
+                                                legendTitles=(r"$J$ (meV)",),
                                                 continuousColor=False,
                                                 yUnit=r"($\mu$eV)")
     #gammaAndFillingPlotter.plotFillingFermi()
@@ -83,16 +83,19 @@ def plotDispersions():
     #dispersionPlotter.shiftEnergies()
 
     dispersionPlotter.plotCrossection(
-        "../Plots/DispersionSliceKy", 300, "ky", 0.0, 2, False
+        "../Plots/DispersionSliceKy", 500, "ky", 0.0, 2, False
     )
 
     dispersionPlotter.plotCrossection(
-        "../Plots/DispersionSliceKx", 300, "kx", 0.0, 2, False
+        "../Plots/DispersionSliceKx", 500, "kx", 0.0, 2, False
     )
 
-    dispersionPlotter.plotFermiCrossection(0, 1.5, "../Plots")
+    #dispersionPlotter.plotFermiCrossection(0, 1.5, "../Plots")
 
     dispersionPlotter.plotFermiCrossection(50, 1.5, "../Plots")
+
+    dispersionPlotter.plotFermiCrossection(100, 1.5, "../Plots")
+
 
     # efs = [-60, -52, -44, -36]
     # dosDirs = [os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-E_Fermi_J_SC_NNN", f"RUN_E_Fermi_{ef}.0_J_SC_NNN_350.0", "OutputData", "DOS.dat") for ef in efs]

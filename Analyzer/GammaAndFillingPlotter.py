@@ -226,7 +226,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 band, spin1, spin2, sublat, symmetry = key
 
                 ax1.set_ylim(bottom=0, top=1.02 * self.maxval * yMultiplier if yMax == np.inf else yMax) # Guarantee a single scale for all plots
-                ax1.set_xlim(right=firstXMax if firstXMax != np.inf else max(firstXPlot))
+                #ax1.set_xlim(right=firstXMax if firstXMax != np.inf else max(firstXPlot))
                 ax1.set_xlabel(firstXLabel)
                 ax1.set_ylabel(
                     rf"{gammaLabelsCallbacks[nNeighborhood](sublat, symmetry, spin1, spin2)}" + yUnit,
@@ -234,7 +234,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 )
                 # ax1.xaxis.set_major_locator(ticker.LinearLocator(5))
                 ax1.yaxis.set_major_locator(ticker.LinearLocator(4))
-                ax1.xaxis.set_major_locator(ticker.MultipleLocator(5))
+                ax1.xaxis.set_major_locator(ticker.MultipleLocator(50))
 
                 #for mu in (31, 79, 141):
                     #ax1.scatter(mu, 0.02, marker='v', s=75, color='deeppink', zorder=10, edgecolors='k', linewidth=1)
@@ -265,7 +265,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
                     ax2.set_xlabel(fr"{secondXLabel}", labelpad=16)
                     #ax2.set_xlabel(fr"{secondXLabel} (10 \textsuperscript{{-2}})", labelpad=16)
                 plt.savefig(
-                    f"../Plots/Gamma2d_{gammaNeighorhoodLabels[nNeighborhood]}_band{band}_spin{spin1}_spin2{spin2}_lat{sublat}_{symmetry}.png"
+                    f"../Plots/Gamma2d_{gammaNeighorhoodLabels[nNeighborhood]}_band{band}_spin1{spin1}_spin2{spin2}_lat{sublat}_{symmetry}.png"
                 )
                 plt.close()
 
