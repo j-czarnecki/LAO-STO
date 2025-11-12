@@ -1617,7 +1617,6 @@ SUBROUTINE HELLICAL_TEST_CHERN(potChem, B, Nk1, Nk2, i, j, U_transformation)
   REAL(REAL64), PARAMETER :: tHop = 200 * meV2au
   REAL(REAL64), PARAMETER :: alphaSOC = 100 * meV2au
   REAL(REAL64), PARAMETER :: gammaSC = CMPLX(0.5 * meV2au, 0.0d0, KIND=REAL64)
-  REAL(REAL64), PARAMETER :: muB = 0.5d0
 
   REAL(REAL64), INTENT(IN) :: potChem
   REAL(REAL64), INTENT(IN) :: B(3) ![Bx, By, Bz]

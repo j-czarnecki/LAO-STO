@@ -27,13 +27,6 @@ SRC_DIR = SRC
 OBJ_DIR = OBJ
 MOD_DIR = MOD
 
-ifeq ($(READ_NO_TRIPLET), TRUE)
-READ_OLD_FLAG = -DREAD_NO_TRIPLET
-endif
-ifeq ($(READ_NO_BAND), TRUE)
-READ_OLD_FLAG = -DREAD_NO_BAND
-endif
-
 # the command shell
 SHELL = /bin/bash
 F90 = ifx
@@ -41,10 +34,11 @@ CC = gcc
 CXX = g++
 
 LIB_OPENMP = -qopenmp -qmkl
-F90FLAGS = -Ofast -ipo -g -fpp -ipo -I$(SRC_DIR)/input_output $(LIB_OPENMP) -module $(MOD_DIR) $(READ_OLD_FLAG) -diag-disable 5268,7025 -stand f2018
-F90FLAGS_HELIOS = -Ofast -ipo -g -fpp -ipo -I$(SRC_DIR)/input_output $(LIB_OPENMP) -module $(MOD_DIR) $(READ_OLD_FLAG)
-F90_DEBUG_FLAGS = -O0 -g -fpp -I$(SRC_DIR)/input_output -DDEBUG -module $(MOD_DIR) -debug all -fpe0 -fstack-protector -traceback -check all -ftrapuv -heap-arrays $(LIB_OPENMP) $(READ_OLD_FLAG)
-LIBS = -llapack -lblas
+F90FLAGS = -O3 -ipo -g -fpp -ipo -I$(SRC_DIR)/input_output $(LIB_OPENMP) -module $(MOD_DIR) -diag-disable 5268,7025 -stand f2018 -qopt-report
+F90FLAGS_HPC = -O3 -ipo -g -fpp -ipo -I$(SRC_DIR)/input_output $(LIB_OPENMP) -module $(MOD_DIR)
+F90_DEBUG_FLAGS = -O0 -g -fpp -I$(SRC_DIR)/input_output -DDEBUG -module $(MOD_DIR) -debug all -fpe0 -fstack-protector -traceback -check all -ftrapuv -heap-arrays $(LIB_OPENMP)
+HPC_LIBS = #-lscalapack -lflexiblas
+LIBS = #-llapack -lblas
 LIBS_MKL = -I${MKLROOT}/include \
 					 -I/opt/intel/mkl/include \
 					 -Wl,--start-group \
@@ -58,7 +52,7 @@ LIBS_MKL = -I${MKLROOT}/include \
 SRC_FILES_ALL := $(shell find $(SRC_DIR) -name '*.f90')
 
 # --- Exclude the two main programs from the common source set ---
-SRC_COMMON := $(filter-out $(SRC_DIR)/main/main.f90 $(SRC_DIR)/main_post/main_postprocessing.f90, $(SRC_FILES_ALL))
+SRC_COMMON := $(filter-out $(SRC_DIR)/main/main.f90 $(SRC_DIR)/main_post/main_postprocessing.f90 $(SRC_DIR)/physical/test/test_profiling.f90, $(SRC_FILES_ALL))
 
 # --- Define two build sets ---
 SRC_FILES_MAIN := $(SRC_COMMON) $(SRC_DIR)/main/main.f90
@@ -67,6 +61,9 @@ SRC_FILES_POST := $(SRC_COMMON) $(SRC_DIR)/main_post/main_postprocessing.f90
 # --- Define corresponding object files ---
 OBJS_MAIN := $(patsubst $(SRC_DIR)/%.f90,$(OBJ_DIR)/%.o,$(SRC_FILES_MAIN))
 OBJS_POST := $(patsubst $(SRC_DIR)/%.f90,$(OBJ_DIR)/%.o,$(SRC_FILES_POST))
+
+# --- Define unit test directories ---
+UNITTEST_DIRS := $(SRC_DIR)/physical
 
 .PHONY: all  ares_all  ares_post gnu tsan debug clean test post post_debug analyze
 
@@ -87,55 +84,61 @@ $(OBJ_DIR)/%.s : $(SRC_DIR)/%.f90
 	mkdir -p $(dir $@) $(MOD_DIR)
 	$(F90) $(F90FLAGS) -S $< -o $@
 
+# --- Rules for default mechines ---
 all: $(TARGET)
 
-ares_all: LIBS = -lscalapack -lflexiblas
-ares_all: $(TARGET)
+post: $(POSTPROCESSING_TARGET)
+
+# --- Rules for HPC clusters ---
+ares: LIBS = $(HPC_LIBS)
+ares: $(TARGET)
 
 #Rememebr to load
 #module load GCC/13.2.0 OpenMPI/5.0.3 FlexiBLAS/3.3.1 ScaLAPACK/2.2.0-fb gimkl/2023b
 #before compilation
-helios_all: LIBS = -lscalapack -lflexiblas
-helios_all: F90FLAGS = $(F90FLAGS_HELIOS)
-helios_all: $(TARGET)
+helios: LIBS = $(HPC_LIBS)
+helios: F90FLAGS = $(F90FLAGS_HPC)
+helios: $(TARGET)
 
-helios_post: LIBS = -lscalapack -lflexiblas
-helios_post: F90FLAGS = $(F90FLAGS_HELIOS)
+helios_post: LIBS = $(HPC_LIBS)
+helios_post: F90FLAGS = $(F90FLAGS_HPC)
 helios_post: $(POSTPROCESSING_TARGET)
 
-ares_post: LIBS = -lscalapack -lflexiblas
+ares_post: LIBS = $(HPC_LIBS)
 ares_post: $(POSTPROCESSING_TARGET)
 
+# --- Rules for local development ---
 gnu: F90 = gfortran
 gnu: LIB_OPENMP = -fopenmp -mkl
 gnu: LIBS = -lscalapack -lflexiblas
-gnu: F90FLAGS = -O3 -g -cpp -Wall -Wextra -ffree-line-length-none $(LIB_OPENMP) $(READ_OLD_FLAG) -J$(MOD_DIR)
+gnu: F90FLAGS = -O3 -g -cpp -Wall -Wextra -ffree-line-length-none $(LIB_OPENMP) -J$(MOD_DIR)
 gnu: $(TARGET)
 
-debug: F90FLAGS = -O0 -g -fpp $(LIB_OPENMP) -module $(MOD_DIR) $(READ_OLD_FLAG) -check bounds -debug all #-diag-enable sc
+debug: F90FLAGS = -O0 -g -fpp $(LIB_OPENMP) -module $(MOD_DIR) -check bounds -debug all #-diag-enable sc
 debug: $(TARGET)
 
 #To avoid Thread Sanitizer error about bad memory mapping
 #echo 0 | sudo tee /proc/sys/kernel/randomize_va_space
 #To include suppressions run as
 #TSAN_OPTIONS="suppressions=thread_suppressions.txt:history_size=7" bin/lao_sto_qd.x
-tsan: F90FLAGS = -O0 -g -fpp -DDEBUG -fsanitize=thread $(LIB_OPENMP) $(READ_OLD_FLAG)
+tsan: F90FLAGS = -O0 -g -fpp -DDEBUG -fsanitize=thread $(LIB_OPENMP)
 tsan: $(TARGET)
 
-post: $(POSTPROCESSING_TARGET)
-
-post_debug: F90FLAGS = -O0 -g -fpp -DDEBUG -module $(MOD_DIR) -debug all -fpe0 -fstack-protector -traceback -check bounds,pointers $(LIB_OPENMP) $(READ_OLD_FLAG)
+post_debug: F90FLAGS = -O0 -g -fpp -DDEBUG -module $(MOD_DIR) -debug all -fpe0 -fstack-protector -traceback -check bounds,pointers $(LIB_OPENMP)
 post_debug:	$(POSTPROCESSING_TARGET)
 
-post_tsan: F90FLAGS = -O0 -g -fpp -DDEBUG -fsanitize=thread $(LIB_OPENMP) $(READ_OLD_FLAG)
+post_tsan: F90FLAGS = -O0 -g -fpp -DDEBUG -fsanitize=thread $(LIB_OPENMP)
 post_tsan: $(POSTPROCESSING_TARGET)
 
-test:
-	mkdir -p $(SRC_DIR)/physical/test/$(MOD_DIR)
-	find $(SRC_DIR) -type f -name "*.f90" ! -path "$(SRC_DIR)/physical/test/*" -exec cp {} $(SRC_DIR)/physical/test/ \;
-	@export FC="$(F90)" && export CC="$(CC)" && export CXX="$(CXX)" && export FSFLAG=-I && export FCFLAGS="$(F90_DEBUG_FLAGS)" && cd $(SRC_DIR)/physical/test && funit
-	cd ../../
 
+# --- Unit tests ---
+test:
+	@for dir in $(UNITTEST_DIRS); do \
+		echo "Running tests in $$dir"; \
+		$(MAKE) -C $$dir test; \
+	done
+
+# --- Python scripts calling ---
 analyze:
 	cd Analyzer && python3 mainAnalyzer.py && cd ..
 
@@ -145,6 +148,8 @@ run_slurm:
 fit:
 	cd Analyzer && python3 DosFitter.py && cd ..
 
+
+# --- Cleaning ---
 clean_plots:
 	cd Plots && rm -rf *.png && cd ..
 
@@ -153,21 +158,18 @@ clean:
 	rm -rf $(OBJ_DIR)
 	rm -f $(TARGET)
 	rm -f $(POSTPROCESSING_TARGET)
-	rm -f $(SRC_DIR)/**/test/*.f90
-	rm -rf $(SRC_DIR)/**/test/$(MOD_DIR)
-	rm -rf $(SRC_DIR)/**/test/*.o
-	rm -f *.mod
 	rm -rf $(SRC_DIR)/**/*.i90
 	rm -rf $(SRC_DIR)/**/*.mod
 	rm -rf *.mod
-	@export CC="$(CC)" && export CXX="$(CXX)" && cd $(SRC_DIR)/physical/test && funit --clean && cd ../../
-
-
+	@for dir in $(UNITTEST_DIRS); do \
+		echo "Running tests in $$dir"; \
+		$(MAKE) -C $$dir clean; \
+	done
 
 ########### Dependencies
-$(OBJ_DIR)/main/main.o: $(OBJ_DIR)/physical/hamiltonians.o \
-									 $(OBJ_DIR)/physical/parameters.o \
-									 $(OBJ_DIR)/physical/utilities.o \
+$(OBJ_DIR)/main/main.o: $(OBJ_DIR)/physical/src/hamiltonians.o \
+									 $(OBJ_DIR)/physical/src/parameters.o \
+									 $(OBJ_DIR)/physical/src/utilities.o \
 									 $(OBJ_DIR)/input_output/writers.o \
 									 $(OBJ_DIR)/input_output/reader.o \
 									 $(OBJ_DIR)/self_consistency/broydenV2.o \
@@ -177,56 +179,56 @@ $(OBJ_DIR)/main/main.o: $(OBJ_DIR)/physical/hamiltonians.o \
 									 $(OBJ_DIR)/input_output/logger.o \
 									 $(OBJ_DIR)/types/types.o
 
-$(OBJ_DIR)/main_postprocessing/main_postprocessing.o: $(OBJ_DIR)/physical/hamiltonians.o \
-																  $(OBJ_DIR)/physical/parameters.o \
-																  $(OBJ_DIR)/physical/utilities.o \
+$(OBJ_DIR)/main_postprocessing/main_postprocessing.o: $(OBJ_DIR)/physical/src/hamiltonians.o \
+																  $(OBJ_DIR)/physical/src/parameters.o \
+																  $(OBJ_DIR)/physical/src/utilities.o \
 																  $(OBJ_DIR)/input_output/writers.o \
 																  $(OBJ_DIR)/input_output/reader.o \
 																  $(OBJ_DIR)/integrate/local_integrand.o \
 																  $(OBJ_DIR)/postprocessing/postprocessing.o \
 																  $(OBJ_DIR)/input_output/logger.o
 
-$(OBJ_DIR)/chern.o: $(OBJ_DIR)/physical/hamiltonians.o \
-									  $(OBJ_DIR)/physical/parameters.o \
-									  $(OBJ_DIR)/physical/utilities.o \
+$(OBJ_DIR)/chern.o: $(OBJ_DIR)/physical/src/hamiltonians.o \
+									  $(OBJ_DIR)/physical/src/parameters.o \
+									  $(OBJ_DIR)/physical/src/utilities.o \
 									  $(OBJ_DIR)/input_output/writers.o \
 									  $(OBJ_DIR)/input_output/reader.o \
 									  $(OBJ_DIR)/integrate/local_integrand.o
 
-$(OBJ_DIR)/physical/utilities.o: $(OBJ_DIR)/physical/parameters.o \
+$(OBJ_DIR)/physical/src/utilities.o: $(OBJ_DIR)/physical/src/parameters.o \
 												$(OBJ_DIR)/input_output/reader.o
 
-$(OBJ_DIR)/physical/parameters.o:
+$(OBJ_DIR)/physical/src/parameters.o:
 
-$(OBJ_DIR)/types/types.o: $(OBJ_DIR)/physical/parameters.o
+$(OBJ_DIR)/types/types.o: $(OBJ_DIR)/physical/src/parameters.o
 
-$(OBJ_DIR)/physical/hamiltonians.o: $(OBJ_DIR)/physical/utilities.o \
-								           $(OBJ_DIR)/physical/parameters.o \
+$(OBJ_DIR)/physical/src/hamiltonians.o: $(OBJ_DIR)/physical/src/utilities.o \
+								           $(OBJ_DIR)/physical/src/parameters.o \
 								           $(OBJ_DIR)/input_output/reader.o \
 								           $(OBJ_DIR)/types/types.o
 
-$(OBJ_DIR)/input_output/writers.o: $(OBJ_DIR)/physical/parameters.o \
+$(OBJ_DIR)/input_output/writers.o: $(OBJ_DIR)/physical/src/parameters.o \
 						          $(OBJ_DIR)/input_output/reader.o \
 						          $(OBJ_DIR)/types/types.o
 
-$(OBJ_DIR)/input_output/reader.o: $(OBJ_DIR)/physical/parameters.o \
+$(OBJ_DIR)/input_output/reader.o: $(OBJ_DIR)/physical/src/parameters.o \
 						         $(OBJ_DIR)/input_output/logger.o \
 						         $(OBJ_DIR)/types/types.o
 
-$(OBJ_DIR)/integrate/local_integrand.o: $(OBJ_DIR)/physical/parameters.o \
-										          $(OBJ_DIR)/physical/utilities.o \
-										          $(OBJ_DIR)/physical/hamiltonians.o \
+$(OBJ_DIR)/integrate/local_integrand.o: $(OBJ_DIR)/physical/src/parameters.o \
+										          $(OBJ_DIR)/physical/src/utilities.o \
+										          $(OBJ_DIR)/physical/src/hamiltonians.o \
 										          $(OBJ_DIR)/input_output/writers.o \
 										          $(OBJ_DIR)/types/types.o
 
-$(OBJ_DIR)/integrate/integrate.o: $(OBJ_DIR)/physical/parameters.o \
+$(OBJ_DIR)/integrate/integrate.o: $(OBJ_DIR)/physical/src/parameters.o \
 							          $(OBJ_DIR)/integrate/local_integrand.o \
 							          $(OBJ_DIR)/input_output/logger.o \
 							          $(OBJ_DIR)/types/types.o
 
-$(OBJ_DIR)/postprocessing/postprocessing.o: 	$(OBJ_DIR)/physical/hamiltonians.o \
-									            $(OBJ_DIR)/physical/parameters.o \
-									            $(OBJ_DIR)/physical/utilities.o \
+$(OBJ_DIR)/postprocessing/postprocessing.o: 	$(OBJ_DIR)/physical/src/hamiltonians.o \
+									            $(OBJ_DIR)/physical/src/parameters.o \
+									            $(OBJ_DIR)/physical/src/utilities.o \
 									            $(OBJ_DIR)/input_output/writers.o \
 									            $(OBJ_DIR)/input_output/reader.o \
 									            $(OBJ_DIR)/integrate/local_integrand.o \
@@ -234,7 +236,7 @@ $(OBJ_DIR)/postprocessing/postprocessing.o: 	$(OBJ_DIR)/physical/hamiltonians.o 
 									            $(OBJ_DIR)/input_output/logger.o \
 									            $(OBJ_DIR)/types/types.o
 
-$(OBJ_DIR)/self_consistency/self_consistency.o: $(OBJ_DIR)/physical/parameters.o \
+$(OBJ_DIR)/self_consistency/self_consistency.o: $(OBJ_DIR)/physical/src/parameters.o \
 															 $(OBJ_DIR)/input_output/reader.o \
 															 $(OBJ_DIR)/input_output/logger.o \
 															 $(OBJ_DIR)/types/types.o \

@@ -153,12 +153,12 @@ PURE SUBROUTINE ACCUMULATE_NEAREST_NEIGHBOURS_DELTA(Delta, J_tensor, U, Energies
         lat_idx_inv = lat + 1
         DO spin3 = 1, SPINS
           spin3_block = (spin3 - 1) * discretization % derived % TBA_DIM
-          row = orb + spin3_block + lat_block_1
-          row_inv = orb + spin3_block + lat_block_2
+          row = orb + spin3_block + lat_block_1 + discretization % derived % DIM_POSITIVE_K
+          row_inv = orb + spin3_block + lat_block_2 + discretization % derived % DIM_POSITIVE_K
           DO spin4 = 1, SPINS
             spin4_block = (spin4 - 1) * discretization % derived % TBA_DIM
-            col = orb + spin4_block + lat_block_2 + discretization % derived % DIM_POSITIVE_K
-            col_inv = orb + spin4_block + lat_block_1 + discretization % derived % DIM_POSITIVE_K
+            col = orb + spin4_block + lat_block_2
+            col_inv = orb + spin4_block + lat_block_1
 
             average_pairing = CONJG(U(row, n)) * U(col, n) * occupation_electron + &
             & CONJG(U(row, discretization % derived % DIM_POSITIVE_K + n)) * U(col, discretization % derived % DIM_POSITIVE_K + n) * occupation_hole
@@ -168,7 +168,7 @@ PURE SUBROUTINE ACCUMULATE_NEAREST_NEIGHBOURS_DELTA(Delta, J_tensor, U, Energies
 
             DO spin1 = 1, SPINS
               DO spin2 = 1, SPINS
-                j_elem = -J_tensor(spin1, spin2, spin3, spin4)
+                j_elem = J_tensor(spin1, spin2, spin3, spin4)
                 average_energy = j_elem * average_pairing
                 average_energy_inv = j_elem * average_pairing_inv
                 DO neigh = 1, N_NEIGHBOURS
@@ -247,7 +247,7 @@ PURE SUBROUTINE ACCUMULATE_NEXT_NEIGHBOURS_DELTA(Delta, J_tensor, U, Energies, k
               DO spin2 = 1, SPINS
 
                 ! Minus because we need the potential to be attractive. This way we can pass positive values in input.nml
-                j_elem = -J_tensor(spin1, spin2, spin3, spin4)
+                j_elem = J_tensor(spin1, spin2, spin3, spin4)
                 average_energy = j_elem * average_pairing
 
                 DO neigh = 1, N_ALL_NEIGHBOURS - N_NEIGHBOURS

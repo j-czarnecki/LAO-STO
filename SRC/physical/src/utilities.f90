@@ -24,7 +24,6 @@
 MODULE utilities
 use, intrinsic :: iso_fortran_env, only: real64, int8, int16, int32, int64
 USE parameters
-USE reader
 IMPLICIT NONE
 CONTAINS
 
@@ -111,6 +110,9 @@ PURE RECURSIVE SUBROUTINE COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, N)
   END DO
 END SUBROUTINE COMPUTE_CONJUGATE_ELEMENTS
 
+!---------------------------------------------------------------------------------------
+!------------------------------ KINETIC TERMS ------------------------------------------
+!---------------------------------------------------------------------------------------
 !dir$ attributes forceinline :: epsilon_yz
 PURE FUNCTION epsilon_yz(kx, ky, t_D, t_I) RESULT(epsilon)
   COMPLEX(REAL64) :: epsilon
@@ -134,6 +136,9 @@ PURE FUNCTION epsilon_xy(kx, ky, t_D, t_I) RESULT(epsilon)
   epsilon = -2.*t_D * COS(SQRT(3.) / 2.*kx) * EXP(-imag * 1./2.*ky) - t_I * EXP(imag * ky)
 END FUNCTION epsilon_xy
 
+!---------------------------------------------------------------------------------------
+!------------------------------ RASHBA TERMS -------------------------------------------
+!---------------------------------------------------------------------------------------
 !dir$ attributes forceinline :: rashba_yz_xz
 PURE FUNCTION rashba_yz_zx(kx, ky, t_Rashba) RESULT(rashba)
   COMPLEX(REAL64) :: rashba
@@ -155,67 +160,254 @@ PURE FUNCTION rashba_zx_xy(kx, ky, t_Rashba) RESULT(rashba)
   rashba = -t_Rashba * EXP(imag * ky) * (1.-EXP(imag * (SQRT(3.) / 2.*kx - 3./2.*ky)))
 END FUNCTION rashba_zx_xy
 
+!dir$ attributes forceinline :: compute_nearest_even_hopping
+PURE RECURSIVE SUBROUTINE COMPUTE_NEAREST_EVEN_HOPPING(Hoppings, kx, ky, t_D, t_I, n)
+  IMPLICIT NONE
+
+  REAL(REAL64), INTENT(IN) :: kx, ky, t_D, t_I
+  INTEGER(INT32), INTENT(IN) :: n
+  COMPLEX(REAL64), INTENT(OUT) :: Hoppings(n)
+  REAL(REAL64) :: kx_sqrt3_2, ky_1_2
+  COMPLEX(REAL64) :: exp_iky ! exp(imag * ky)
+  COMPLEX(REAL64) :: exp_pm ! exp(imag * (kx_sqrt3_2 - ky_1_2))
+  COMPLEX(REAL64) :: exp_mm ! exp(-imag * (kx_sqrt3_2 + ky_1_2))
+
+  kx_sqrt3_2 = 0.5 * SQRT(3.) * kx
+  ky_1_2 = 0.5 * ky
+  !Utilizing Euler's formula for performance
+  exp_iky = CMPLX(COS(ky), SIN(ky), REAL64)
+  exp_pm = CMPLX(COS(kx_sqrt3_2 - ky_1_2), SIN(kx_sqrt3_2 - ky_1_2), REAL64)
+  exp_mm = CMPLX(COS(kx_sqrt3_2 + ky_1_2), -SIN(kx_sqrt3_2 + ky_1_2), REAL64)
+
+  !Electrons
+  Hoppings(1) = -t_D * (exp_iky + exp_pm) - t_I * exp_mm !yz - yz
+  Hoppings(2) = -t_D * (exp_iky + exp_mm) - t_I * exp_pm !zx - zx
+  Hoppings(3) = -2.*t_D * COS(kx_sqrt3_2) * EXP(-imag * ky_1_2) - t_I * exp_iky !xy - xy
+
+  !Holes
+  Hoppings(4) = -Hoppings(1) !yz - yz
+  Hoppings(5) = -Hoppings(2) !zx - zx
+  Hoppings(6) = -Hoppings(3) !xy - xy
+END SUBROUTINE COMPUTE_NEAREST_EVEN_HOPPING
+
+!dir$ attributes forceinline :: compute_nearest_odd_hopping
+PURE RECURSIVE SUBROUTINE COMPUTE_NEAREST_ODD_HOPPING(Hoppings, kx, ky, coupling_energy, n)
+  REAL(REAL64), INTENT(IN) :: kx, ky, coupling_energy
+  INTEGER(INT32), INTENT(IN) :: n
+  COMPLEX(REAL64), INTENT(OUT) :: Hoppings(n)
+
+  REAL(REAL64) :: kx_sqrt3_2, ky_1_2
+  COMPLEX(REAL64) :: exp_iky ! exp(imag * ky)
+  COMPLEX(REAL64) :: exp_minus_iky_1_2 ! exp(imag * ky_1_2)
+  COMPLEX(REAL64) :: exp_mm ! exp(-imag * (kx_sqrt3_2 + ky_1_2))
+  COMPLEX(REAL64) :: exp_pm ! exp(imag * (kx_sqrt3_2 - ky_1_2))
+
+  kx_sqrt3_2 = 0.5 * SQRT(3.) * kx
+  ky_1_2 = 0.5 * ky
+
+  exp_iky = CMPLX(COS(ky), SIN(ky), REAL64)
+  exp_minus_iky_1_2 = CMPLX(COS(ky_1_2), -SIN(ky_1_2), REAL64)
+  exp_mm = CMPLX(COS(kx_sqrt3_2 + ky_1_2), -SIN(kx_sqrt3_2 + ky_1_2), REAL64)
+  exp_pm = CMPLX(COS(kx_sqrt3_2 - ky_1_2), SIN(kx_sqrt3_2 - ky_1_2), REAL64)
+
+  !Electrons
+  Hoppings(1) = -coupling_energy * (2.*imag * exp_minus_iky_1_2 * SIN(kx_sqrt3_2)) !yz - zx
+  Hoppings(2) = -coupling_energy * (exp_iky - exp_mm) !yz - xy
+  Hoppings(3) = -coupling_energy * (exp_iky - exp_pm) !zx - xy
+  !Holes
+  Hoppings(4) = -Hoppings(1) !yz - zx
+  Hoppings(5) = -Hoppings(2) !yz - xy
+  Hoppings(6) = -Hoppings(3) !zx - xy
+END SUBROUTINE COMPUTE_NEAREST_ODD_HOPPING
+
+!dir$ attributes forceinline :: compute_next_pi_odd_hopping
+PURE RECURSIVE SUBROUTINE COMPUTE_NEXT_PI_ODD_HOPPING(Hoppings, kx, ky, coupling_energy, n)
+  REAL(REAL64), INTENT(IN) :: kx, ky
+  COMPLEX(REAL64), INTENT(IN) :: coupling_energy
+  INTEGER(INT32), INTENT(IN) :: n
+  COMPLEX(REAL64), INTENT(OUT) :: Hoppings(n)
+
+  REAL(REAL64) :: k1, k2, k3
+  REAL(REAL64) :: sum_sin, sin1, sin2, sin3
+
+  k1 = -0.5 * SQRT(3.) * kx + 1.5 * ky
+  k2 = -0.5 * SQRT(3.) * kx - 1.5 * ky
+  k3 = SQRT(3.) * kx
+
+  sin1 = SIN(k1)
+  sin2 = SIN(k2)
+  sin3 = SIN(k3)
+  sum_sin = sin1 + sin2 + sin3
+  !Electrons
+  Hoppings(1) = -coupling_energy * (sum_sin + sin3) !yz - zx
+  Hoppings(2) = coupling_energy * (sum_sin + sin2) !yz - xy
+  Hoppings(3) = -coupling_energy * (sum_sin + sin1) !zx - xy
+  !Holes
+  !The resulting minus sign calculated analitacally
+  Hoppings(4) = -Hoppings(1) !yz - zx
+  Hoppings(5) = -Hoppings(2) !yz - xy
+  Hoppings(6) = -Hoppings(3) !zx - xy
+END SUBROUTINE COMPUTE_NEXT_PI_ODD_HOPPING
+
+!dir$ attributes forceinline :: compute_next_sigma_odd_hopping
+PURE RECURSIVE SUBROUTINE COMPUTE_NEXT_SIGMA_ODD_HOPPING(Hoppings, kx, ky, coupling_energy, n)
+  REAL(REAL64), INTENT(IN) :: kx, ky
+  COMPLEX(REAL64), INTENT(IN) :: coupling_energy
+  INTEGER(INT32), INTENT(IN) :: n
+  COMPLEX(REAL64), INTENT(OUT) :: Hoppings(n)
+
+  REAL(REAL64) :: k1, k2, k3
+  REAL(REAL64) :: sin1, sin2, sin3
+
+  k1 = -0.5 * SQRT(3.) * kx + 1.5 * ky
+  k2 = -0.5 * SQRT(3.) * kx - 1.5 * ky
+  k3 = SQRT(3.) * kx
+
+  sin1 = SIN(k1)
+  sin2 = SIN(k2)
+  sin3 = SIN(k3)
+  !Electrons
+  Hoppings(1) = coupling_energy * (sin1 + sin2) !yz - zx
+  Hoppings(2) = -coupling_energy * (sin1 + sin3) !yz - xy
+  Hoppings(3) = coupling_energy * (sin2 + sin3) !zx - xy
+  !Holes
+  !The resulting minus sign calculated analitacally
+  Hoppings(4) = -Hoppings(1) !yz - zx
+  Hoppings(5) = -Hoppings(2) !yz - xy
+  Hoppings(6) = -Hoppings(3) !zx - xy
+
+END SUBROUTINE COMPUTE_NEXT_SIGMA_ODD_HOPPING
+
+!---------------------------------------------------------------------------------------
+!------------------------------ SC PAIRING TERMS ---------------------------------------
+!---------------------------------------------------------------------------------------
+!dir$ attributes forceinline :: compute_nearest_pairings
+PURE RECURSIVE SUBROUTINE COMPUTE_NEAREST_PAIRINGS(Pairings, kx, ky, n)
+  REAL(REAL64), INTENT(IN) :: kx, ky
+  INTEGER(INT32), INTENT(IN) :: n
+  COMPLEX(REAL64), INTENT(OUT) :: Pairings(n)
+
+  REAL(REAL64) :: kx_sqrt3_2, ky_1_2
+  REAL(REAL64) :: c1, c2, c3, s1, s2, s3
+
+  kx_sqrt3_2 = 0.5 * SQRT(3.) * kx
+  ky_1_2 = 0.5 * ky
+
+  c1 = COS(ky)
+  s1 = SIN(ky)
+
+  c2 = COS(kx_sqrt3_2 + ky_1_2)
+  s2 = SIN(kx_sqrt3_2 + ky_1_2)
+
+  c3 = COS(-kx_sqrt3_2 + ky_1_2)
+  s3 = SIN(-kx_sqrt3_2 + ky_1_2)
+
+  Pairings(1) = CMPLX(c1, -s1, REAL64)
+  Pairings(2) = CMPLX(c2, s2, REAL64)
+  Pairings(3) = CMPLX(c3, s3, REAL64)
+  Pairings(4) = CMPLX(c1, s1, REAL64)
+  Pairings(5) = CMPLX(c2, -s2, REAL64)
+  Pairings(6) = CMPLX(c3, -s3, REAL64)
+
+END SUBROUTINE COMPUTE_NEAREST_PAIRINGS
+
+!dir$ attributes forceinline :: compute_next_pairings
+PURE RECURSIVE SUBROUTINE COMPUTE_NEXT_PAIRINGS(Pairings, kx, ky, n)
+  REAL(REAL64), INTENT(IN) :: kx, ky
+  INTEGER(INT32), INTENT(IN) :: n
+  COMPLEX(REAL64), INTENT(OUT) :: Pairings(n)
+
+  REAL(REAL64) :: kx_sqrt_3, kx_sqrt3_2, ky_3_2
+  REAL(REAL64) :: c1, c2, c3, s1, s2, s3
+  kx_sqrt_3 = SQRT(3.) * kx
+  kx_sqrt3_2 = 0.5 * SQRT(3.) * kx
+  ky_3_2 = 1.5 * ky
+
+  c1 = COS(kx_sqrt_3)
+  s1 = SIN(kx_sqrt_3)
+
+  c2 = COS(kx_sqrt3_2 + ky_3_2)
+  s2 = SIN(kx_sqrt3_2 + ky_3_2)
+
+  c3 = COS(-kx_sqrt3_2 + ky_3_2)
+  s3 = SIN(-kx_sqrt3_2 + ky_3_2)
+
+  Pairings(1) = CMPLX(c1, -s1, REAL64)
+  Pairings(2) = CMPLX(c2, -s2, REAL64)
+  Pairings(3) = CMPLX(c3, -s3, REAL64)
+  Pairings(4) = CMPLX(c1, s1, REAL64)
+  Pairings(5) = CMPLX(c2, s2, REAL64)
+  Pairings(6) = CMPLX(c3, s3, REAL64)
+
+END SUBROUTINE COMPUTE_NEXT_PAIRINGS
+
 !dir$ attributes forceinline :: pairing_1
 PURE FUNCTION pairing_1(ky) RESULT(pairing)
   COMPLEX(REAL64) :: pairing
   REAL(REAL64), INTENT(IN) :: ky
-  pairing = EXP(imag * ky)
+  pairing = CMPLX(COS(ky), SIN(ky), REAL64)
 END FUNCTION pairing_1
 
 !dir$ attributes forceinline :: pairing_2
 PURE FUNCTION pairing_2(kx, ky) RESULT(pairing)
   COMPLEX(REAL64) :: pairing
   REAL(REAL64), INTENT(IN) :: kx, ky
-  pairing = EXP(-imag * (SQRT(3.) / 2.*kx + ky / 2.))
+  pairing = CMPLX(COS(SQRT(3.) / 2.*kx + ky / 2.), -SIN(SQRT(3.) / 2.*kx + ky / 2.), REAL64)
 END FUNCTION pairing_2
 
 !dir$ attributes forceinline :: pairing_3
 PURE FUNCTION pairing_3(kx, ky) RESULT(pairing)
   COMPLEX(REAL64) :: pairing
   REAL(REAL64), INTENT(IN) :: kx, ky
-  pairing = EXP(-imag * (-SQRT(3.) / 2.*kx + ky / 2.))
+  pairing = CMPLX(COS(-SQRT(3.) / 2.*kx + ky / 2.), -SIN(-SQRT(3.) / 2.*kx + ky / 2.), REAL64)
 END FUNCTION pairing_3
 
 !dir$ attributes forceinline :: pairing_nnn_1
 PURE FUNCTION pairing_nnn_1(kx) RESULT(pairing)
   COMPLEX(REAL64) :: pairing
   REAL(REAL64), INTENT(IN) :: kx
-  pairing = EXP(-imag * (SQRT(3.) * kx))
+  !pairing = EXP(-imag * (SQRT(3.) * kx))
+  pairing = CMPLX(COS(SQRT(3.) * kx), -SIN(SQRT(3.) * kx), REAL64)
 END FUNCTION pairing_nnn_1
 
 !dir$ attributes forceinline :: pairing_nnn_2
 PURE FUNCTION pairing_nnn_2(kx, ky) RESULT(pairing)
   COMPLEX(REAL64) :: pairing
   REAL(REAL64), INTENT(IN) :: kx, ky
-  pairing = EXP(-imag * (SQRT(3.) / 2.*kx + 3./2.*ky))
+  !pairing = EXP(-imag * (SQRT(3.) / 2.*kx + 3./2.*ky))
+  pairing = CMPLX(COS(SQRT(3.) / 2.*kx + 1.5 * ky), -SIN(SQRT(3.) / 2.*kx + 1.5 * ky), REAL64)
 END FUNCTION pairing_nnn_2
 
 !dir$ attributes forceinline :: pairing_nnn_3
 PURE FUNCTION pairing_nnn_3(kx, ky) RESULT(pairing)
   COMPLEX(REAL64) :: pairing
   REAL(REAL64), INTENT(IN) :: kx, ky
-  pairing = EXP(-imag * (-SQRT(3.) / 2.*kx + 3./2.*ky))
+  !pairing = EXP(-imag * (-SQRT(3.) / 2.*kx + 3./2.*ky))
+  pairing = CMPLX(COS(-SQRT(3.) / 2.*kx + 1.5 * ky), -SIN(-SQRT(3.) / 2.*kx + 1.5 * ky), REAL64)
 END FUNCTION pairing_nnn_3
 
 !dir$ attributes forceinline :: pairing_nnn_4
 PURE FUNCTION pairing_nnn_4(kx) RESULT(pairing)
   COMPLEX(REAL64) :: pairing
   REAL(REAL64), INTENT(IN) :: kx
-  pairing = EXP(-imag * (-SQRT(3.) * kx))
+  !pairing = EXP(-imag * (-SQRT(3.) * kx))
+  pairing = CMPLX(COS(SQRT(3.) * kx), SIN(SQRT(3.) * kx), REAL64)
 END FUNCTION pairing_nnn_4
 
 !dir$ attributes forceinline :: pairing_nnn_5
 PURE FUNCTION pairing_nnn_5(kx, ky) RESULT(pairing)
   COMPLEX(REAL64) :: pairing
   REAL(REAL64), INTENT(IN) :: kx, ky
-  pairing = EXP(-imag * (-SQRT(3.) / 2.*kx - 3./2.*ky))
+  !pairing = EXP(-imag * (-SQRT(3.) / 2.*kx - 3./2.*ky))
+  pairing = CMPLX(COS(-SQRT(3.) / 2.*kx - 1.5 * ky), -SIN(-SQRT(3.) / 2.*kx - 1.5 * ky), REAL64)
 END FUNCTION pairing_nnn_5
 
 !dir$ attributes forceinline :: pairing_nnn_6
 PURE FUNCTION pairing_nnn_6(kx, ky) RESULT(pairing)
   COMPLEX(REAL64) :: pairing
   REAL(REAL64), INTENT(IN) :: kx, ky
-  pairing = EXP(-imag * (SQRT(3.) / 2.*kx - 3./2.*ky))
+  !pairing = EXP(-imag * (SQRT(3.) / 2.*kx - 3./2.*ky))
+  pairing = CMPLX(COS(SQRT(3.) / 2.*kx - 1.5 * ky), -SIN(SQRT(3.) / 2.*kx - 1.5 * ky), REAL64)
 END FUNCTION pairing_nnn_6
 
 !dir$ attributes forceinline :: fd_distribution

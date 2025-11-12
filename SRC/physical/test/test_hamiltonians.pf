@@ -1,0 +1,1460 @@
+MODULE test_hamiltonians
+USE funit
+USE types
+USE hamiltonians
+use, intrinsic :: iso_fortran_env, only: real64, int8, int16, int32, int64
+IMPLICIT NONE
+
+!------------------------------------------------------------------------------
+!-------------------------------- TYPES ---------------------------------------
+!------------------------------------------------------------------------------
+
+TYPE :: entry_check_t
+  INTEGER(INT32) :: i, j !! Indeces of the hamiltonian to check
+  COMPLEX(REAL64) :: elem_value
+END TYPE entry_check_t
+
+!------------------------------------------------------------------------------
+!----------------------------- LOCAL VARIAVBLES -------------------------------
+!------------------------------------------------------------------------------
+REAL(REAL64), PARAMETER :: s = 0.5
+TYPE(sc_input_params_t) :: sc_input
+CHARACTER(len=256) :: test_output_data_path
+
+CONTAINS
+!------------------------------------------------------------------------------
+!---------------------------- SETUP/TEARDOWN ----------------------------------
+!------------------------------------------------------------------------------
+@before
+SUBROUTINE setup()
+  INTEGER(INT32) :: sublats = 2
+  INTEGER(INT32) :: n_subbands = 2
+  CALL SET_HAMILTONIAN_PARAMS(sublats, n_subbands, sc_input % discretization)
+END SUBROUTINE setup
+
+!------------------------------------------------------------------------------
+!------------------------------- HELPERS --------------------------------------
+!------------------------------------------------------------------------------
+
+SUBROUTINE check_elements(Hamiltonian, Was_checked, Checks, N)
+  IMPLICIT NONE
+  COMPLEX(REAL64), INTENT(IN) :: Hamiltonian(N, N)
+  LOGICAL, INTENT(OUT) :: Was_checked(N, N)
+  TYPE(entry_check_t), INTENT(IN) :: Checks(:)
+  INTEGER(INT32), INTENT(IN) :: N
+
+  INTEGER(INT32) :: i
+  INTEGER(INT32) :: row, col
+  INTEGER(INT32) :: first_half_size
+
+  first_half_size = N / 2
+
+  DO i = 1, size(Checks)
+    !Electron part
+    row = Checks(i) % i
+    col = Checks(i) % j
+    Was_checked(row, col) = .TRUE.
+    Was_checked(col, row) = .TRUE.
+    !Top triangle
+    @assertEqual(Checks(i) % elem_value, Hamiltonian(row, col), tolerance=1.0e-7, message='Top triangle failure')
+    !Bottom triangle
+    @assertEqual(CONJG(Checks(i) % elem_value), Hamiltonian(col, row), tolerance=1.0e-7, message='Bottom triangle failure')
+    !Hole part, Nambu space
+    row = first_half_size + Checks(i) % i
+    col = first_half_size + Checks(i) % j
+    Was_checked(row, col) = .TRUE.
+    Was_checked(col, row) = .TRUE.
+    !-H*(-k)
+    !Top triangle
+    @assertEqual(-CONJG(Checks(i) % elem_value), Hamiltonian(row, col), tolerance=1.0e-7, message='Top triangle failure in Nambu space')
+    !Bottom triangle
+    @assertEqual(-Checks(i) % elem_value, Hamiltonian(col, row), tolerance=1.0e-7, message='Bottom triangle failure in Nambu space')
+  END DO
+
+END SUBROUTINE check_elements
+
+SUBROUTINE check_rotational_symmetry(n_pi_3_rotations, Hamiltonian_original, Hamiltonian_rotated_k, N)
+  !! This function checks whether U H(k) U\dag = H(\hat{R}k), i.e.
+  !! whether Hamiltonianis invariant under rotations by n * pi/3
+  IMPLICIT NONE
+  INTEGER(INT32), INTENT(IN) :: n_pi_3_rotations !! Number of rotations by pi/3
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian_original(N, N) !! H(k), original Hamiltonian
+  COMPLEX(REAL64), INTENT(IN) :: Hamiltonian_rotated_k(N, N) !! H(\hat{R}k)
+                                                                 !! Hamiltonian in which wavevctor was rotated
+  INTEGER(INT32), INTENT(IN) :: N !! Dimension of the Hamiltonian
+
+  INTEGER(INT32) :: i, j, n_rot
+
+  !! Hamiltonian_original is changed at this point!
+  DO n_rot = 1, n_pi_3_rotations
+    CALL ROTATE_HAMILTONIAN_60_DEG(Hamiltonian_original, N)
+  END DO
+
+  !! Invariance condition
+  DO i = 1, N
+    DO j = 1, N
+      @assertEqual(Hamiltonian_original(i, j), Hamiltonian_rotated_k(i, j), tolerance=1.0e-5, message='Rotational invariance failed')
+    END DO
+  END DO
+
+END SUBROUTINE check_rotational_symmetry
+
+SUBROUTINE check_time_reversal_symmetry(Hamiltonian, Hamiltonian_minus_k, N)
+  IMPLICIT NONE
+  COMPLEX(REAL64), INTENT(IN) :: Hamiltonian(N, N)
+  COMPLEX(REAL64), INTENT(IN) :: Hamiltonian_minus_k(N, N)
+  INTEGER(INT32), INTENT(IN) :: N
+
+  COMPLEX(REAL64), ALLOCATABLE :: U(:, :) !!Transormation matrix
+  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian_time_reversed(:, :)
+  INTEGER(INT32) :: DIM_HALF
+  INTEGER(INT32) :: DIM_SPIN
+  INTEGER(INT32) :: i, j, row, col
+
+  DIM_HALF = N / 2
+  DIM_SPIN = DIM_HALF / 2
+
+  ALLOCATE (U(N, N))
+  ALLOCATE (Hamiltonian_time_reversed(N, N))
+
+  !Assuming that matrix is in the Nambu space
+  !And that the spin "outermost" index i.e.
+  ! |spin> \otimes |d1> ... \otimes |dN>
+  U = CMPLX(0, 0, KIND=REAL64)
+
+  !Constructed according to Appendix A in https://arxiv.org/html/2507.06586v1 (Eq. 48)
+  DO i = 1, DIM_HALF / 2
+    !Electron part
+    row = i
+    col = DIM_SPIN + i
+    U(row, col) = CMPLX(-1, 0, KIND=REAL64)
+    U(col, row) = CMPLX(1, 0, KIND=REAL64)
+    !Hole part
+    row = DIM_HALF + i
+    col = DIM_HALF + DIM_SPIN + i
+    U(row, col) = CMPLX(-1, 0, KIND=REAL64)
+    U(col, row) = CMPLX(1, 0, KIND=REAL64)
+  END DO
+
+  Hamiltonian_time_reversed = MATMUL(U, MATMUL(CONJG(Hamiltonian), CONJG(TRANSPOSE(U))))
+
+  DO i = 1, N
+    DO j = 1, N
+      @assertEqual(Hamiltonian_minus_k(i, j), Hamiltonian_time_reversed(i, j), tolerance=1.0e-7, message='Time reversal invariance failed')
+    END DO
+  END DO
+
+  DEALLOCATE (U)
+  DEALLOCATE (Hamiltonian_time_reversed)
+
+END SUBROUTINE check_time_reversal_symmetry
+
+SUBROUTINE check_zero_elems(Hamiltonian, Was_checked, N)
+  IMPLICIT NONE
+  COMPLEX(REAL64), INTENT(IN) :: Hamiltonian(N, N)
+  LOGICAL, INTENT(IN) :: Was_checked(N, N)
+  INTEGER(INT32), INTENT(IN) :: N
+
+  INTEGER(INT32) :: i, j
+
+  DO i = 1, N
+    DO j = 1, N
+      IF (.NOT. Was_checked(i, j)) THEN
+        @assertEqual(CMPLX(0., 0., KIND=REAL64), Hamiltonian(i, j))
+      END IF
+    END DO
+  END DO
+
+END SUBROUTINE check_zero_elems
+
+!---------------------------------------------------------------------
+!----------------------------- TESTS ---------------------------------
+!---------------------------------------------------------------------
+
+! ------------------------ K-dependent parts -------------------------
+@test
+SUBROUTINE test_compute_tba_term()
+
+  !! Defining functions' interface and a type to easily check whether
+  !! H(i,j) == f(x,y,z,...)
+  interface
+    function kinetic_term(kx, ky, t_D, t_I) result(epsilon)
+      use, intrinsic :: iso_fortran_env, only: real64
+      implicit none
+      complex(real64) :: epsilon
+      real(real64), intent(in) :: kx, ky, t_D, t_I
+    end function kinetic_term
+  end interface
+
+  TYPE :: entry_check_callback_t
+    INTEGER(INT32) :: i, j !! Indeces of the hamiltonian to check
+    PROCEDURE(kinetic_term), POINTER, NOPASS :: cb => null()
+  END TYPE entry_check_callback_t
+
+  COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_rotated(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_minus_k(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  LOGICAL :: Was_checked(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  TYPE(entry_check_callback_t), ALLOCATABLE :: Checks(:)
+
+  !Physical variables
+  REAL(REAL64), PARAMETER :: t_D = .5
+  REAL(REAL64), PARAMETER :: t_I = .04
+
+  REAL(REAL64) :: phi_rot
+  INTEGER(INT32) :: nr_points = 3
+  INTEGER(INT32) :: nphi_points = 7
+  INTEGER(INT32) :: n_pi_3_rotations = 1
+  INTEGER(INT32) :: row, col
+  INTEGER(INT32) :: i, j, ir, jphi
+  REAL(REAL64) :: kx, ky, dr, dphi, kx_rot, ky_rot
+
+  Was_checked = .FALSE.
+  dr = 1./nr_points
+  dphi = PI / 2./nphi_points
+
+  ASSOCIATE (DIM => sc_input % discretization % derived % DIM, &
+             DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+             TBA_DIM => sc_input % discretization % derived % TBA_DIM, &
+             LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS)
+
+    ! Define checks only for upper triangle and electron part
+    ! This way hole part and hermicity can be easily checked
+    Checks = [ &
+               & entry_check_callback_t(1, 4, epsilon_yz), &
+               & entry_check_callback_t(2, 5, epsilon_zx), &
+               & entry_check_callback_t(3, 6, epsilon_xy), &
+               & entry_check_callback_t(TBA_DIM + 1, TBA_DIM + 4, epsilon_yz), &
+               & entry_check_callback_t(TBA_DIM + 2, TBA_DIM + 5, epsilon_zx), &
+               & entry_check_callback_t(TBA_DIM + 3, TBA_DIM + 6, epsilon_xy)]
+
+    DO ir = 0, nr_points
+      DO jphi = -nphi_points, nphi_points
+        Hamiltonian = CMPLX(0., 0., KIND=REAL64)
+        kx = ir * dr * COS(jphi * dphi)
+        ky = ir * dr * SIN(jphi * dphi)
+
+        CALL COMPUTE_TBA_TERM(Hamiltonian, kx, ky, t_D, t_I, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, DIM)
+
+        ! Check elements that should be filled for TBA_DIM
+        DO i = 1, size(Checks)
+          !Electron part
+          row = Checks(i) % i
+          col = Checks(i) % j
+          Was_checked(row, col) = .TRUE.
+          Was_checked(col, row) = .TRUE.
+          !Top triangle
+          @assertEqual(Checks(i) % cb(kx, ky, t_D, t_I), Hamiltonian(row, col), tolerance=1.0e-7)
+          !Bottom triangle
+          @assertEqual(CONJG(Checks(i) % cb(kx, ky, t_D, t_I)), Hamiltonian(col, row), tolerance=1.0e-7)
+          !Hole part, Nambu space
+          row = DIM_POSITIVE_K + Checks(i) % i
+          col = DIM_POSITIVE_K + Checks(i) % j
+          Was_checked(row, col) = .TRUE.
+          Was_checked(col, row) = .TRUE.
+          !-H*(-k)
+          !Top triangle
+          @assertEqual(-CONJG(Checks(i) % cb(-kx, -ky, t_D, t_I)), Hamiltonian(row, col), tolerance=1.0e-7)
+          !Bottom triangle
+          @assertEqual(-Checks(i) % cb(-kx, -ky, t_D, t_I), Hamiltonian(col, row), tolerance=1.0e-7)
+        END DO
+
+        !Check that the rest of the matrix is zero
+        CALL check_zero_elems(Hamiltonian, Was_checked, DIM)
+
+        !Check time-reversal symmetry
+        Hamiltonian_minus_k = CMPLX(0., 0., KIND=REAL64)
+        CALL COMPUTE_TBA_TERM(Hamiltonian_minus_k, -kx, -ky, t_D, t_I, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_minus_k, DIM)
+        CALL check_time_reversal_symmetry(Hamiltonian, Hamiltonian_minus_k, DIM)
+
+        ! Check symmetry of the Hamiltonian
+        Hamiltonian_rotated = CMPLX(0., 0., KIND=REAL64)
+        phi_rot = n_pi_3_rotations * PI / 3
+        kx_rot = ir * dr * COS(jphi * dphi - phi_rot)
+        ky_rot = ir * dr * SIN(jphi * dphi - phi_rot)
+        CALL COMPUTE_TBA_TERM(Hamiltonian_rotated, kx_rot, ky_rot, t_D, t_I, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_rotated, DIM)
+        CALL check_rotational_symmetry(n_pi_3_rotations, Hamiltonian, Hamiltonian_rotated, DIM)
+
+      END DO
+    END DO !Loop over k
+  END ASSOCIATE
+
+END SUBROUTINE test_compute_tba_term
+
+@test
+SUBROUTINE test_compute_ti1_ti2()
+  USE writers
+
+  interface
+    function odd_nearest_hopping_term(kx, ky, t_Rashba) result(hop)
+      use, intrinsic :: iso_fortran_env, only: real64
+      implicit none
+      complex(real64) :: hop
+      real(real64), intent(in) :: kx, ky, t_Rashba
+    end function odd_nearest_hopping_term
+  end interface
+
+  TYPE :: entry_check_callback_t
+    INTEGER(INT32) :: i, j !! Indeces of the hamiltonian to check
+    PROCEDURE(odd_nearest_hopping_term), POINTER, NOPASS :: cb => null()
+  END TYPE entry_check_callback_t
+
+  COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_rotated(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_minus_k(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  LOGICAL :: Was_checked(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  TYPE(entry_check_callback_t), ALLOCATABLE :: Checks(:)
+
+  REAL(REAL64), PARAMETER :: eta_p = 1.
+  REAL(REAL64), PARAMETER :: V_pdp = 1.
+
+  REAL(REAL64) :: strength
+  REAL(REAL64) :: hop_sign
+  REAL(REAL64) :: phi_rot
+  INTEGER(INT32) :: nr_points = 3
+  INTEGER(INT32) :: nphi_points = 7
+  INTEGER(INT32) :: n_pi_3_rotations_c3 = 2 !Has C3v symmetry
+  INTEGER(INT32) :: n_pi_3_rotations_c6 = 1 !Changes sign under C6v rotations
+  INTEGER(INT32) :: row, col
+  INTEGER(INT32) :: i, j, ir, jphi
+  REAL(REAL64) :: kx, ky, kx_minus, ky_minus, dr, dphi, kx_rot, ky_rot, k1, k2, k3
+
+  Was_checked = .FALSE.
+  dr = 1./nr_points
+  dphi = PI / 2./nphi_points
+  strength = eta_p * V_pdp * SQRT(2.)**(0.5 * 7.) / SQRT(15.)
+
+  ASSOCIATE (DIM => sc_input % discretization % derived % DIM, &
+             DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+             TBA_DIM => sc_input % discretization % derived % TBA_DIM, &
+             LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS, &
+             ORBITALS => sc_input % discretization % ORBITALS)
+
+    Checks = [ &
+               & entry_check_callback_t(1, ORBITALS + 2, rashba_yz_zx), &
+               & entry_check_callback_t(1, ORBITALS + 3, rashba_yz_xy), &
+               & entry_check_callback_t(2, ORBITALS + 3, rashba_zx_xy), &
+               & entry_check_callback_t(2, ORBITALS + 1, rashba_yz_zx), &
+               & entry_check_callback_t(3, ORBITALS + 1, rashba_yz_xy), &
+               & entry_check_callback_t(3, ORBITALS + 2, rashba_zx_xy), &
+               & entry_check_callback_t(TBA_DIM + 1, TBA_DIM + ORBITALS + 2, rashba_yz_zx), &
+               & entry_check_callback_t(TBA_DIM + 1, TBA_DIM + ORBITALS + 3, rashba_yz_xy), &
+               & entry_check_callback_t(TBA_DIM + 2, TBA_DIM + ORBITALS + 3, rashba_zx_xy), &
+               & entry_check_callback_t(TBA_DIM + 2, TBA_DIM + ORBITALS + 1, rashba_yz_zx), &
+               & entry_check_callback_t(TBA_DIM + 3, TBA_DIM + ORBITALS + 1, rashba_yz_xy), &
+               & entry_check_callback_t(TBA_DIM + 3, TBA_DIM + ORBITALS + 2, rashba_zx_xy)]
+
+    DO ir = 0, nr_points
+      DO jphi = -nphi_points, nphi_points
+        kx = ir * dr * COS(jphi * dphi)
+        ky = ir * dr * SIN(jphi * dphi)
+
+        Hamiltonian = CMPLX(0., 0., KIND=REAL64)
+        CALL COMPUTE_TI1_TI2(Hamiltonian, kx, ky, eta_p, V_pdp, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, DIM)
+
+        !Check elements that should be filled for TBA_DIM
+        DO i = 1, size(Checks)
+          !Electron part
+          row = Checks(i) % i
+          col = Checks(i) % j
+          Was_checked(row, col) = .TRUE.
+          Was_checked(col, row) = .TRUE.
+          hop_sign = 1.
+          !Taking into account that hopping is antisymmetric
+          IF (col - ORBITALS < row) hop_sign = -1
+          !Top triangle
+          @assertEqual(hop_sign * Checks(i) % cb(kx, ky, strength), Hamiltonian(row, col), tolerance=1.0e-7)
+          !Bottom triangle
+          @assertEqual(hop_sign * CONJG(Checks(i) % cb(kx, ky, strength)), Hamiltonian(col, row), tolerance=1.0e-7)
+          !Hole part, Nambu space
+          row = DIM_POSITIVE_K + Checks(i) % i
+          col = DIM_POSITIVE_K + Checks(i) % j
+          Was_checked(row, col) = .TRUE.
+          Was_checked(col, row) = .TRUE.
+          !-H*(-k)
+          !Top triangle
+          @assertEqual(-hop_sign * CONJG(Checks(i) % cb(-kx, -ky, strength)), Hamiltonian(row, col), tolerance=1.0e-7)
+          !Bottom triangle
+          @assertEqual(-hop_sign * Checks(i) % cb(-kx, -ky, strength), Hamiltonian(col, row), tolerance=1.0e-7)
+        END DO
+
+        CALL check_zero_elems(Hamiltonian, Was_checked, DIM)
+
+        Hamiltonian_minus_k = CMPLX(0., 0., KIND=REAL64)
+        kx_minus = -kx
+        ky_minus = -ky
+        CALL COMPUTE_TI1_TI2(Hamiltonian_minus_k, kx_minus, ky_minus, eta_p, V_pdp, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_minus_k, DIM)
+        CALL check_time_reversal_symmetry(Hamiltonian, Hamiltonian_minus_k, DIM)
+
+        !Check C3v rotational symmetry
+        Hamiltonian_rotated = CMPLX(0., 0., KIND=REAL64)
+        phi_rot = n_pi_3_rotations_c3 * PI / 3
+        kx_rot = ir * dr * COS(jphi * dphi - phi_rot)
+        ky_rot = ir * dr * SIN(jphi * dphi - phi_rot)
+        CALL COMPUTE_TI1_TI2(Hamiltonian_rotated, kx_rot, ky_rot, eta_p, V_pdp, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_rotated, DIM)
+        CALL check_rotational_symmetry(n_pi_3_rotations_c3, Hamiltonian, Hamiltonian_rotated, DIM)
+
+        !Check C6v with sign change
+        Hamiltonian = CMPLX(0., 0., KIND=REAL64)
+        CALL COMPUTE_TI1_TI2(Hamiltonian, kx, ky, eta_p, V_pdp, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, DIM)
+
+        Hamiltonian_rotated = CMPLX(0., 0., KIND=REAL64)
+        phi_rot = n_pi_3_rotations_c6 * PI / 3
+        kx_rot = ir * dr * COS(jphi * dphi - phi_rot)
+        ky_rot = ir * dr * SIN(jphi * dphi - phi_rot)
+        CALL COMPUTE_TI1_TI2(Hamiltonian_rotated, kx_rot, ky_rot, eta_p, V_pdp, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_rotated, DIM)
+        Hamiltonian = -1 * Hamiltonian
+        CALL check_rotational_symmetry(n_pi_3_rotations_c6, Hamiltonian, Hamiltonian_rotated, DIM)
+      END DO
+    END DO
+
+  END ASSOCIATE
+
+END SUBROUTINE test_compute_ti1_ti2
+
+@test
+SUBROUTINE test_compute_h_pi()
+  IMPLICIT NONE
+  COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_rotated(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_minus_k(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  LOGICAL :: Was_checked(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  TYPE(entry_check_t), ALLOCATABLE :: Checks(:)
+
+  REAL(REAL64), PARAMETER :: eta_p = 1.
+  REAL(REAL64), PARAMETER :: V_pdp = 3.
+  COMPLEX(REAL64), PARAMETER :: strength = eta_p * 2 * imag * V_pdp / SQRT(15.)
+
+  REAL(REAL64) :: phi_rot
+  INTEGER(INT32) :: nr_points = 3
+  INTEGER(INT32) :: nphi_points = 7
+  INTEGER(INT32) :: n_pi_3_rotations_c3 = 2 !Has C3v symmetry
+  INTEGER(INT32) :: n_pi_3_rotations_c6 = 1 !Changes sign under C6v rotations
+  INTEGER(INT32) :: row, col
+  INTEGER(INT32) :: i, j, ir, jphi
+  REAL(REAL64) :: kx, ky, kx_minus, ky_minus, dr, dphi, kx_rot, ky_rot, k1, k2, k3
+
+  Was_checked = .FALSE.
+  dr = 1./nr_points
+  dphi = PI / 2./nphi_points
+
+  ASSOCIATE (DIM => sc_input % discretization % derived % DIM, &
+             DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+             TBA_DIM => sc_input % discretization % derived % TBA_DIM, &
+             LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS, &
+             ORBITALS => sc_input % discretization % ORBITALS)
+
+    DO ir = 0, nr_points
+      DO jphi = -nphi_points, nphi_points
+        kx = ir * dr * COS(jphi * dphi)
+        ky = ir * dr * SIN(jphi * dphi)
+
+        k1 = -SQRT(3.) / 2.*kx + 3./2.*ky
+        k2 = -SQRT(3.) / 2.*kx - 3./2.*ky
+        k3 = SQRT(3.) * kx
+
+        Checks = [ &
+                 entry_check_t(1, 2, -strength * (sin(k1) + sin(k2) + 2.*sin(k3))), &
+                 entry_check_t(1, 3, strength * (sin(k1) + 2 * sin(k2) + sin(k3))), &
+                 entry_check_t(2, 3, -strength * (2.*sin(k1) + sin(k2) + sin(k3))), &
+                 entry_check_t(1 + ORBITALS, 2 + ORBITALS, -strength * (sin(k1) + sin(k2) + 2.*sin(k3))), &
+                 entry_check_t(1 + ORBITALS, 3 + ORBITALS, strength * (sin(k1) + 2 * sin(k2) + sin(k3))), &
+                 entry_check_t(2 + ORBITALS, 3 + ORBITALS, -strength * (2.*sin(k1) + sin(k2) + sin(k3))), &
+                 entry_check_t(1 + TBA_DIM, 2 + TBA_DIM, -strength * (sin(k1) + sin(k2) + 2.*sin(k3))), &
+                 entry_check_t(1 + TBA_DIM, 3 + TBA_DIM, strength * (sin(k1) + 2 * sin(k2) + sin(k3))), &
+                 entry_check_t(2 + TBA_DIM, 3 + TBA_DIM, -strength * (2.*sin(k1) + sin(k2) + sin(k3))), &
+                 entry_check_t(1 + ORBITALS + TBA_DIM, 2 + ORBITALS + TBA_DIM, -strength * (sin(k1) + sin(k2) + 2.*sin(k3))), &
+                 entry_check_t(1 + ORBITALS + TBA_DIM, 3 + ORBITALS + TBA_DIM, strength * (sin(k1) + 2 * sin(k2) + sin(k3))), &
+                 entry_check_t(2 + ORBITALS + TBA_DIM, 3 + ORBITALS + TBA_DIM, -strength * (2.*sin(k1) + sin(k2) + sin(k3))), &
+                 ! ===== Negative k =====
+                 entry_check_t(1 + DIM_POSITIVE_K, 2 + DIM_POSITIVE_K, CONJG(strength * (sin(-k1) + sin(-k2) + 2.*sin(-k3)))), &
+                 entry_check_t(1 + DIM_POSITIVE_K, 3 + DIM_POSITIVE_K, -CONJG(strength * (sin(-k1) + 2 * sin(-k2) + sin(-k3)))), &
+                 entry_check_t(2 + DIM_POSITIVE_K, 3 + DIM_POSITIVE_K, CONJG(strength * (2.*sin(-k1) + sin(-k2) + sin(-k3)))), &
+                 entry_check_t(1 + ORBITALS + DIM_POSITIVE_K, 2 + ORBITALS + DIM_POSITIVE_K, CONJG(strength * (sin(-k1) + sin(-k2) + 2.*sin(-k3)))), &
+                 entry_check_t(1 + ORBITALS + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K, -CONJG(strength * (sin(-k1) + 2 * sin(-k2) + sin(-k3)))), &
+                 entry_check_t(2 + ORBITALS + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K, CONJG(strength * (2.*sin(-k1) + sin(-k2) + sin(-k3)))), &
+                 entry_check_t(1 + TBA_DIM + DIM_POSITIVE_K, 2 + TBA_DIM + DIM_POSITIVE_K, CONJG(strength * (sin(-k1) + sin(-k2) + 2.*sin(-k3)))), &
+                 entry_check_t(1 + TBA_DIM + DIM_POSITIVE_K, 3 + TBA_DIM + DIM_POSITIVE_K, -CONJG(strength * (sin(-k1) + 2 * sin(-k2) + sin(-k3)))), &
+                 entry_check_t(2 + TBA_DIM + DIM_POSITIVE_K, 3 + TBA_DIM + DIM_POSITIVE_K, CONJG(strength * (2.*sin(-k1) + sin(-k2) + sin(-k3)))), &
+                 entry_check_t(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, CONJG(strength * (sin(-k1) + sin(-k2) + 2.*sin(-k3)))), &
+                 entry_check_t(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, -CONJG(strength * (sin(-k1) + 2 * sin(-k2) + sin(-k3)))), &
+                 entry_check_t(2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, CONJG(strength * (2.*sin(-k1) + sin(-k2) + sin(-k3))))]
+
+        Hamiltonian = CMPLX(0., 0., KIND=REAL64)
+        CALL COMPUTE_H_PI(Hamiltonian, kx, ky, eta_p, V_pdp, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, DIM)
+
+        DO i = 1, size(Checks)
+          !Electron part
+          row = Checks(i) % i
+          col = Checks(i) % j
+          Was_checked(row, col) = .TRUE.
+          Was_checked(col, row) = .TRUE.
+          !Top triangle
+          @assertEqual(Checks(i) % elem_value, Hamiltonian(row, col), tolerance=1.0e-7)
+          !Bottom triangle
+          @assertEqual(CONJG(Checks(i) % elem_value), Hamiltonian(col, row), tolerance=1.0e-7)
+        END DO
+
+        CALL check_zero_elems(Hamiltonian, Was_checked, DIM)
+
+        Hamiltonian_minus_k = CMPLX(0., 0., KIND=REAL64)
+        kx_minus = -kx
+        ky_minus = -ky
+        CALL COMPUTE_H_PI(Hamiltonian_minus_k, kx_minus, ky_minus, eta_p, V_pdp, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_minus_k, DIM)
+        CALL check_time_reversal_symmetry(Hamiltonian, Hamiltonian_minus_k, DIM)
+
+        !Check C3v rotational symmetry
+        Hamiltonian_rotated = CMPLX(0., 0., KIND=REAL64)
+        phi_rot = n_pi_3_rotations_c3 * PI / 3
+        kx_rot = ir * dr * COS(jphi * dphi - phi_rot)
+        ky_rot = ir * dr * SIN(jphi * dphi - phi_rot)
+        CALL COMPUTE_H_PI(Hamiltonian_rotated, kx_rot, ky_rot, eta_p, V_pdp, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_rotated, DIM)
+        CALL check_rotational_symmetry(n_pi_3_rotations_c3, Hamiltonian, Hamiltonian_rotated, DIM)
+
+        !Check C6v with sign change
+        Hamiltonian = CMPLX(0., 0., KIND=REAL64)
+        CALL COMPUTE_H_PI(Hamiltonian, kx, ky, eta_p, V_pdp, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, DIM)
+
+        Hamiltonian_rotated = CMPLX(0., 0., KIND=REAL64)
+        phi_rot = n_pi_3_rotations_c6 * PI / 3
+        kx_rot = ir * dr * COS(jphi * dphi - phi_rot)
+        ky_rot = ir * dr * SIN(jphi * dphi - phi_rot)
+        CALL COMPUTE_H_PI(Hamiltonian_rotated, kx_rot, ky_rot, eta_p, V_pdp, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_rotated, DIM)
+        Hamiltonian = -1 * Hamiltonian
+        CALL check_rotational_symmetry(n_pi_3_rotations_c6, Hamiltonian, Hamiltonian_rotated, DIM)
+
+      END DO
+    END DO
+  END ASSOCIATE
+END SUBROUTINE test_compute_h_pi
+
+@test
+SUBROUTINE test_compute_h_sigma()
+  USE writers
+  COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_rotated(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_minus_k(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  LOGICAL :: Was_checked(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  TYPE(entry_check_t), ALLOCATABLE :: Checks(:)
+
+  REAL(REAL64), PARAMETER :: eta_p = 1.
+  REAL(REAL64), PARAMETER :: V_pds = 3.
+  COMPLEX(REAL64), PARAMETER :: strength = eta_p * 2 * imag * SQRT(3.) * V_pds / SQRT(15.)
+
+  REAL(REAL64) :: phi_rot
+  INTEGER(INT32) :: nr_points = 3
+  INTEGER(INT32) :: nphi_points = 7
+  INTEGER(INT32) :: n_pi_3_rotations_c3 = 2 !Has C3v symmetry
+  INTEGER(INT32) :: n_pi_3_rotations_c6 = 1 !Changes sign under C6v rotations
+  INTEGER(INT32) :: row, col
+  INTEGER(INT32) :: i, j, ir, jphi
+  REAL(REAL64) :: kx, ky, kx_minus, ky_minus, dr, dphi, kx_rot, ky_rot, k1, k2, k3
+
+  Was_checked = .FALSE.
+  dr = 1./nr_points
+  dphi = PI / 2./nphi_points
+
+  ASSOCIATE (DIM => sc_input % discretization % derived % DIM, &
+             DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+             TBA_DIM => sc_input % discretization % derived % TBA_DIM, &
+             LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS, &
+             ORBITALS => sc_input % discretization % ORBITALS)
+
+    DO ir = 0, nr_points
+      DO jphi = -nphi_points, nphi_points
+        kx = ir * dr * COS(jphi * dphi)
+        ky = ir * dr * SIN(jphi * dphi)
+
+        k1 = -SQRT(3.) / 2.*kx + 3./2.*ky
+        k2 = -SQRT(3.) / 2.*kx - 3./2.*ky
+        k3 = SQRT(3.) * kx
+
+        Checks = [ &
+                 entry_check_t(1, 2, strength * (sin(k1) + sin(k2))), &
+                 entry_check_t(1, 3, -strength * (sin(k1) + sin(k3))), &
+                 entry_check_t(2, 3, strength * (sin(k2) + sin(k3))), &
+                 entry_check_t(1 + ORBITALS, 2 + ORBITALS, strength * (sin(k1) + sin(k2))), &
+                 entry_check_t(1 + ORBITALS, 3 + ORBITALS, -strength * (sin(k1) + sin(k3))), &
+                 entry_check_t(2 + ORBITALS, 3 + ORBITALS, strength * (sin(k2) + sin(k3))), &
+                 entry_check_t(1 + TBA_DIM, 2 + TBA_DIM, strength * (sin(k1) + sin(k2))), &
+                 entry_check_t(1 + TBA_DIM, 3 + TBA_DIM, -strength * (sin(k1) + sin(k3))), &
+                 entry_check_t(2 + TBA_DIM, 3 + TBA_DIM, strength * (sin(k2) + sin(k3))), &
+                 entry_check_t(1 + ORBITALS + TBA_DIM, 2 + ORBITALS + TBA_DIM, strength * (sin(k1) + sin(k2))), &
+                 entry_check_t(1 + ORBITALS + TBA_DIM, 3 + ORBITALS + TBA_DIM, -strength * (sin(k1) + sin(k3))), &
+                 entry_check_t(2 + ORBITALS + TBA_DIM, 3 + ORBITALS + TBA_DIM, strength * (sin(k2) + sin(k3))), &
+                 ! ===== Negative k =====
+                 entry_check_t(1 + DIM_POSITIVE_K, 2 + DIM_POSITIVE_K, -CONJG(strength * (sin(-k1) + sin(-k2)))), &
+                 entry_check_t(1 + DIM_POSITIVE_K, 3 + DIM_POSITIVE_K, CONJG(strength * (sin(-k1) + sin(-k3)))), &
+                 entry_check_t(2 + DIM_POSITIVE_K, 3 + DIM_POSITIVE_K, -CONJG(strength * (sin(-k2) + sin(-k3)))), &
+                 entry_check_t(1 + ORBITALS + DIM_POSITIVE_K, 2 + ORBITALS + DIM_POSITIVE_K, -CONJG(strength * (sin(-k1) + sin(-k2)))), &
+                 entry_check_t(1 + ORBITALS + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K, CONJG(strength * (sin(-k1) + sin(-k3)))), &
+                 entry_check_t(2 + ORBITALS + DIM_POSITIVE_K, 3 + ORBITALS + DIM_POSITIVE_K, -CONJG(strength * (sin(-k2) + sin(-k3)))), &
+                 entry_check_t(1 + TBA_DIM + DIM_POSITIVE_K, 2 + TBA_DIM + DIM_POSITIVE_K, -CONJG(strength * (sin(-k1) + sin(-k2)))), &
+                 entry_check_t(1 + TBA_DIM + DIM_POSITIVE_K, 3 + TBA_DIM + DIM_POSITIVE_K, CONJG(strength * (sin(-k1) + sin(-k3)))), &
+                 entry_check_t(2 + TBA_DIM + DIM_POSITIVE_K, 3 + TBA_DIM + DIM_POSITIVE_K, -CONJG(strength * (sin(-k2) + sin(-k3)))), &
+                 entry_check_t(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, -CONJG(strength * (sin(-k1) + sin(-k2)))), &
+                 entry_check_t(1 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, CONJG(strength * (sin(-k1) + sin(-k3)))), &
+                 entry_check_t(2 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, 3 + ORBITALS + TBA_DIM + DIM_POSITIVE_K, -CONJG(strength * (sin(-k2) + sin(-k3))))]
+
+        Hamiltonian = CMPLX(0., 0., KIND=REAL64)
+        CALL COMPUTE_H_SIGMA(Hamiltonian, kx, ky, eta_p, V_pds, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, DIM)
+
+        DO i = 1, size(Checks)
+          !Electron part
+          row = Checks(i) % i
+          col = Checks(i) % j
+          Was_checked(row, col) = .TRUE.
+          Was_checked(col, row) = .TRUE.
+          !Top triangle
+          @assertEqual(Checks(i) % elem_value, Hamiltonian(row, col), tolerance=1.0e-7)
+          !Bottom triangle
+          @assertEqual(CONJG(Checks(i) % elem_value), Hamiltonian(col, row), tolerance=1.0e-7)
+        END DO
+
+        CALL check_zero_elems(Hamiltonian, Was_checked, DIM)
+
+        Hamiltonian_minus_k = CMPLX(0., 0., KIND=REAL64)
+        kx_minus = -kx
+        ky_minus = -ky
+        CALL COMPUTE_H_SIGMA(Hamiltonian_minus_k, kx_minus, ky_minus, eta_p, V_pds, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_minus_k, DIM)
+        CALL check_time_reversal_symmetry(Hamiltonian, Hamiltonian_minus_k, DIM)
+
+        !Check C3v rotational symmetry
+        Hamiltonian_rotated = CMPLX(0., 0., KIND=REAL64)
+        phi_rot = n_pi_3_rotations_c3 * PI / 3
+        kx_rot = ir * dr * COS(jphi * dphi - phi_rot)
+        ky_rot = ir * dr * SIN(jphi * dphi - phi_rot)
+        CALL COMPUTE_H_SIGMA(Hamiltonian_rotated, kx_rot, ky_rot, eta_p, V_pds, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_rotated, DIM)
+        CALL check_rotational_symmetry(n_pi_3_rotations_c3, Hamiltonian, Hamiltonian_rotated, DIM)
+
+        !Check C6v with sign change
+        Hamiltonian = CMPLX(0., 0., KIND=REAL64)
+        CALL COMPUTE_H_SIGMA(Hamiltonian, kx, ky, eta_p, V_pds, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, DIM)
+
+        Hamiltonian_rotated = CMPLX(0., 0., KIND=REAL64)
+        phi_rot = n_pi_3_rotations_c6 * PI / 3
+        kx_rot = ir * dr * COS(jphi * dphi - phi_rot)
+        ky_rot = ir * dr * SIN(jphi * dphi - phi_rot)
+        CALL COMPUTE_H_SIGMA(Hamiltonian_rotated, kx_rot, ky_rot, eta_p, V_pds, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_rotated, DIM)
+        Hamiltonian = -1 * Hamiltonian
+        CALL check_rotational_symmetry(n_pi_3_rotations_c6, Hamiltonian, Hamiltonian_rotated, DIM)
+
+      END DO
+    END DO
+  END ASSOCIATE
+
+END SUBROUTINE test_compute_h_sigma
+
+@test
+SUBROUTINE test_compute_rashba_hopping()
+  USE writers
+
+  interface
+    function odd_nearest_hopping_term(kx, ky, t_Rashba) result(hop)
+      use, intrinsic :: iso_fortran_env, only: real64
+      implicit none
+      complex(real64) :: hop
+      real(real64), intent(in) :: kx, ky, t_Rashba
+    end function odd_nearest_hopping_term
+  end interface
+
+  TYPE :: entry_check_callback_t
+    INTEGER(INT32) :: i, j !! Indeces of the hamiltonian to check
+    PROCEDURE(odd_nearest_hopping_term), POINTER, NOPASS :: cb => null()
+  END TYPE entry_check_callback_t
+
+  COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_rotated(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_minus_k(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  LOGICAL :: Was_checked(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  TYPE(entry_check_callback_t), ALLOCATABLE :: Checks(:)
+
+  REAL(REAL64), PARAMETER :: t_Rashba = 1.
+
+  REAL(REAL64) :: hop_sign
+  REAL(REAL64) :: phi_rot
+  INTEGER(INT32) :: nr_points = 3
+  INTEGER(INT32) :: nphi_points = 7
+  INTEGER(INT32) :: n_pi_3_rotations_c3 = 2 !Has C3v symmetry
+  INTEGER(INT32) :: n_pi_3_rotations_c6 = 1 !Changes sign under C6v rotations
+  INTEGER(INT32) :: row, col
+  INTEGER(INT32) :: i, j, ir, jphi
+  REAL(REAL64) :: kx, ky, kx_minus, ky_minus, dr, dphi, kx_rot, ky_rot, k1, k2, k3
+
+  Was_checked = .FALSE.
+  dr = 1./nr_points
+  dphi = PI / 2./nphi_points
+
+  ASSOCIATE (DIM => sc_input % discretization % derived % DIM, &
+             DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+             TBA_DIM => sc_input % discretization % derived % TBA_DIM, &
+             LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS, &
+             ORBITALS => sc_input % discretization % ORBITALS)
+
+    Checks = [ &
+               & entry_check_callback_t(1, ORBITALS + 2, rashba_yz_zx), &
+               & entry_check_callback_t(1, ORBITALS + 3, rashba_yz_xy), &
+               & entry_check_callback_t(2, ORBITALS + 3, rashba_zx_xy), &
+               & entry_check_callback_t(2, ORBITALS + 1, rashba_yz_zx), &
+               & entry_check_callback_t(3, ORBITALS + 1, rashba_yz_xy), &
+               & entry_check_callback_t(3, ORBITALS + 2, rashba_zx_xy), &
+               & entry_check_callback_t(TBA_DIM + 1, TBA_DIM + ORBITALS + 2, rashba_yz_zx), &
+               & entry_check_callback_t(TBA_DIM + 1, TBA_DIM + ORBITALS + 3, rashba_yz_xy), &
+               & entry_check_callback_t(TBA_DIM + 2, TBA_DIM + ORBITALS + 3, rashba_zx_xy), &
+               & entry_check_callback_t(TBA_DIM + 2, TBA_DIM + ORBITALS + 1, rashba_yz_zx), &
+               & entry_check_callback_t(TBA_DIM + 3, TBA_DIM + ORBITALS + 1, rashba_yz_xy), &
+               & entry_check_callback_t(TBA_DIM + 3, TBA_DIM + ORBITALS + 2, rashba_zx_xy)]
+
+    DO ir = 0, nr_points
+      DO jphi = -nphi_points, nphi_points
+        kx = ir * dr * COS(jphi * dphi)
+        ky = ir * dr * SIN(jphi * dphi)
+
+        Hamiltonian = CMPLX(0., 0., KIND=REAL64)
+        CALL COMPUTE_RASHBA_HOPPING(Hamiltonian, kx, ky, t_Rashba, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, DIM)
+
+        !Check elements that should be filled for TBA_DIM
+        DO i = 1, size(Checks)
+          !Electron part
+          row = Checks(i) % i
+          col = Checks(i) % j
+          Was_checked(row, col) = .TRUE.
+          Was_checked(col, row) = .TRUE.
+          hop_sign = 1.
+          !Taking into account that hopping is antisymmetric
+          IF (col - ORBITALS < row) hop_sign = -1
+          !Top triangle
+          @assertEqual(hop_sign * Checks(i) % cb(kx, ky, t_Rashba), Hamiltonian(row, col), tolerance=1.0e-7)
+          !Bottom triangle
+          @assertEqual(hop_sign * CONJG(Checks(i) % cb(kx, ky, t_Rashba)), Hamiltonian(col, row), tolerance=1.0e-7)
+          !Hole part, Nambu space
+          row = DIM_POSITIVE_K + Checks(i) % i
+          col = DIM_POSITIVE_K + Checks(i) % j
+          Was_checked(row, col) = .TRUE.
+          Was_checked(col, row) = .TRUE.
+          !-H*(-k)
+          !Top triangle
+          @assertEqual(-hop_sign * CONJG(Checks(i) % cb(-kx, -ky, t_Rashba)), Hamiltonian(row, col), tolerance=1.0e-7)
+          !Bottom triangle
+          @assertEqual(-hop_sign * Checks(i) % cb(-kx, -ky, t_Rashba), Hamiltonian(col, row), tolerance=1.0e-7)
+        END DO
+
+        CALL check_zero_elems(Hamiltonian, Was_checked, DIM)
+
+        Hamiltonian_minus_k = CMPLX(0., 0., KIND=REAL64)
+        kx_minus = -kx
+        ky_minus = -ky
+        CALL COMPUTE_RASHBA_HOPPING(Hamiltonian_minus_k, kx_minus, ky_minus, t_Rashba, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_minus_k, DIM)
+        CALL check_time_reversal_symmetry(Hamiltonian, Hamiltonian_minus_k, DIM)
+
+        !Check C3v rotational symmetry
+        Hamiltonian_rotated = CMPLX(0., 0., KIND=REAL64)
+        phi_rot = n_pi_3_rotations_c3 * PI / 3
+        kx_rot = ir * dr * COS(jphi * dphi - phi_rot)
+        ky_rot = ir * dr * SIN(jphi * dphi - phi_rot)
+        CALL COMPUTE_RASHBA_HOPPING(Hamiltonian_rotated, kx_rot, ky_rot, t_Rashba, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_rotated, DIM)
+        CALL check_rotational_symmetry(n_pi_3_rotations_c3, Hamiltonian, Hamiltonian_rotated, DIM)
+
+        !Check C6v with sign change
+        Hamiltonian = CMPLX(0., 0., KIND=REAL64)
+        CALL COMPUTE_RASHBA_HOPPING(Hamiltonian, kx, ky, t_Rashba, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, DIM)
+
+        Hamiltonian_rotated = CMPLX(0., 0., KIND=REAL64)
+        phi_rot = n_pi_3_rotations_c6 * PI / 3
+        kx_rot = ir * dr * COS(jphi * dphi - phi_rot)
+        ky_rot = ir * dr * SIN(jphi * dphi - phi_rot)
+        CALL COMPUTE_RASHBA_HOPPING(Hamiltonian_rotated, kx_rot, ky_rot, t_Rashba, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_rotated, DIM)
+        Hamiltonian = -1 * Hamiltonian
+        CALL check_rotational_symmetry(n_pi_3_rotations_c6, Hamiltonian, Hamiltonian_rotated, DIM)
+
+      END DO
+    END DO
+
+  END ASSOCIATE
+
+END SUBROUTINE test_compute_rashba_hopping
+
+! -------------------------- K-independent tests -------------------------
+@test
+SUBROUTINE test_compute_trigonal_terms()
+  COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_rotated(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_minus_k(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  LOGICAL :: Was_checked(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  TYPE(entry_check_t), ALLOCATABLE :: Checks(:)
+
+  INTEGER(INT32) :: i, j, row, col
+
+  ! Physical variables
+  REAL(REAL64), PARAMETER :: delta_trigonal = 1.
+  INTEGER(INT32), PARAMETER :: n_pi_3_rotations = 1
+
+  Was_checked = .FALSE.
+  Hamiltonian = CMPLX(0, 0, KIND=REAL64)
+  Hamiltonian_rotated = CMPLX(0, 0, KIND=REAL64)
+  Hamiltonian_minus_k = CMPLX(0, 0, KIND=REAL64)
+
+  ASSOCIATE (DIM => sc_input % discretization % derived % DIM, &
+             DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+             TBA_DIM => sc_input % discretization % derived % TBA_DIM, &
+             LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS, &
+             ORBITALS => sc_input % discretization % ORBITALS)
+
+    Checks = [&
+              & entry_check_t(1, 2, 0.5d0 * delta_trigonal), &
+              & entry_check_t(1, 3, 0.5d0 * delta_trigonal), &
+              & entry_check_t(2, 3, 0.5d0 * delta_trigonal), &
+              & entry_check_t(ORBITALS + 1, ORBITALS + 2, 0.5d0 * delta_trigonal), &
+              & entry_check_t(ORBITALS + 1, ORBITALS + 3, 0.5d0 * delta_trigonal), &
+              & entry_check_t(ORBITALS + 2, ORBITALS + 3, 0.5d0 * delta_trigonal), &
+              & entry_check_t(TBA_DIM + 1, TBA_DIM + 2, 0.5d0 * delta_trigonal), &
+              & entry_check_t(TBA_DIM + 1, TBA_DIM + 3, 0.5d0 * delta_trigonal), &
+              & entry_check_t(TBA_DIM + 2, TBA_DIM + 3, 0.5d0 * delta_trigonal), &
+              & entry_check_t(TBA_DIM + ORBITALS + 1, TBA_DIM + ORBITALS + 2, 0.5d0 * delta_trigonal), &
+              & entry_check_t(TBA_DIM + ORBITALS + 1, TBA_DIM + ORBITALS + 3, 0.5d0 * delta_trigonal), &
+              & entry_check_t(TBA_DIM + ORBITALS + 2, TBA_DIM + ORBITALS + 3, 0.5d0 * delta_trigonal)]
+
+    CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian, delta_trigonal, sc_input % discretization)
+    CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM)
+
+    CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_rotated, delta_trigonal, sc_input % discretization)
+    CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_rotated, sc_input % discretization % derived % DIM)
+
+    CALL COMPUTE_TRIGONAL_TERMS(Hamiltonian_minus_k, delta_trigonal, sc_input % discretization)
+    CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_minus_k, sc_input % discretization % derived % DIM)
+
+    CALL check_elements(Hamiltonian, Was_checked, Checks, sc_input % discretization % derived % DIM)
+
+    CALL check_zero_elems(Hamiltonian, Was_checked, DIM)
+    CALL check_time_reversal_symmetry(Hamiltonian, Hamiltonian_minus_k, DIM)
+    CALL check_rotational_symmetry(n_pi_3_rotations, Hamiltonian, Hamiltonian_rotated, DIM)
+
+  END ASSOCIATE
+
+END SUBROUTINE test_compute_trigonal_terms
+
+@test
+SUBROUTINE test_compute_atomic_soc_terms()
+
+  COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_rotated(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_minus_k(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  LOGICAL :: Was_checked(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  TYPE(entry_check_t), ALLOCATABLE :: Checks(:)
+
+  !Physical variables
+  REAL(REAL64), PARAMETER :: lambda_SOC = 100.
+
+  REAL(REAL64) :: phi_rot
+  INTEGER(INT32) :: n_pi_3_rotations = 1
+  INTEGER(INT32) :: i, j, row, col
+  Was_checked = .FALSE.
+  Hamiltonian = CMPLX(0, 0, KIND=REAL64)
+  Hamiltonian_rotated = CMPLX(0, 0, KIND=REAL64)
+  Hamiltonian_minus_k = CMPLX(0, 0, KIND=REAL64)
+
+  ASSOCIATE (DIM => sc_input % discretization % derived % DIM, &
+             DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+             TBA_DIM => sc_input % discretization % derived % TBA_DIM, &
+             LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS, &
+             ORBITALS => sc_input % discretization % ORBITALS)
+
+    ! Define checks only for upper triangle and electron part
+    ! This way hole part and hermicity can be easily checked
+    Checks = [ &
+              & entry_check_t(1, TBA_DIM + 2, -0.5 * lambda_soc * (L_x(1, 2) - imag * L_y(1, 2))), & ! sigma_x parts, lat1, spin up - down
+              & entry_check_t(1, TBA_DIM + 3, -0.5 * lambda_soc * (L_x(1, 3) - imag * L_y(1, 3))), &
+              & entry_check_t(2, TBA_DIM + 3, -0.5 * lambda_soc * (L_x(2, 3) - imag * L_y(2, 3))), &
+              & entry_check_t(2, TBA_DIM + 1, -0.5 * lambda_soc * (L_x(2, 1) - imag * L_y(2, 1))), &
+              & entry_check_t(3, TBA_DIM + 1, -0.5 * lambda_soc * (L_x(3, 1) - imag * L_y(3, 1))), &
+              & entry_check_t(3, TBA_DIM + 2, -0.5 * lambda_soc * (L_x(3, 2) - imag * L_y(3, 2))), &
+              & entry_check_t(ORBITALS + 1, TBA_DIM + ORBITALS + 2, -0.5 * lambda_soc * (L_x(1, 2) - imag * L_y(1, 2))), & ! lat2, spin up - down
+              & entry_check_t(ORBITALS + 1, TBA_DIM + ORBITALS + 3, -0.5 * lambda_soc * (L_x(1, 3) - imag * L_y(1, 3))), &
+              & entry_check_t(ORBITALS + 2, TBA_DIM + ORBITALS + 3, -0.5 * lambda_soc * (L_x(2, 3) - imag * L_y(2, 3))), &
+              & entry_check_t(ORBITALS + 2, TBA_DIM + ORBITALS + 1, -0.5 * lambda_soc * (L_x(2, 1) - imag * L_y(2, 1))), &
+              & entry_check_t(ORBITALS + 3, TBA_DIM + ORBITALS + 1, -0.5 * lambda_soc * (L_x(3, 1) - imag * L_y(3, 1))), &
+              & entry_check_t(ORBITALS + 3, TBA_DIM + ORBITALS + 2, -0.5 * lambda_soc * (L_x(3, 2) - imag * L_y(3, 2))), &
+              & entry_check_t(1, 2, -0.5 * lambda_soc * L_z(1, 2)), & ! sigma_z parts, lat1, spin up
+              & entry_check_t(1, 3, -0.5 * lambda_soc * L_z(1, 3)), &
+              & entry_check_t(2, 3, -0.5 * lambda_soc * L_z(2, 3)), &
+              & entry_check_t(ORBITALS + 1, ORBITALS + 2, -0.5 * lambda_soc * L_z(1, 2)), & !lat2, spin up
+              & entry_check_t(ORBITALS + 1, ORBITALS + 3, -0.5 * lambda_soc * L_z(1, 3)), &
+              & entry_check_t(ORBITALS + 2, ORBITALS + 3, -0.5 * lambda_soc * L_z(2, 3)), &
+              & entry_check_t(TBA_DIM + 1, TBA_DIM + 2, 0.5 * lambda_soc * L_z(1, 2)), & !lat1, spin down
+              & entry_check_t(TBA_DIM + 1, TBA_DIM + 3, 0.5 * lambda_soc * L_z(1, 3)), &
+              & entry_check_t(TBA_DIM + 2, TBA_DIM + 3, 0.5 * lambda_soc * L_z(2, 3)), &
+              & entry_check_t(TBA_DIM + ORBITALS + 1, TBA_DIM + ORBITALS + 2, 0.5 * lambda_soc * L_z(1, 2)), & !lat2, spin down
+              & entry_check_t(TBA_DIM + ORBITALS + 1, TBA_DIM + ORBITALS + 3, 0.5 * lambda_soc * L_z(1, 3)), &
+              & entry_check_t(TBA_DIM + ORBITALS + 2, TBA_DIM + ORBITALS + 3, 0.5 * lambda_soc * L_z(2, 3))]
+
+    CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian, lambda_SOC, sc_input % discretization)
+    CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, DIM)
+
+    CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_rotated, lambda_SOC, sc_input % discretization)
+    CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_rotated, DIM)
+
+    CALL COMPUTE_ATOMIC_SOC_TERMS(Hamiltonian_minus_k, lambda_SOC, sc_input % discretization)
+    CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_minus_k, DIM)
+
+    CALL check_elements(Hamiltonian, Was_checked, Checks, sc_input % discretization % derived % DIM)
+
+    CALL check_zero_elems(Hamiltonian, Was_checked, DIM)
+    CALL check_time_reversal_symmetry(Hamiltonian, Hamiltonian_minus_k, DIM)
+    ! This is problematic, since real represenation of the orbitals is said to be unfaithful
+    ! Therefore parmutation over orbitals is a bad represenation of rotation.
+    ! The spectrum, however, preserves C3v symmetry.
+    ! CALL check_rotational_symmetry(n_pi_3_rotations, Hamiltonian, Hamiltonian_rotated, DIM)
+
+  END ASSOCIATE
+
+END SUBROUTINE test_compute_atomic_soc_terms
+
+@test
+SUBROUTINE test_compute_electric_field
+  USE writers
+  COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_rotated(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_minus_k(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  LOGICAL :: Was_checked(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  TYPE(entry_check_t), ALLOCATABLE :: Checks(:)
+
+  INTEGER(INT32) :: i, j, row, col
+
+  REAL(REAL64), PARAMETER :: v = 1.
+  INTEGER(INT32), PARAMETER :: n_pi_3_rotations = 2 !Electric field reduces symmetry from C6v to C3v
+
+  Was_checked = .FALSE.
+  Hamiltonian = CMPLX(0, 0, KIND=REAL64)
+  Hamiltonian_rotated = CMPLX(0, 0, KIND=REAL64)
+  Hamiltonian_minus_k = CMPLX(0, 0, KIND=REAL64)
+
+  ASSOCIATE (DIM => sc_input % discretization % derived % DIM, &
+             DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+             TBA_DIM => sc_input % discretization % derived % TBA_DIM, &
+             LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS, &
+             ORBITALS => sc_input % discretization % ORBITALS)
+    Checks = [&
+              & entry_check_t(1, 1, v / 2.), &
+              & entry_check_t(2, 2, v / 2.), &
+              & entry_check_t(3, 3, v / 2.), &
+              & entry_check_t(ORBITALS + 1, ORBITALS + 1, -v / 2.), &
+              & entry_check_t(ORBITALS + 2, ORBITALS + 2, -v / 2.), &
+              & entry_check_t(ORBITALS + 3, ORBITALS + 3, -v / 2.), &
+              & entry_check_t(TBA_DIM + 1, TBA_DIM + 1, v / 2.), &
+              & entry_check_t(TBA_DIM + 2, TBA_DIM + 2, v / 2.), &
+              & entry_check_t(TBA_DIM + 3, TBA_DIM + 3, v / 2.), &
+              & entry_check_t(TBA_DIM + ORBITALS + 1, TBA_DIM + ORBITALS + 1, -v / 2.), &
+              & entry_check_t(TBA_DIM + ORBITALS + 2, TBA_DIM + ORBITALS + 2, -v / 2.), &
+              & entry_check_t(TBA_DIM + ORBITALS + 3, TBA_DIM + ORBITALS + 3, -v / 2.)]
+
+    CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian, v, sc_input % discretization)
+    CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian_rotated, v, sc_input % discretization)
+    CALL COMPUTE_ELECTRIC_FIELD(Hamiltonian_minus_k, v, sc_input % discretization)
+
+    CALL PRINT_HAMILTONIAN(Hamiltonian, DIM, "H_v")
+
+    CALL check_elements(Hamiltonian, Was_checked, Checks, sc_input % discretization % derived % DIM)
+
+    CALL check_zero_elems(Hamiltonian, Was_checked, DIM)
+    CALL check_time_reversal_symmetry(Hamiltonian, Hamiltonian_minus_k, DIM)
+    CALL check_rotational_symmetry(n_pi_3_rotations, Hamiltonian, Hamiltonian_rotated, DIM)
+
+  END ASSOCIATE
+END SUBROUTINE test_compute_electric_field
+
+@test
+SUBROUTINE test_compute_layer_potential
+  COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_rotated(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_minus_k(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  LOGICAL :: Was_checked(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  TYPE(entry_check_t), ALLOCATABLE :: Checks(:)
+
+  INTEGER(INT32) :: i, j, row, col
+
+  REAL(REAL64), ALLOCATABLE :: V_layer(:)
+  INTEGER(INT32), PARAMETER :: n_pi_3_rotations = 2
+  ALLOCATE (V_layer(sc_input % discretization % SUBLATTICES))
+
+  Was_checked = .FALSE.
+  Hamiltonian = CMPLX(0, 0, KIND=REAL64)
+  Hamiltonian_rotated = CMPLX(0, 0, KIND=REAL64)
+  Hamiltonian_minus_k = CMPLX(0, 0, KIND=REAL64)
+  V_layer = (/1.0, 3.0/)
+
+  ASSOCIATE (DIM => sc_input % discretization % derived % DIM, &
+             DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+             TBA_DIM => sc_input % discretization % derived % TBA_DIM, &
+             LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS, &
+             ORBITALS => sc_input % discretization % ORBITALS)
+    Checks = [&
+              & entry_check_t(1, 1, V_layer(1)), &
+              & entry_check_t(2, 2, V_layer(1)), &
+              & entry_check_t(3, 3, V_layer(1)), &
+              & entry_check_t(ORBITALS + 1, ORBITALS + 1, V_layer(2)), &
+              & entry_check_t(ORBITALS + 2, ORBITALS + 2, V_layer(2)), &
+              & entry_check_t(ORBITALS + 3, ORBITALS + 3, V_layer(2)), &
+              & entry_check_t(TBA_DIM + 1, TBA_DIM + 1, V_layer(1)), &
+              & entry_check_t(TBA_DIM + 2, TBA_DIM + 2, V_layer(1)), &
+              & entry_check_t(TBA_DIM + 3, TBA_DIM + 3, V_layer(1)), &
+              & entry_check_t(TBA_DIM + ORBITALS + 1, TBA_DIM + ORBITALS + 1, V_layer(2)), &
+              & entry_check_t(TBA_DIM + ORBITALS + 2, TBA_DIM + ORBITALS + 2, V_layer(2)), &
+              & entry_check_t(TBA_DIM + ORBITALS + 3, TBA_DIM + ORBITALS + 3, V_layer(2))]
+
+    CALL COMPUTE_LAYER_POTENTIAL(Hamiltonian, V_layer, sc_input % discretization)
+    CALL COMPUTE_LAYER_POTENTIAL(Hamiltonian_rotated, V_layer, sc_input % discretization)
+    CALL COMPUTE_LAYER_POTENTIAL(Hamiltonian_minus_k, V_layer, sc_input % discretization)
+
+    CALL check_elements(Hamiltonian, Was_checked, Checks, sc_input % discretization % derived % DIM)
+
+    CALL check_zero_elems(Hamiltonian, Was_checked, DIM)
+    CALL check_time_reversal_symmetry(Hamiltonian, Hamiltonian_minus_k, DIM)
+    CALL check_rotational_symmetry(n_pi_3_rotations, Hamiltonian, Hamiltonian_rotated, DIM)
+
+  END ASSOCIATE
+  DEALLOCATE (V_layer)
+END SUBROUTINE test_compute_layer_potential
+
+@test
+SUBROUTINE test_compute_tetragonal_strain()
+  USE writers
+  COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_rotated(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_minus_k(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  LOGICAL :: Was_checked(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  TYPE(entry_check_t), ALLOCATABLE :: Checks(:)
+
+  INTEGER(INT32) :: i, j, row, col
+
+  REAL(REAL64), PARAMETER :: zeta_tetragonal = 1.
+  INTEGER(INT32), PARAMETER :: orb_affected_tetragonal = 1
+  INTEGER(INT32), PARAMETER :: n_pi_3_rotations = 3 !Tetragonal strain reduces symmetry from C6v to C2
+
+  Was_checked = .FALSE.
+  Hamiltonian = CMPLX(0, 0, KIND=REAL64)
+  Hamiltonian_rotated = CMPLX(0, 0, KIND=REAL64)
+  Hamiltonian_minus_k = CMPLX(0, 0, KIND=REAL64)
+
+  ASSOCIATE (DIM => sc_input % discretization % derived % DIM, &
+             DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+             TBA_DIM => sc_input % discretization % derived % TBA_DIM, &
+             LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS, &
+             ORBITALS => sc_input % discretization % ORBITALS)
+    Checks = [&
+              & entry_check_t(orb_affected_tetragonal, orb_affected_tetragonal, zeta_tetragonal), &
+              & entry_check_t(ORBITALS + orb_affected_tetragonal, ORBITALS + orb_affected_tetragonal, zeta_tetragonal), &
+              & entry_check_t(TBA_DIM + orb_affected_tetragonal, TBA_DIM + orb_affected_tetragonal, zeta_tetragonal), &
+              & entry_check_t(TBA_DIM + ORBITALS + orb_affected_tetragonal, TBA_DIM + ORBITALS + orb_affected_tetragonal, zeta_tetragonal)]
+
+    CALL COMPUTE_TETRAGONAL_STRAIN(Hamiltonian, zeta_tetragonal, orb_affected_tetragonal, sc_input % discretization)
+    CALL COMPUTE_TETRAGONAL_STRAIN(Hamiltonian_rotated, zeta_tetragonal, orb_affected_tetragonal, sc_input % discretization)
+    CALL COMPUTE_TETRAGONAL_STRAIN(Hamiltonian_minus_k, zeta_tetragonal, orb_affected_tetragonal, sc_input % discretization)
+
+    CALL check_elements(Hamiltonian, Was_checked, Checks, sc_input % discretization % derived % DIM)
+
+    CALL check_zero_elems(Hamiltonian, Was_checked, DIM)
+    CALL check_time_reversal_symmetry(Hamiltonian, Hamiltonian_minus_k, DIM)
+    CALL check_rotational_symmetry(n_pi_3_rotations, Hamiltonian, Hamiltonian_rotated, DIM)
+
+  END ASSOCIATE
+END SUBROUTINE test_compute_tetragonal_strain
+
+@test
+SUBROUTINE test_compute_fermi_energy()
+  USE writers
+  COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_rotated(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_minus_k(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  LOGICAL :: Was_checked(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  TYPE(entry_check_t), ALLOCATABLE :: Checks(:)
+
+  INTEGER(INT32) :: i, j, row, col
+
+  REAL(REAL64), PARAMETER :: E_Fermi = 1.
+  INTEGER(INT32), PARAMETER :: n_pi_3_rotations = 1
+
+  Was_checked = .FALSE.
+  Hamiltonian = CMPLX(0, 0, KIND=REAL64)
+  Hamiltonian_rotated = CMPLX(0, 0, KIND=REAL64)
+  Hamiltonian_minus_k = CMPLX(0, 0, KIND=REAL64)
+
+  ASSOCIATE (DIM => sc_input % discretization % derived % DIM, &
+             DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+             TBA_DIM => sc_input % discretization % derived % TBA_DIM, &
+             LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS, &
+             ORBITALS => sc_input % discretization % ORBITALS)
+    Checks = [&
+              & entry_check_t(1, 1, -E_Fermi), &
+              & entry_check_t(2, 2, -E_Fermi), &
+              & entry_check_t(3, 3, -E_Fermi), &
+              & entry_check_t(ORBITALS + 1, ORBITALS + 1, -E_Fermi), &
+              & entry_check_t(ORBITALS + 2, ORBITALS + 2, -E_Fermi), &
+              & entry_check_t(ORBITALS + 3, ORBITALS + 3, -E_Fermi), &
+              & entry_check_t(TBA_DIM + 1, TBA_DIM + 1, -E_Fermi), &
+              & entry_check_t(TBA_DIM + 2, TBA_DIM + 2, -E_Fermi), &
+              & entry_check_t(TBA_DIM + 3, TBA_DIM + 3, -E_Fermi), &
+              & entry_check_t(TBA_DIM + ORBITALS + 1, TBA_DIM + ORBITALS + 1, -E_Fermi), &
+              & entry_check_t(TBA_DIM + ORBITALS + 2, TBA_DIM + ORBITALS + 2, -E_Fermi), &
+              & entry_check_t(TBA_DIM + ORBITALS + 3, TBA_DIM + ORBITALS + 3, -E_Fermi)]
+
+    CALL COMPUTE_FERMI_ENERGY(Hamiltonian, E_Fermi, sc_input % discretization)
+    CALL COMPUTE_FERMI_ENERGY(Hamiltonian_rotated, E_Fermi, sc_input % discretization)
+    CALL COMPUTE_FERMI_ENERGY(Hamiltonian_minus_k, E_Fermi, sc_input % discretization)
+
+    CALL check_elements(Hamiltonian, Was_checked, Checks, sc_input % discretization % derived % DIM)
+
+    CALL check_zero_elems(Hamiltonian, Was_checked, DIM)
+    CALL check_time_reversal_symmetry(Hamiltonian, Hamiltonian_minus_k, DIM)
+    CALL check_rotational_symmetry(n_pi_3_rotations, Hamiltonian, Hamiltonian_rotated, DIM)
+
+  END ASSOCIATE
+END SUBROUTINE test_compute_fermi_energy
+
+@test
+SUBROUTINE test_compute_zeeman()
+  USE writers
+
+  COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_rotated(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_minus_k(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  LOGICAL :: Was_checked(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  TYPE(entry_check_t), ALLOCATABLE :: Checks(:)
+
+  INTEGER(INT32) :: i, j, row, col
+
+  REAL(REAL64), PARAMETER :: B(3) = [1, 3, 7]
+  REAL(REAL64), PARAMETER :: g_factor = 6.0
+  INTEGER(INT32), PARAMETER :: n_pi_3_rotations = 6
+
+  Was_checked = .FALSE.
+  Hamiltonian = CMPLX(0, 0, KIND=REAL64)
+  Hamiltonian_rotated = CMPLX(0, 0, KIND=REAL64)
+  Hamiltonian_minus_k = CMPLX(0, 0, KIND=REAL64)
+
+  ASSOCIATE (DIM => sc_input % discretization % derived % DIM, &
+             DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+             TBA_DIM => sc_input % discretization % derived % TBA_DIM, &
+             LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS, &
+             ORBITALS => sc_input % discretization % ORBITALS)
+
+    Checks = [&
+              & entry_check_t(1, TBA_DIM + 1, 0.5d0 * muB * g_factor * (B(1) - imag * B(2))), & !B_x + B_y part
+              & entry_check_t(2, TBA_DIM + 2, 0.5d0 * muB * g_factor * (B(1) - imag * B(2))), &
+              & entry_check_t(3, TBA_DIM + 3, 0.5d0 * muB * g_factor * (B(1) - imag * B(2))), &
+              & entry_check_t(ORBITALS + 1, TBA_DIM + ORBITALS + 1, 0.5d0 * muB * g_factor * (B(1) - imag * B(2))), &
+              & entry_check_t(ORBITALS + 2, TBA_DIM + ORBITALS + 2, 0.5d0 * muB * g_factor * (B(1) - imag * B(2))), &
+              & entry_check_t(ORBITALS + 3, TBA_DIM + ORBITALS + 3, 0.5d0 * muB * g_factor * (B(1) - imag * B(2))), &
+              & entry_check_t(1, 1, 0.5d0 * muB * g_factor * B(3)), & !B_z part
+              & entry_check_t(2, 2, 0.5d0 * muB * g_factor * B(3)), &
+              & entry_check_t(3, 3, 0.5d0 * muB * g_factor * B(3)), &
+              & entry_check_t(ORBITALS + 1, ORBITALS + 1, 0.5d0 * muB * g_factor * B(3)), &
+              & entry_check_t(ORBITALS + 2, ORBITALS + 2, 0.5d0 * muB * g_factor * B(3)), &
+              & entry_check_t(ORBITALS + 3, ORBITALS + 3, 0.5d0 * muB * g_factor * B(3)), &
+              & entry_check_t(TBA_DIM + 1, TBA_DIM + 1, -0.5d0 * muB * g_factor * B(3)), &
+              & entry_check_t(TBA_DIM + 2, TBA_DIM + 2, -0.5d0 * muB * g_factor * B(3)), &
+              & entry_check_t(TBA_DIM + 3, TBA_DIM + 3, -0.5d0 * muB * g_factor * B(3)), &
+              & entry_check_t(TBA_DIM + ORBITALS + 1, TBA_DIM + ORBITALS + 1, -0.5d0 * muB * g_factor * B(3)), &
+              & entry_check_t(TBA_DIM + ORBITALS + 2, TBA_DIM + ORBITALS + 2, -0.5d0 * muB * g_factor * B(3)), &
+              & entry_check_t(TBA_DIM + ORBITALS + 3, TBA_DIM + ORBITALS + 3, -0.5d0 * muB * g_factor * B(3))]
+
+    CALL COMPUTE_ZEEMAN(B, g_factor, Hamiltonian, sc_input % discretization)
+    CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, DIM)
+
+    CALL COMPUTE_ZEEMAN(B, g_factor, Hamiltonian_rotated, sc_input % discretization)
+    CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_rotated, DIM)
+
+    CALL COMPUTE_ZEEMAN(B, g_factor, Hamiltonian_minus_k, sc_input % discretization)
+    CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_minus_k, DIM)
+
+    CALL check_elements(Hamiltonian, Was_checked, Checks, sc_input % discretization % derived % DIM)
+
+    CALL check_zero_elems(Hamiltonian, Was_checked, DIM)
+    !No time reversal symmetry when magnetic field is applied
+    CALL check_rotational_symmetry(n_pi_3_rotations, Hamiltonian, Hamiltonian_rotated, DIM)
+
+  END ASSOCIATE
+
+END SUBROUTINE test_compute_zeeman
+
+@test
+SUBROUTINE test_compute_orbital_magnetic_coupling()
+  USE writers
+
+  COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_rotated(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_minus_k(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  LOGICAL :: Was_checked(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  TYPE(entry_check_t), ALLOCATABLE :: Checks(:)
+
+  INTEGER(INT32) :: i, j, row, col
+  REAL(REAL64), PARAMETER :: B(3) = [1, 3, 7]
+
+  Was_checked = .FALSE.
+  Hamiltonian = CMPLX(0, 0, KIND=REAL64)
+  Hamiltonian_rotated = CMPLX(0, 0, KIND=REAL64)
+  Hamiltonian_minus_k = CMPLX(0, 0, KIND=REAL64)
+
+  ASSOCIATE (DIM => sc_input % discretization % derived % DIM, &
+             DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+             TBA_DIM => sc_input % discretization % derived % TBA_DIM, &
+             LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS, &
+             ORBITALS => sc_input % discretization % ORBITALS)
+    Checks = [&
+    & entry_check_t(1, 2, muB * (L_x(1, 2) * B(1) + L_y(1, 2) * B(2) + L_z(1, 2) * B(3))), &
+    & entry_check_t(1, 3, muB * (L_x(1, 3) * B(1) + L_y(1, 3) * B(2) + L_z(1, 3) * B(3))), &
+    & entry_check_t(2, 3, muB * (L_x(2, 3) * B(1) + L_y(2, 3) * B(2) + L_z(2, 3) * B(3))), &
+    & entry_check_t(ORBITALS + 1, ORBITALS + 2, muB * (L_x(1, 2) * B(1) + L_y(1, 2) * B(2) + L_z(1, 2) * B(3))), &
+    & entry_check_t(ORBITALS + 1, ORBITALS + 3, muB * (L_x(1, 3) * B(1) + L_y(1, 3) * B(2) + L_z(1, 3) * B(3))), &
+    & entry_check_t(ORBITALS + 2, ORBITALS + 3, muB * (L_x(2, 3) * B(1) + L_y(2, 3) * B(2) + L_z(2, 3) * B(3))), &
+    & entry_check_t(TBA_DIM + 1, TBA_DIM + 2, muB * (L_x(1, 2) * B(1) + L_y(1, 2) * B(2) + L_z(1, 2) * B(3))), &
+    & entry_check_t(TBA_DIM + 1, TBA_DIM + 3, muB * (L_x(1, 3) * B(1) + L_y(1, 3) * B(2) + L_z(1, 3) * B(3))), &
+    & entry_check_t(TBA_DIM + 2, TBA_DIM + 3, muB * (L_x(2, 3) * B(1) + L_y(2, 3) * B(2) + L_z(2, 3) * B(3))), &
+    & entry_check_t(TBA_DIM + ORBITALS + 1, TBA_DIM + ORBITALS + 2, muB * (L_x(1, 2) * B(1) + L_y(1, 2) * B(2) + L_z(1, 2) * B(3))), &
+    & entry_check_t(TBA_DIM + ORBITALS + 1, TBA_DIM + ORBITALS + 3, muB * (L_x(1, 3) * B(1) + L_y(1, 3) * B(2) + L_z(1, 3) * B(3))), &
+    & entry_check_t(TBA_DIM + ORBITALS + 2, TBA_DIM + ORBITALS + 3, muB * (L_x(2, 3) * B(1) + L_y(2, 3) * B(2) + L_z(2, 3) * B(3)))]
+
+    CALL COMPUTE_ORBITAL_MAGNETIC_COUPLING(B, Hamiltonian, sc_input % discretization)
+    CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, DIM)
+
+    CALL PRINT_HAMILTONIAN(Hamiltonian, DIM, "H_L_dot_B")
+
+    CALL COMPUTE_ORBITAL_MAGNETIC_COUPLING(B, Hamiltonian_rotated, sc_input % discretization)
+    CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_rotated, DIM)
+
+    CALL COMPUTE_ORBITAL_MAGNETIC_COUPLING(B, Hamiltonian_minus_k, sc_input % discretization)
+    CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_minus_k, DIM)
+
+    CALL check_elements(Hamiltonian, Was_checked, Checks, sc_input % discretization % derived % DIM)
+
+    CALL check_zero_elems(Hamiltonian, Was_checked, DIM)
+
+  END ASSOCIATE
+
+END SUBROUTINE test_compute_orbital_magnetic_coupling
+
+@test
+SUBROUTINE test_compute_full_hamiltonian()
+  USE writers
+
+  COMPLEX(REAL64) :: Hamiltonian_const(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_rotated(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_minus_k(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+
+  REAL(REAL64) :: phi_rot
+  INTEGER(INT32) :: nr_points = 3
+  INTEGER(INT32) :: nphi_points = 7
+  INTEGER(INT32) :: n_pi_3_rotations = 1
+  INTEGER(INT32) :: row, col
+  INTEGER(INT32) :: i, j, ir, jphi
+  REAL(REAL64) :: kx, ky, dr, dphi, kx_minus, ky_minus, kx_rot, ky_rot
+
+  TYPE(physical_params_t) :: physical_params
+
+  physical_params % subband_params % t_D = 1.
+  physical_params % subband_params % t_I = 1.
+  physical_params % subband_params % t_Rashba = 0.
+  physical_params % subband_params % lambda_SOC = 1.
+  physical_params % subband_params % delta_trigonal = 1.
+  physical_params % subband_params % zeta_tetragonal = 0.
+  physical_params % subband_params % orb_affected_tetragonal = 1
+  physical_params % subband_params % v = 0.
+  physical_params % subband_params % V_pdp = 1.
+  physical_params % subband_params % V_pds = 1.
+  physical_params % subband_params % J_SC_tensor = 0
+  physical_params % subband_params % nearest_interorb_multiplier = 0
+  physical_params % subband_params % J_SC_NNN_tensor = 0
+  physical_params % subband_params % next_interorb_multiplier = 0
+  physical_params % subband_params % U_HUB = 0
+  physical_params % subband_params % V_HUB = 0
+  physical_params % subband_params % E_Fermi = 0
+  physical_params % subband_params % V_layer = (/1., 1./)
+  physical_params % subband_params % Subband_energies = 0.
+  physical_params % subband_params % g_factor = 8
+  physical_params % subband_params % eta_p = 1.
+
+  sc_input % physical % external % T = 0.
+  sc_input % physical % external % B_field(1) = 0.
+  sc_input % physical % external % B_field(2) = 0.
+  sc_input % physical % external % B_field(3) = 0.
+
+  dr = 1./nr_points
+  dphi = PI / 2./nphi_points
+
+  Hamiltonian_const = CMPLX(0., 0., KIND=REAL64)
+  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const, sc_input % discretization, physical_params)
+  CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const, sc_input % discretization % derived % DIM)
+
+  DO ir = 0, nr_points
+    DO jphi = -nphi_points, nphi_points
+      kx = ir * dr * COS(jphi * dphi)
+      ky = ir * dr * SIN(jphi * dphi)
+
+      Hamiltonian = CMPLX(0., 0., KIND=REAL64)
+      Hamiltonian = Hamiltonian_const
+      CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, physical_params)
+      CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM)
+
+      !Check time-reversal symmetry
+      Hamiltonian_minus_k = Hamiltonian_const
+      kx_minus = -kx
+      ky_minus = -ky
+      CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian_minus_k, kx_minus, ky_minus, sc_input % discretization, physical_params)
+      CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_minus_k, sc_input % discretization % derived % DIM)
+      CALL check_time_reversal_symmetry(Hamiltonian, Hamiltonian_minus_k, sc_input % discretization % derived % DIM)
+
+    END DO
+  END DO
+
+END SUBROUTINE test_compute_full_hamiltonian
+
+!TODO: Think about more advanced testing of this hamiltonian
+@test
+SUBROUTINE test_compute_sc()
+  USE writers
+
+  COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_rotated(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_minus_k(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  LOGICAL :: Was_checked(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  TYPE(entry_check_t), ALLOCATABLE :: Checks(:)
+
+  REAL(REAL64), PARAMETER :: gamma_nearest = 1.
+  REAL(REAL64), PARAMETER :: gamma_next = 3.
+  COMPLEX(REAL64) :: Gamma_SC(sc_input % discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, sc_input % discretization % derived % LAYER_COUPLINGS) !! Superconducting energies
+
+  REAL(REAL64) :: phi_rot
+  INTEGER(INT32) :: nr_points = 3
+  INTEGER(INT32) :: nphi_points = 7
+  INTEGER(INT32) :: n_pi_3_rotations = 1
+  INTEGER(INT32) :: row, col
+  INTEGER(INT32) :: i, j, ir, jphi
+  REAL(REAL64) :: kx, ky, dr, dphi, kx_minus, ky_minus, kx_rot, ky_rot
+
+  COMPLEX(REAL64) :: exp_sum_nearest
+  COMPLEX(REAL64) :: exp_sum_next
+
+  Was_checked = .FALSE.
+  dr = 1./nr_points
+  dphi = PI / 2./nphi_points
+
+  ASSOCIATE (DIM => sc_input % discretization % derived % DIM, &
+             DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+             TBA_DIM => sc_input % discretization % derived % TBA_DIM, &
+             LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS, &
+             ORBITALS => sc_input % discretization % ORBITALS)
+
+    Gamma_SC = 0.
+    !Setting fully-symmetric pairing symmetry
+    Gamma_SC(:, :N_NEIGHBOURS, 1, 2, :) = CMPLX(gamma_nearest, 0., KIND=REAL64)
+    Gamma_SC(:, :N_NEIGHBOURS, 2, 1, :) = CMPLX(-gamma_nearest, 0., KIND=REAL64)
+    !coupling for next nearest neighbours
+    Gamma_SC(:, (N_NEIGHBOURS + 1):, 1, 2, :) = CMPLX(gamma_next, 0., KIND=REAL64)
+    Gamma_SC(:, (N_NEIGHBOURS + 1):, 2, 1, :) = CMPLX(-gamma_next, 0., KIND=REAL64)
+
+    DO ir = 0, nr_points
+      DO jphi = -nphi_points, nphi_points
+        kx = ir * dr * COS(jphi * dphi)
+        ky = ir * dr * SIN(jphi * dphi)
+
+        exp_sum_nearest = pairing_1(ky) + pairing_2(kx, ky) + pairing_3(kx, ky)
+        exp_sum_next = pairing_nnn_1(kx) + pairing_nnn_2(kx, ky) + pairing_nnn_3(kx, ky) + &
+                       pairing_nnn_4(kx) + pairing_nnn_5(kx, ky) + pairing_nnn_6(kx, ky)
+        !Checks
+        Checks = [ &
+                 !Nearest neighbours
+                 ! ==== up - down ====
+                 entry_check_t(1, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 1, gamma_nearest * CONJG(exp_sum_nearest)), &
+                 entry_check_t(2, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 2, gamma_nearest * CONJG(exp_sum_nearest)), &
+                 entry_check_t(3, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 3, gamma_nearest * CONJG(exp_sum_nearest)), &
+                 entry_check_t(1 + ORBITALS, DIM_POSITIVE_K + TBA_DIM + 1, gamma_nearest * exp_sum_nearest), &
+                 entry_check_t(2 + ORBITALS, DIM_POSITIVE_K + TBA_DIM + 2, gamma_nearest * exp_sum_nearest), &
+                 entry_check_t(3 + ORBITALS, DIM_POSITIVE_K + TBA_DIM + 3, gamma_nearest * exp_sum_nearest), &
+                 ! ==== down - up ====
+                 entry_check_t(1 + TBA_DIM, DIM_POSITIVE_K + ORBITALS + 1, -gamma_nearest * CONJG(exp_sum_nearest)), &
+                 entry_check_t(2 + TBA_DIM, DIM_POSITIVE_K + ORBITALS + 2, -gamma_nearest * CONJG(exp_sum_nearest)), &
+                 entry_check_t(3 + TBA_DIM, DIM_POSITIVE_K + ORBITALS + 3, -gamma_nearest * CONJG(exp_sum_nearest)), &
+                 entry_check_t(1 + ORBITALS + TBA_DIM, DIM_POSITIVE_K + 1, -gamma_nearest * exp_sum_nearest), &
+                 entry_check_t(2 + ORBITALS + TBA_DIM, DIM_POSITIVE_K + 2, -gamma_nearest * exp_sum_nearest), &
+                 entry_check_t(3 + ORBITALS + TBA_DIM, DIM_POSITIVE_K + 3, -gamma_nearest * exp_sum_nearest), &
+                 !Next nearest neighbours
+                 ! ==== up - down ====
+                 entry_check_t(1, DIM_POSITIVE_K + TBA_DIM + 1, gamma_next * exp_sum_next), &
+                 entry_check_t(2, DIM_POSITIVE_K + TBA_DIM + 2, gamma_next * exp_sum_next), &
+                 entry_check_t(3, DIM_POSITIVE_K + TBA_DIM + 3, gamma_next * exp_sum_next), &
+                 entry_check_t(1 + ORBITALS, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 1, gamma_next * exp_sum_next), &
+                 entry_check_t(2 + ORBITALS, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 2, gamma_next * exp_sum_next), &
+                 entry_check_t(3 + ORBITALS, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 3, gamma_next * exp_sum_next), &
+                 ! ==== down - up ====
+                 entry_check_t(1 + TBA_DIM, DIM_POSITIVE_K + 1, -gamma_next * exp_sum_next), &
+                 entry_check_t(2 + TBA_DIM, DIM_POSITIVE_K + 2, -gamma_next * exp_sum_next), &
+                 entry_check_t(3 + TBA_DIM, DIM_POSITIVE_K + 3, -gamma_next * exp_sum_next), &
+                 entry_check_t(1 + ORBITALS + TBA_DIM, DIM_POSITIVE_K + ORBITALS + 1, -gamma_next * exp_sum_next), &
+                 entry_check_t(2 + ORBITALS + TBA_DIM, DIM_POSITIVE_K + ORBITALS + 2, -gamma_next * exp_sum_next), &
+                 entry_check_t(3 + ORBITALS + TBA_DIM, DIM_POSITIVE_K + ORBITALS + 3, -gamma_next * exp_sum_next)]
+
+        Hamiltonian = CMPLX(0., 0., KIND=REAL64)
+        CALL COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM)
+
+        CALL PRINT_HAMILTONIAN(Hamiltonian, sc_input % discretization % derived % DIM, "H_SC")
+
+        DO i = 1, size(Checks)
+          !Electron part
+          row = Checks(i) % i
+          col = Checks(i) % j
+          Was_checked(row, col) = .TRUE.
+          Was_checked(col, row) = .TRUE.
+          !Top triangle
+          @assertEqual(Checks(i) % elem_value, Hamiltonian(row, col), tolerance=1.0e-7)
+          !Bottom triangle
+          @assertEqual(CONJG(Checks(i) % elem_value), Hamiltonian(col, row), tolerance=1.0e-7)
+        END DO
+
+        CALL check_zero_elems(Hamiltonian, Was_checked, DIM)
+
+        Hamiltonian_minus_k = CMPLX(0., 0., KIND=REAL64)
+        kx_minus = -kx
+        ky_minus = -ky
+        CALL COMPUTE_SC(Hamiltonian_minus_k, kx_minus, ky_minus, Gamma_SC, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_minus_k, DIM)
+        CALL check_time_reversal_symmetry(Hamiltonian, Hamiltonian_minus_k, DIM)
+
+        !Check rotational symmetry
+        Hamiltonian_rotated = CMPLX(0., 0., KIND=REAL64)
+        phi_rot = n_pi_3_rotations * PI / 3
+        kx_rot = ir * dr * COS(jphi * dphi - phi_rot)
+        ky_rot = ir * dr * SIN(jphi * dphi - phi_rot)
+        CALL COMPUTE_SC(Hamiltonian_rotated, kx_rot, ky_rot, Gamma_SC, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_rotated, DIM)
+        CALL check_rotational_symmetry(n_pi_3_rotations, Hamiltonian, Hamiltonian_rotated, DIM)
+
+      END DO
+    END DO
+  END ASSOCIATE
+END SUBROUTINE test_compute_sc
+
+END MODULE test_hamiltonians
