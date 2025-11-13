@@ -297,15 +297,15 @@ PURE RECURSIVE SUBROUTINE COMPUTE_NEAREST_PAIRINGS(Pairings, kx, ky, n)
   s1 = SIN(ky)
 
   c2 = COS(kx_sqrt3_2 + ky_1_2)
-  s2 = SIN(kx_sqrt3_2 + ky_1_2)
+  s2 = -SIN(kx_sqrt3_2 + ky_1_2)
 
   c3 = COS(-kx_sqrt3_2 + ky_1_2)
-  s3 = SIN(-kx_sqrt3_2 + ky_1_2)
+  s3 = -SIN(-kx_sqrt3_2 + ky_1_2)
 
-  Pairings(1) = CMPLX(c1, -s1, REAL64)
+  Pairings(1) = CMPLX(c1, s1, REAL64)
   Pairings(2) = CMPLX(c2, s2, REAL64)
   Pairings(3) = CMPLX(c3, s3, REAL64)
-  Pairings(4) = CMPLX(c1, s1, REAL64)
+  Pairings(4) = CMPLX(c1, -s1, REAL64)
   Pairings(5) = CMPLX(c2, -s2, REAL64)
   Pairings(6) = CMPLX(c3, -s3, REAL64)
 

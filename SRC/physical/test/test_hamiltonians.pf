@@ -1381,25 +1381,26 @@ SUBROUTINE test_compute_sc()
         ky = ir * dr * SIN(jphi * dphi)
 
         exp_sum_nearest = pairing_1(ky) + pairing_2(kx, ky) + pairing_3(kx, ky)
-        exp_sum_next = pairing_nnn_1(kx) + pairing_nnn_2(kx, ky) + pairing_nnn_3(kx, ky) + &
-                       pairing_nnn_4(kx) + pairing_nnn_5(kx, ky) + pairing_nnn_6(kx, ky)
+        ! THe following is in fact a real number, but to keep consistenncy with singlet implementation
+        exp_sum_next = CONJG(pairing_nnn_1(kx) + pairing_nnn_2(kx, ky) + pairing_nnn_3(kx, ky) + &
+                             pairing_nnn_4(kx) + pairing_nnn_5(kx, ky) + pairing_nnn_6(kx, ky))
         !Checks
         Checks = [ &
                  !Nearest neighbours
                  ! ==== up - down ====
-                 entry_check_t(1, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 1, gamma_nearest * CONJG(exp_sum_nearest)), &
-                 entry_check_t(2, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 2, gamma_nearest * CONJG(exp_sum_nearest)), &
-                 entry_check_t(3, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 3, gamma_nearest * CONJG(exp_sum_nearest)), &
-                 entry_check_t(1 + ORBITALS, DIM_POSITIVE_K + TBA_DIM + 1, gamma_nearest * exp_sum_nearest), &
-                 entry_check_t(2 + ORBITALS, DIM_POSITIVE_K + TBA_DIM + 2, gamma_nearest * exp_sum_nearest), &
-                 entry_check_t(3 + ORBITALS, DIM_POSITIVE_K + TBA_DIM + 3, gamma_nearest * exp_sum_nearest), &
+                 entry_check_t(1, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 1, gamma_nearest * exp_sum_nearest), &
+                 entry_check_t(2, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 2, gamma_nearest * exp_sum_nearest), &
+                 entry_check_t(3, DIM_POSITIVE_K + TBA_DIM + ORBITALS + 3, gamma_nearest * exp_sum_nearest), &
+                 entry_check_t(1 + ORBITALS, DIM_POSITIVE_K + TBA_DIM + 1, gamma_nearest * CONJG(exp_sum_nearest)), &
+                 entry_check_t(2 + ORBITALS, DIM_POSITIVE_K + TBA_DIM + 2, gamma_nearest * CONJG(exp_sum_nearest)), &
+                 entry_check_t(3 + ORBITALS, DIM_POSITIVE_K + TBA_DIM + 3, gamma_nearest * CONJG(exp_sum_nearest)), &
                  ! ==== down - up ====
-                 entry_check_t(1 + TBA_DIM, DIM_POSITIVE_K + ORBITALS + 1, -gamma_nearest * CONJG(exp_sum_nearest)), &
-                 entry_check_t(2 + TBA_DIM, DIM_POSITIVE_K + ORBITALS + 2, -gamma_nearest * CONJG(exp_sum_nearest)), &
-                 entry_check_t(3 + TBA_DIM, DIM_POSITIVE_K + ORBITALS + 3, -gamma_nearest * CONJG(exp_sum_nearest)), &
-                 entry_check_t(1 + ORBITALS + TBA_DIM, DIM_POSITIVE_K + 1, -gamma_nearest * exp_sum_nearest), &
-                 entry_check_t(2 + ORBITALS + TBA_DIM, DIM_POSITIVE_K + 2, -gamma_nearest * exp_sum_nearest), &
-                 entry_check_t(3 + ORBITALS + TBA_DIM, DIM_POSITIVE_K + 3, -gamma_nearest * exp_sum_nearest), &
+                 entry_check_t(1 + TBA_DIM, DIM_POSITIVE_K + ORBITALS + 1, -gamma_nearest * exp_sum_nearest), &
+                 entry_check_t(2 + TBA_DIM, DIM_POSITIVE_K + ORBITALS + 2, -gamma_nearest * exp_sum_nearest), &
+                 entry_check_t(3 + TBA_DIM, DIM_POSITIVE_K + ORBITALS + 3, -gamma_nearest * exp_sum_nearest), &
+                 entry_check_t(1 + ORBITALS + TBA_DIM, DIM_POSITIVE_K + 1, -gamma_nearest * CONJG(exp_sum_nearest)), &
+                 entry_check_t(2 + ORBITALS + TBA_DIM, DIM_POSITIVE_K + 2, -gamma_nearest * CONJG(exp_sum_nearest)), &
+                 entry_check_t(3 + ORBITALS + TBA_DIM, DIM_POSITIVE_K + 3, -gamma_nearest * CONJG(exp_sum_nearest)), &
                  !Next nearest neighbours
                  ! ==== up - down ====
                  entry_check_t(1, DIM_POSITIVE_K + TBA_DIM + 1, gamma_next * exp_sum_next), &

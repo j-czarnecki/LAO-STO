@@ -1,0 +1,58 @@
+MODULE test_local_integrand
+USE funit
+USE types
+USE local_integrand
+use, intrinsic :: iso_fortran_env, only: real64, int8, int16, int32, int64
+IMPLICIT NONE
+
+!------------------------------------------------------------------------------
+!-------------------------------- TYPES ---------------------------------------
+!------------------------------------------------------------------------------
+
+!------------------------------------------------------------------------------
+!----------------------------- LOCAL VARIAVBLES -------------------------------
+!------------------------------------------------------------------------------
+REAL(REAL64), PARAMETER :: s = 0.5
+TYPE(sc_input_params_t) :: sc_input
+
+CONTAINS
+!------------------------------------------------------------------------------
+!---------------------------- SETUP/TEARDOWN ----------------------------------
+!------------------------------------------------------------------------------
+@before
+SUBROUTINE setup()
+  INTEGER(INT32) :: sublats = 2
+  INTEGER(INT32) :: n_subbands = 2
+  CALL SET_HAMILTONIAN_PARAMS(sublats, n_subbands, sc_input % discretization)
+END SUBROUTINE setup
+!------------------------------------------------------------------------------
+!------------------------------- HELPERS --------------------------------------
+!------------------------------------------------------------------------------
+
+!---------------------------------------------------------------------
+!----------------------------- TESTS ---------------------------------
+!---------------------------------------------------------------------
+
+@test
+SUBROUTINE test_accumulate_charge_density()
+  REAL(REAL64) :: Charge(sc_input % discretization % derived % DIM_POSITIVE_K)
+  COMPLEX(REAL64) :: U(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM) !! Unitary matrix that diagonalizes the Hamiltonian - from ZGEEV
+  REAL(REAL64) :: Energies(sc_input % discretization % derived % DIM) !! Energies for given wavevector
+  REAL(REAL64) :: T !! Temperature
+
+  INTEGER(INT32) :: i
+
+  Charge = 0.
+  U = 0.
+  Energies = 0.
+  T = 0.
+
+  CALL ACCUMULATE_CHARGE_DENSITY(Charge, U, Energies, sc_input % discretization, T)
+
+  DO i = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+    @assertEqual(0, Charge(i), tolerance=1.0e-7)
+  END DO
+
+END SUBROUTINE test_accumulate_charge_density
+
+END MODULE test_local_integrand

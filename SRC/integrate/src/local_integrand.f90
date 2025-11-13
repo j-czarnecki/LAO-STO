@@ -235,10 +235,10 @@ PURE SUBROUTINE ACCUMULATE_NEXT_NEIGHBOURS_DELTA(Delta, J_tensor, U, Energies, k
         lat_block = lat * discretization % ORBITALS
         lat_idx = lat + 1
         DO spin3 = 1, SPINS
-          row = orb + lat_block + (spin3 - 1) * discretization % derived % TBA_DIM
+          row = orb + lat_block + (spin3 - 1) * discretization % derived % TBA_DIM + discretization % derived % DIM_POSITIVE_K
           DO spin4 = 1, SPINS
 
-            col = orb + lat_block + (spin4 - 1) * discretization % derived % TBA_DIM + discretization % derived % DIM_POSITIVE_K
+            col = orb + lat_block + (spin4 - 1) * discretization % derived % TBA_DIM
 
             average_pairing = CONJG(U(row, n)) * U(col, n) * occupation_electron + &
             & CONJG(U(row, discretization % derived % DIM_POSITIVE_K + n)) * U(col, discretization % derived % DIM_POSITIVE_K + n) * occupation_hole

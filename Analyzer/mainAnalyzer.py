@@ -43,7 +43,7 @@ def plotGammas():
     #eMin = -1480
     eMin = 0
     gammaAndFillingPlotter = GammaAndFillingPlotter(
-        runsPath=os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-E_Fermi_J_SC_tensor"),
+        runsPath=os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-E_Fermi_J_SC_tensor_ham_unit_tested"),
         # runsPath=os.path.join(
         #     "/home", "jczarnecki", "LAO-STO-results", "LAO-STO-E_Fermi_J_SC_J_SC_NNN"
         # ),
@@ -185,8 +185,8 @@ def addMissingBandNumber():
 
 def main():
     logger.info("Starting Analyzer")
-    #plotGammas()
-    plotDispersions()
+    plotGammas()
+    #plotDispersions()
     #addMissingBandNumber()
 
 

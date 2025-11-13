@@ -19,7 +19,7 @@
     v_pds = -65.0
     j_sc_tensor = 0.0, 0.0, 0.0, 0.0, 0.0, 0.,350., 0.0, 0.0,350., 0., 0.0, 0.0, 0.0, 0.0, 0.0
     nearest_interorb_multiplier = 0.1
-    j_sc_nnn_tensor = 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    j_sc_nnn_tensor = 0.0, 0.0, 0.0, 0.0, 0.0, 0.,300., 0.0, 0.0,300., 0., 0.0, 0.0, 0.0, 0.0, 0.0
     next_interorb_multiplier = 0.1
     u_hub = 0.0
     v_hub = 0.0
@@ -50,8 +50,8 @@
 &romberg_integration
     romb_eps_x = 0.001
     interpolation_deg_x = 3
-    max_grid_refinements_x = 10
+    max_grid_refinements_x = 8
     romb_eps_y = 0.001
     interpolation_deg_y = 3
-    max_grid_refinements_y = 10
+    max_grid_refinements_y = 8
 /

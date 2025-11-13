@@ -59,7 +59,6 @@ INTEGER(INT32) :: sc_iter
 LOGICAL :: sc_flag
 
 INTEGER(INT32) :: delta_real_elems
-CHARACTER(LEN=10) :: iter_string
 
 !OMP specific
 INTEGER(INT32) :: max_num_threads
@@ -213,9 +212,6 @@ DO sc_iter = 1, sc_input % self_consistency % max_sc_iter
   LOG_INFO(log_string)
   WRITE (log_string, '(a, E15.5)') "charge_max_error: ", charge_max_error
   LOG_INFO(log_string)
-
-  WRITE (iter_string, '(I0)') sc_iter
-  CALL PRINT_GAMMA(Gamma_SC_new, "Gamma_SC_new"//TRIM(iter_string), sc_input % discretization)
 
   !PRINT*, "Gamma max error ", gamma_max_error
 
