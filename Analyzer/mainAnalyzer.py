@@ -43,11 +43,11 @@ def plotGammas():
     #eMin = -1480
     eMin = 0
     gammaAndFillingPlotter = GammaAndFillingPlotter(
-        runsPath=os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-E_Fermi_J_SC_tensor_ham_unit_tested"),
+        runsPath=os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-B_phi_B_J_SC_chunking_500_eps4"),
         # runsPath=os.path.join(
         #     "/home", "jczarnecki", "LAO-STO-results", "LAO-STO-E_Fermi_J_SC_J_SC_NNN"
         # ),
-        matchPattern="RUN_.*",
+        matchPattern="RUN_.*B_magnitude_\\d.0.*",
         nNeighbors=3,
         nNextNeighbors=6,
         eMinimal=eMin,
@@ -57,16 +57,16 @@ def plotGammas():
     )
 
     gammaAndFillingPlotter.LoadFilling(loadUnfinished=True)
-    gammaAndFillingPlotter.LoadGamma(xKeywords=("e_fermi", "j_sc_tensor"), loadUnfinished=True)
+    gammaAndFillingPlotter.LoadGamma(xKeywords=("b_phi", "b_magnitude"), loadUnfinished=True)
     gammaAndFillingPlotter.sortData()
     gammaAndFillingPlotter.CalculateSymmetryGamma()
     gammaAndFillingPlotter.getMaxvalSymmetrizedGamma()
-    gammaAndFillingPlotter.plotGammasTwoParam2d(firstXLabel=r"$\mu$ (meV)",
+    gammaAndFillingPlotter.plotGammasTwoParam2d(firstXLabel=r"$\varphi$ (deg)",
                                                 neighborsToPlot=("nearest", ),
                                                 plotSecondX=False,
                                                 secondXLabel=r"$n$ (10\textsuperscript{14} cm\textsuperscript{-2})",
-                                                legendTitles=(r"$J$ (meV)",),
-                                                continuousColor=False,
+                                                legendTitles=(r"$|B|$ (T)",),
+                                                continuousColor=True,
                                                 yUnit=r"($\mu$eV)")
     #gammaAndFillingPlotter.plotFillingFermi()
     # gammaAndFillingPlotter.plotGammasThreeParamCmap(neighborsToPlot=("nearest",),
@@ -76,25 +76,17 @@ def plotGammas():
 
 def plotDispersions():
     #eMin = -1053
-    dispersionPlotter = DispersionPlotter(sublattices=2, subbands=1)
+    dispersionPlotter = DispersionPlotter(sublattices=3, subbands=1, plotOutputPath="../Plots")
 
     dispersionPlotter.LoadDispersion("../OutputData/Energies.dat")
     dispersionPlotter.GetStatistics()
     #dispersionPlotter.shiftEnergies()
 
-    dispersionPlotter.plotCrossection(
-        "../Plots/DispersionSliceKy", 500, "ky", 0.0, 2, False
-    )
+    dispersionPlotter.plotCrossection(500, "ky", 0.0, 2, False)
+    dispersionPlotter.plotCrossection(500, "kx", 0.0, 2, False)
 
-    dispersionPlotter.plotCrossection(
-        "../Plots/DispersionSliceKx", 500, "kx", 0.0, 2, False
-    )
+    dispersionPlotter.plotFermiCrossection(60, 1.5, False)
 
-    #dispersionPlotter.plotFermiCrossection(0, 1.5, "../Plots")
-
-    dispersionPlotter.plotFermiCrossection(50, 1.5, "../Plots")
-
-    dispersionPlotter.plotFermiCrossection(100, 1.5, "../Plots")
 
 
     # efs = [-60, -52, -44, -36]
@@ -185,8 +177,8 @@ def addMissingBandNumber():
 
 def main():
     logger.info("Starting Analyzer")
-    plotGammas()
-    #plotDispersions()
+    #plotGammas()
+    plotDispersions()
     #addMissingBandNumber()
 
 

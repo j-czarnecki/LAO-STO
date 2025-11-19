@@ -87,7 +87,7 @@ class SymmetryResolver(DataReader):
                             for orbital in range(1, 4):
                                 # This code could be simplified, maybe list comprehension?
                                 # Nearest neighbours pairing
-                                for sublat in range(1, self.layerCouplings + 1):
+                                for sublat in range(1, 2 + 1):
                                     for neighbor in range(1, self.nNeighbors + 1):
                                         gammaKey = (band, spin1, spin2, neighbor, sublat, orbital)
                                         gammaToSymmetrize.append(self.gamma[gammaKey][i])

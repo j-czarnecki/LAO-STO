@@ -245,7 +245,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
                     sm.set_array([])  # Required for ScalarMappable
                     colorbar = fig.colorbar(sm, ax=ax1)
                     colorbar.set_label(legendTitles[nNeighborhood])  # Update label as needed TODO: this should be variable
-                    colorbar.set_ticks([30, 40])
+                    colorbar.set_ticks(np.linspace(min(secondParamValues), max(secondParamValues), 3))
                 else:
                     ax1.legend(title=legendTitles[nNeighborhood], loc="best") #TODO: this should be variable
 
@@ -265,7 +265,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
                     ax2.set_xlabel(fr"{secondXLabel}", labelpad=16)
                     #ax2.set_xlabel(fr"{secondXLabel} (10 \textsuperscript{{-2}})", labelpad=16)
                 plt.savefig(
-                    f"../Plots/Gamma2d_{gammaNeighorhoodLabels[nNeighborhood]}_band{band}_spin1{spin1}_spin2{spin2}_lat{sublat}_{symmetry}.png"
+                    f"../Plots/Gamma2d_{gammaNeighorhoodLabels[nNeighborhood]}_band{band}_spin{spin1}{spin2}_lat{sublat}_{symmetry}.png"
                 )
                 plt.close()
 
@@ -451,9 +451,186 @@ class GammaAndFillingPlotter(SymmetryResolver):
 
                     # Saving figure
                     plt.savefig(
-                        f"../Plots/GammaCmap_{gammaNeighorhoodLabels[nNeighborhood]}_{z}_band{band}_spin1{spin1}_spin2{spin2}_lat{sublat}_{symmetry}.png"
+                        f"../Plots/GammaCmap_{gammaNeighorhoodLabels[nNeighborhood]}_{z}_band{band}_spin{spin1}{spin2}_lat{sublat}_{symmetry}.png"
                     )
                     plt.close()
+
+    #TODO: genralize this to arbitrary critiacl parameter i.e. Temperature, field etc.
+    def plotCriticalTemperatures(self,
+                                 firstXLabel: str = r"$\mu$ (meV)",
+                                 plotSecondX: bool = True,
+                                 secondXLabel: str = r"$n$",
+                                 neighborsToPlot: tuple[str, ...] = ("nearest",),
+                                 firstXMax: float = np.inf,
+                                 firstXShift: float = 0,
+                                 yMax: float = np.inf,
+                                 yUnit: str = "(K)",
+                                 criticalThreshold: float = 5e-2,):
+        """
+        Plots a 2D graphs o critical temperatures for given symmetrized Gammas as a function of argument X,
+        where X is the first parameter specified in self.LoadGammas(xKeywords=(X, Y, Z))
+        and Y is the second one.
+        The third parameter, Z, specifies how many curves, corresponding to different values of Z, are plotted.
+
+        Parameters:
+        firstXLabel: str
+            Label of the X axis.
+        plotSecondX: bool
+            If True, a second X axis is plotted.
+            It corresponds to carrier concentration and is only sensible for chemical potential/Fermi energy
+            being the first argument.
+        secondXLabel: str
+            Label of the second X axis.
+        neighborsToPlot: tuple[str, ...]
+            List of neighbors to plot.
+            Supported: "nearest", "next".
+        firstXMax: float
+            Maximum value of the first X axis.
+        firstXShift: float
+            Shift of the first X axis.
+        yMax: float
+            Maximum value of the Y axis.
+            This is not Y parameter passed to xKeywords.
+        yUnit: str
+            Unit of the Y axis.
+            Supported: '(K)', '(mK)'
+            This is not Y parameter passed to xKeywords.
+        criticalThreshold: float
+            Threshold for critical temperatures.
+            Fraction gamma(T)/Gamma(0) below which we consider gamma to be "zero".
+        """
+        X = [element[0] for element in self.params]
+        X = sorted(list(set(X)))
+
+        Y = [element[1] for element in self.params]
+        Y = sorted(list(set(Y)))
+
+        Z = [element[2] for element in self.params]
+        Z = sorted(list(set(Z)))
+
+        secondXPlot = []
+        yPlot = []
+
+        secondXCallback = None
+        neighborGammasList = []
+        neighborKeys = []
+        gammaLabelsCallbacks = []
+        gammaNeighorhoodLabels = []
+
+        #Assign neighbor gammas
+        if "nearest" in neighborsToPlot:
+            neighborGammasList.append(self.symmetryGammaDict)
+            gammaLabelsCallbacks.append(self.__getNearestNeighborGammaLabel)
+            gammaNeighorhoodLabels.append("nearest")
+        if "next" in neighborsToPlot:
+            neighborGammasList.append(self.nnnSymmetryGammaDict)
+            gammaLabelsCallbacks.append(self.__getNextNearestNeighborGammaLabel)
+            gammaNeighorhoodLabels.append("next")
+
+        # Pick second axis label
+        if plotSecondX:
+            if secondXLabel == r"$n$":
+                secondXCallback = self.__calculateFillingPerSpinOrbital
+            elif secondXLabel == r"$n$ (10\textsuperscript{14} cm\textsuperscript{-2})":
+                secondXCallback = self.__calculateFillingPerCm2
+            else:
+                raise ValueError(f"Unknown secondXLabel: {secondXLabel}")
+        else:
+            secondXCallback = lambda *args, **kwargs: None
+
+        # Set energy units and multipliers
+        if yUnit == r"(K)":
+            yMultiplier = 1
+        elif yUnit == r"(mK)":
+            yMultiplier = 1e3
+        else:
+            raise ValueError(f"Unknown yUnit: {yUnit}")
+
+        # Main plotting loop
+        for nNeighborhood, gammaDict in enumerate(neighborGammasList):
+            for key in self.symmetryKeys[gammaNeighorhoodLabels[nNeighborhood]]:
+                fig = plt.figure(figsize=(7, 5), dpi=400)
+                # Set up GridSpec (1 row, 1 column, with some spacing)
+                gs = gridspec.GridSpec(1, 1, figure=fig, left=0.18, right=0.9, top=0.85, bottom=0.25)
+                ax1 = fig.add_subplot(gs[0,0])
+
+                secondXPlot = []
+                xPlotFixed = []
+                for z in Z:
+                    gammaZero = {}
+                    #Finding zero-temperature values
+                    for i in range(len(self.params)):
+                        if int(self.params[i][2]) == z and self.params[i][1] == Y[0]:
+                            gammaZero[self.params[i][0]] = np.abs(gammaDict[key][i])
+                            if z == Z[0]:
+                                secondXPlot.append(secondXCallback(self.fillingTotal[i]))
+                                xPlotFixed.append(self.params[i][0])
+
+                    #Keeping all values above threshold
+                    tCriticalDict = {}
+                    for i in range(len(self.params)):
+                        if int(self.params[i][2]) == z:
+                            xVal = self.params[i][0]
+                            zeroTempVal = gammaZero[xVal]
+                            currentVal = np.abs(gammaDict[key][i])
+                            if currentVal / zeroTempVal < criticalThreshold:
+                                temperature = self.params[i][1] * yMultiplier
+                                if xVal not in list(tCriticalDict.keys()):
+                                    tCriticalDict[xVal] = temperature
+                                else:
+                                    tCriticalDict[xVal] = min(tCriticalDict[xVal], temperature)
+
+                    xPlot = list(tCriticalDict.keys())
+                    yPlot = list(tCriticalDict.values())
+                    ax1.scatter(xPlot, yPlot, marker='o', c='blue', s=100)
+
+                #Setting labels
+                band, spin1, spin2, sublat, symmetry = key
+                ax1.grid(True, linestyle=':')
+                ax1.set_xlabel(firstXLabel)
+                ax1.set_ylabel(rf"$T_c$ {yUnit}")
+                ax1.set_xlim(right=firstXMax if firstXMax != np.inf else max(xPlotFixed))
+                ax1.set_ylim(bottom=0)
+                if yMax != np.inf:
+                    ax1.set_ylim(top=yMax)
+                ax1.xaxis.set_major_locator(ticker.LinearLocator(4))
+                ax1.yaxis.set_major_locator(ticker.LinearLocator(5))
+                ax1.tick_params(axis='both', which='major', pad=10)
+
+                ax1.annotate(
+                    '', xy=(21., 130), xytext=(21., 180),
+                    arrowprops=dict(
+                        arrowstyle='-|>',  # or '-|>', '<->', etc.
+                        color='blue',
+                        lw=2
+                    )
+                )
+
+                #Bottom X axis being electron concentration
+                plt.draw()
+                ax1_ticks = ax1.get_xticks()
+                # Plot secondary axis for occupation
+
+                tick_labels = np.interp(
+                    ax1_ticks, xPlotFixed, secondXPlot
+                )  # Interpolate the mapping
+                tick_labels = [tick * 10 for tick in tick_labels]
+                ax1.set_xticklabels(
+                    [f"{val:.1f}" for val in tick_labels]
+                )  # Map `n_total_plot` as tick labels
+                ax1.set_xlabel(r"$n$ (10\textsuperscript{13} cm\textsuperscript{-2})", labelpad = 10)
+
+                ax1.tick_params(axis="x", direction="in")
+                ax1.tick_params(axis="y", direction="in")
+
+
+
+                # Saving figure
+                plt.savefig(
+                    f"../Plots/CriticalTemperature_{gammaNeighorhoodLabels[nNeighborhood]}_band{band}_spin{spin1}{spin2}_lat{sublat}_{symmetry}.png"
+                )
+                plt.close()
+
 
     def plotFillingFermi(self):
         secondParamValues = [element[1] for element in self.params]

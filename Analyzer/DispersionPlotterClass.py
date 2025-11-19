@@ -42,16 +42,18 @@ from matplotlib.patches import Rectangle
 import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.colors import ListedColormap
+from matplotlib.patches import FancyArrowPatch
 
 # TODO: self.lowestEnergy should not be used - all energies should be shown with respect to E_Fermi
 # Data reader is in fact not used here, rethink this architecture
 class DispersionPlotter(DataReader):
 
-    def __init__(self, sublattices: int, subbands: int):
+    def __init__(self, sublattices: int, subbands: int, plotOutputPath: str = "./"):
         DataReader.__init__(self, "./", "xxx", sublattices, subbands)
         self.dataLength: int = 0
         self.kPoints1D: int = 0
         self.maxBands: int = 0
+        self.plotOutputPath = plotOutputPath
 
         self.__initializePlotParams()
 
@@ -112,7 +114,6 @@ class DispersionPlotter(DataReader):
 
     def plotCrossection(
         self,
-        plotOutputPath: str,
         maxEnergy: float,
         sliceAlong: str,
         fixedKVal: float,
@@ -156,7 +157,7 @@ class DispersionPlotter(DataReader):
         for colorKey in colorValuesDict.keys():
             fig = plt.figure(figsize=(7, 5), dpi=400)
             # Set up GridSpec (1 row, 1 column, with some spacing)
-            gs = gridspec.GridSpec(1, 1, figure=fig, left=0.3, right=0.9, top=0.9, bottom=0.25)
+            gs = gridspec.GridSpec(1, 1, figure=fig, left=0.25, right=0.9, top=0.95, bottom=0.1)
             ax = fig.add_subplot(gs[0,0])
 
             if colorKey == "spin":
@@ -205,10 +206,13 @@ class DispersionPlotter(DataReader):
             # axin.set_yticks([0, eZoomMax/2, eZoomMax])
             # axin.patch.set_alpha(0.6)
 
-            plt.savefig(f"{plotOutputPath}_{colorKey}.png")
+            filename = os.path.join(self.plotOutputPath, f"DispersionSlice_{sliceAlong}_{colorKey}.png")
+            plt.savefig(filename)
             plt.close()
 
-    def plotFermiCrossection(self, eFermi: float, dE: float, plotOutputPath: str):
+    def plotFermiCrossection(self, eFermi: float, dE: float, plotSpinArrows: bool = True):
+
+        print(f"plotSpinArrows set to {plotSpinArrows}")
 
         filteredDispersion = self.dispersionDataframe[
             np.abs(self.dispersionDataframe["E"] - eFermi) < dE
@@ -237,9 +241,9 @@ class DispersionPlotter(DataReader):
         vectorProbing = 10
 
         for colorKey in colorValuesDict.keys():
-            fig = plt.figure(figsize=(5, 5), dpi=400)
+            fig = plt.figure(figsize=(7, 5), dpi=400)
             # Set up GridSpec (1 row, 1 column, with some spacing)
-            gs = gridspec.GridSpec(1, 1, figure=fig, left=0.3, right=0.8, top=0.95, bottom=0.25)
+            gs = gridspec.GridSpec(1, 1, figure=fig, left=0.05, right=0.93, top=0.95, bottom=0.22)
             ax = fig.add_subplot(gs[0,0])
             self.plotFirstBrillouinZoneBoundary()
             if colorKey == "orbital":
@@ -256,27 +260,42 @@ class DispersionPlotter(DataReader):
                     segments = np.concatenate([points[:-1], points[1:]], axis=1)
                     segmentColors = 0.5 * (P_sz[:-1] + P_sz[1:])
 
+                    #norm = Normalize(vmin=P_sz.min(), vmax=P_sz.max())
                     norm = Normalize(vmin=P_sz.min(), vmax=P_sz.max())
-                    lc = LineCollection(segments, linewidths=0.5, cmap="coolwarm")
+                    lc = LineCollection(segments, linewidths=1, cmap="coolwarm")
                     lc.set_array(segmentColors)
                     ax.add_collection(lc)
 
-                    #ax.plot(group["kx"], group["ky"], c='black', linewidth=0.5, zorder=3)
-                    vectorsGroup = group.iloc[::vectorProbing, :]
-                    ax.quiver(vectorsGroup["kx"], vectorsGroup["ky"],
-                              vectorsGroup["P_sx"], vectorsGroup["P_sy"],
-                              vectorsGroup["P_sz"],
-                              cmap="coolwarm",
-                              scale=4,
-                              scale_units="xy",
-                              width=0.004,
-                              headwidth=5,
-                              headlength=4,
-                              headaxislength=3,
-                              zorder=2)
+                    if plotSpinArrows:
+                        vectorsGroup = group.iloc[::vectorProbing, :]
+                        ax.quiver(vectorsGroup["kx"], vectorsGroup["ky"],
+                                vectorsGroup["P_sx"], vectorsGroup["P_sy"],
+                                vectorsGroup["P_sz"],
+                                cmap="coolwarm",
+                                scale=4,
+                                scale_units="xy",
+                                width=0.004,
+                                headwidth=5,
+                                headlength=4,
+                                headaxislength=3,
+                                zorder=2)
                 # Colorbar on top of entire figure
-                cbar = fig.colorbar(lc, ax=ax, orientation='vertical', pad=0.05, shrink=0.5)
-                cbar.ax.set_title(r"$\langle \sigma_z \rangle$", loc="left")
+                cbar = fig.colorbar(lc, ax=ax, orientation='vertical', pad=0.05, shrink=0.8)
+                cbar.ax.set_title(r"$\langle \sigma_z \rangle$", loc="left", pad = 10)
+
+
+                #Plot arrow indicating C3 symmetry
+                # begin = (1.1, 0.1)
+                # end = (-0.6, 0.9)
+                # arrow = FancyArrowPatch(
+                #     begin, end,
+                #     connectionstyle="arc3,rad=1.2",  # curvature; try rad=0.2 to 0.5
+                #     arrowstyle='->',
+                #     mutation_scale=20,   # size of the arrowhead
+                #     color="black"
+                # )
+                # ax.add_patch(arrow)
+                # ax.text(0.75, 1.5, r"$C_3$")
             else:
                 for _, group in groups:
                     kx = group["kx"].values
@@ -290,21 +309,27 @@ class DispersionPlotter(DataReader):
                     lc = LineCollection(segments, colors=segmentColors, linewidths=0.5)
                     ax.add_collection(lc)
 
-            ax.grid(True, linestyle=':')
+            ax.grid(which="major", linestyle=':')
+            #ax.grid(which="minor", linestyle=':', alpha=0.6)
+
             ax.set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
             ax.set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
             ax.set_xlim(-2.5, 2.5)
             ax.set_ylim(-2.5, 2.5)
+            # ax.set_xticks([-2, 0, 2])
+            # ax.set_yticks([-2, 0, 2])
+            # ax.set_xticks([-1, 1], minor = True)
+            # ax.set_yticks([-1, 1], minor = True)
             ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
             ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
             ax.set_aspect("equal", adjustable="box")
-            plt.savefig(os.path.join(plotOutputPath, f"FermiCrossection_{colorKey}_Ef_{eFermi}"))
+            filename = os.path.join(self.plotOutputPath, f"FermiCrossection_{colorKey}_Ef_{eFermi}.png")
+            plt.savefig(filename)
             plt.close()
 
     def plotDos(
         self,
         eMax: float,
-        plotOutputPath: str,
         addSmearing: bool,
         zeta: float,
         isSingle: bool = True,
@@ -350,13 +375,13 @@ class DispersionPlotter(DataReader):
             plt.xlim(left=-eMax, right=eMax)
             plt.xlabel(r"E (meV)")
             plt.ylabel(r"DOS")
-            plt.savefig(plotOutputPath)
+            filename = os.path.join(self.plotOutputPath, "DOS.png")
+            plt.savefig(filename)
             plt.close()
 
     def plotStackedDos(
         self,
         eMax: float,
-        plotOutputPath: str,
         addSmearing: bool,
         zeta: float,
         dosDirsList: list,
@@ -380,7 +405,6 @@ class DispersionPlotter(DataReader):
             color = cmap(norm(colorParamList[dosDirsList.index(dir)]))
             self.plotDos(
                 eMax,
-                plotOutputPath,
                 addSmearing,
                 zeta,
                 isSingle=False,
@@ -409,7 +433,8 @@ class DispersionPlotter(DataReader):
         colorbar.set_label(r"$\mu$ (meV)")  # Update label as needed
 
         fig.text(0.01, 0.5, r"DOS (a.u.)", va='center', rotation='vertical')
-        plt.savefig(plotOutputPath)
+        filename = os.path.join(self.plotOutputPath, "DOS_stack.png")
+        plt.savefig(filename)
         plt.close()
 
     def plotSuperconductingGap(self, postfix: str, title: str):
@@ -446,7 +471,8 @@ class DispersionPlotter(DataReader):
         ax.set_aspect("equal")
 
         # plt.grid()
-        plt.savefig("../Plots/SuperconductingGap" + postfix + ".png")
+        filename = os.path.join(self.plotOutputPath, f"SuperconductingGap_{postfix}.png")
+        plt.savefig(filename)
         plt.close()
 
     def plotSuperconductingGapAngular(self, postfix: str = "", title: str = None):
@@ -514,7 +540,8 @@ class DispersionPlotter(DataReader):
         axAngular.set_ylabel(r"$\tilde{\Delta}$~($\mu$eV)")
         axAngular.set_ylim(bottom=0.98 * yMin * 1e3)
         axAngular.grid(True, linestyle=':')
-        figAngular.savefig(f"../Plots/SuperconductingGapAngular{postfix}.png")
+        filename = os.path.join(self.plotOutputPath, f"SuperconductingGapAngular_{postfix}.png")
+        figAngular.savefig(filename)
         plt.close(figAngular)
 
         axFourier.set_title(title)
@@ -523,7 +550,8 @@ class DispersionPlotter(DataReader):
         axFourier.set_ylabel(r"$\tilde{\Delta}$~(meV)")
         axFourier.set_xlim(-2, 2)
         axFourier.grid(True, linestyle=':')
-        figFourier.savefig(f"../Plots/SuperconductingGapFourier{postfix}.png")
+        filename = os.path.join(self.plotOutputPath, f"SuperconductingGapFourier_{postfix}.png")
+        figFourier.savefig(filename)
         plt.close(figFourier)
 
     def plotSuperconductingGapMap(self):
@@ -552,7 +580,8 @@ class DispersionPlotter(DataReader):
             plt.ylabel(r"$k_y~(\tilde{a}^{-1})$")
             plt.gca().set_aspect("equal", adjustable="box")
             # plt.grid()
-            plt.savefig(f"../Plots/SuperconductingGapMap_n{state}.png")
+            filename = os.path.join(self.plotOutputPath, f"SuperconductingGapMap_n{state}.png")
+            plt.savefig(filename)
             plt.close()
 
     def plotGammaKMap(self,
@@ -664,9 +693,9 @@ class DispersionPlotter(DataReader):
                                     cbar.set_label(rowNames[1])
 
                             fig.subplots_adjust(wspace=0, hspace=0.1, left=0, right=1, top=1, bottom=0)
-                            fig.savefig( f"../Plots/GammaKMap_{neighborName}_spin1{spin1}_spin2{spin2}_layer{sublat}_band{band}_{postfix}.png",
-                                    bbox_inches="tight",
-                            )
+                            filename = os.path.join(self.plotOutputPath,
+                                                    f"GammaKMap_{neighborName}_spin{spin1}{spin2}_layer{sublat}_band{band}_{postfix}.png")
+                            fig.savefig(filename, bbox_inches="tight")
                             plt.close()
 
     """ ---------------------------------------------------------------------------------- """
@@ -679,13 +708,13 @@ class DispersionPlotter(DataReader):
         plt.rcParams["font.serif"] = "Computer Modern Roman"
         plt.rcParams["font.sans-serif"] = "Computer Modern Sans serif"
         plt.rcParams["font.monospace"] = "Computer Modern Typewriter"
-        plt.rcParams["axes.titlesize"] = 40
-        plt.rcParams["axes.labelsize"] = 40
-        plt.rcParams["xtick.labelsize"] = 36
-        plt.rcParams["ytick.labelsize"] = 36
-        plt.rcParams["font.size"] = 40
-        plt.rcParams["legend.fontsize"] = 34
-        plt.rcParams["legend.title_fontsize"] = 36
+        plt.rcParams["axes.titlesize"] = 36
+        plt.rcParams["axes.labelsize"] = 36
+        plt.rcParams["xtick.labelsize"] = 32
+        plt.rcParams["ytick.labelsize"] = 32
+        plt.rcParams["font.size"] = 32
+        plt.rcParams["legend.fontsize"] = 32
+        plt.rcParams["legend.title_fontsize"] = 32
         # Optionally, add custom LaTeX preamble
         plt.rcParams["text.latex.preamble"] = (
             r"\usepackage{amsmath} \usepackage{amsfonts} \usepackage{amssymb}"
