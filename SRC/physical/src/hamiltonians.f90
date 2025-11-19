@@ -572,7 +572,7 @@ PURE RECURSIVE SUBROUTINE COMPUTE_ZEEMAN(B, g_factor, Hamiltonian, discretizatio
     row = discretization % derived % DIM_POSITIVE_K + i
     col = discretization % derived % DIM_POSITIVE_K + discretization % derived % TBA_DIM + i
     !B_x and B_y terms
-    Hamiltonian(row, col) = Hamiltonian(row, col) - 0.5d0 * muB * g_factor * CONJG(B(1) - imag * B(2))
+    Hamiltonian(row, col) = Hamiltonian(row, col) - 0.5d0 * muB * g_factor * (B(1) + imag * B(2))
   END DO
 
 END SUBROUTINE COMPUTE_ZEEMAN

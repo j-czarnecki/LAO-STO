@@ -53,7 +53,8 @@ SUBROUTINE SET_GAMMA_INITIAL(Gamma_SC, J_nearest_tensor, J_next_tensor, gamma_st
 
   INTEGER(INT32) :: spin1, spin2, spin3, spin4
   LOGICAL :: set_to_nonzero_nearest, set_to_nonzero_next
-  REAL(REAL64) :: eps = 1e-9 !! To compare reals
+  REAL(REAL64), PARAMETER :: eps = 1e-9 !! To compare reals
+  REAL(REAL64), PARAMETER :: spin_offset_fraction = 0.05
 
   Gamma_SC = CMPLX(0.0, 0.0, KIND=REAL64)
 
@@ -74,16 +75,16 @@ SUBROUTINE SET_GAMMA_INITIAL(Gamma_SC, J_nearest_tensor, J_next_tensor, gamma_st
       IF (set_to_nonzero_nearest) THEN
         !If opposite spin coupling has been set, then assume spin-singlet and set to minus
         IF (ABS(Gamma_SC(1, 1, spin2, spin1, 1, 1)) .GT. eps) THEN
-          Gamma_SC(:, :N_NEIGHBOURS, spin1, spin2, :, :) = -Gamma_SC(1, 1, spin2, spin1, 1, 1)
+          Gamma_SC(:, :N_NEIGHBOURS, spin1, spin2, :, :) = -(1.0 - spin_offset_fraction) / (1.0 + spin_offset_fraction) * Gamma_SC(1, 1, spin2, spin1, 1, 1)
         ELSE
-          Gamma_SC(:, :N_NEIGHBOURS, spin1, spin2, :, :) = gamma_start_nearest
+          Gamma_SC(:, :N_NEIGHBOURS, spin1, spin2, :, :) = (1.0 + spin_offset_fraction) * gamma_start_nearest
         END IF
       END IF
       IF (set_to_nonzero_next) THEN
         IF (ABS(Gamma_SC(1, 4, spin2, spin1, 1, 1)) .GT. eps) THEN
-          Gamma_SC(:, (N_NEIGHBOURS + 1):, spin1, spin2, :, :) = -Gamma_SC(1, 4, spin2, spin1, 1, 1)
+          Gamma_SC(:, (N_NEIGHBOURS + 1):, spin1, spin2, :, :) = -(1.0 - spin_offset_fraction) / (1.0 + spin_offset_fraction) * Gamma_SC(1, 4, spin2, spin1, 1, 1)
         ELSE
-          Gamma_SC(:, (N_NEIGHBOURS + 1):, spin1, spin2, :, :) = gamma_start_next
+          Gamma_SC(:, (N_NEIGHBOURS + 1):, spin1, spin2, :, :) = (1.0 + spin_offset_fraction) * gamma_start_next
         END IF
       END IF
 
