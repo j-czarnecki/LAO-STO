@@ -69,6 +69,7 @@ RECURSIVE SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, i_r, k1
   REAL(REAL64) :: dk2_trap, k2_trap
   LOGICAL :: convergence
   REAL(REAL64) :: r_max_local, k1_chunk_min, k1_chunk_max
+  REAL(REAL64) :: max_error_delta, max_error_charge
 
   stepsize = CMPLX(0., 0., KIND=REAL64)
   Delta_iterations = CMPLX(0., 0., KIND=REAL64)
@@ -129,6 +130,9 @@ RECURSIVE SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, i_r, k1
       Charge_dens_iterations(:, j) = 0.5 * (Charge_dens_iterations(:, j) + (k2_chunk_max - k2_chunk_min) * Charge_dens_sum / i)
 
       IF (j >= sc_input % romberg % interpolation_deg_y) THEN
+        max_error_delta = 0.
+        max_error_charge = 0.
+
         !For all components of Delta_iterations and Charge_dens_iterations
         !Check whether integral when dk1 ---> 0 can be approximated
         !With relative error no bigger than EPS
@@ -143,6 +147,9 @@ RECURSIVE SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, i_r, k1
                   CALL POLINT(stepsize((j - sc_input % romberg % interpolation_deg_y + 1):j), Delta_iterations(orb, n, spin1, spin2, lat, (j - sc_input % romberg % interpolation_deg_y + 1):j), &
                               & sc_input % romberg % interpolation_deg_y, CMPLX(0., 0., KIND=REAL64), result, result_error)
                   Delta_local(orb, n, spin1, spin2, lat) = result
+                  IF (ABS(result) > 0.0d0) THEN
+                    max_error_delta = MAX(max_error_delta, ABS(result_error) / ABS(result))
+                  END IF
                   IF (ABS(result_error) > sc_input % romberg % romb_eps_y * ABS(result)) THEN
                     convergence = .FALSE.
                   END IF
@@ -153,6 +160,9 @@ RECURSIVE SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, i_r, k1
                   CALL POLINT(stepsize((j - sc_input % romberg % interpolation_deg_y + 1):j), Delta_iterations(orb, n, spin1, spin2, lat, (j - sc_input % romberg % interpolation_deg_y + 1):j), &
                               & sc_input % romberg % interpolation_deg_y, CMPLX(0., 0., KIND=REAL64), result, result_error)
                   Delta_local(orb, n, spin1, spin2, lat) = result
+                  IF (ABS(result) > 0.0d0) THEN
+                    max_error_delta = MAX(max_error_delta, ABS(result_error) / ABS(result))
+                  END IF
                   IF (ABS(result_error) > sc_input % romberg % romb_eps_y * ABS(result)) THEN
                     convergence = .FALSE.
                   END IF
@@ -167,6 +177,7 @@ RECURSIVE SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, i_r, k1
           CALL POLINT(stepsize((j - sc_input % romberg % interpolation_deg_y + 1):j), CMPLX(Charge_dens_iterations(n, (j - sc_input % romberg % interpolation_deg_y + 1):j), 0.0_REAL64, KIND=REAL64), &
                       & sc_input % romberg % interpolation_deg_y, CMPLX(0., 0., KIND=REAL64), result, result_error)
           Charge_dens_local(n) = REAL(result)
+          max_error_charge = MAX(max_error_charge, ABS(result_error) / ABS(result))
           IF (ABS(result_error) > sc_input % romberg % romb_eps_y * ABS(result)) THEN
             convergence = .FALSE.
           END IF
@@ -186,8 +197,9 @@ RECURSIVE SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, i_r, k1
     END IF
   END DO
 
-  WRITE (log_string, '(a, F10.6, a, F10.6, a, I15)') "Romberg Y did not converge for chunk &
-  & k1_chunk_min: ", k1_chunk_min, " k2_chunk_min: ", k2_chunk_min, " after iteration: ", j - 1
+  WRITE (log_string, '(2(a, F10.6), a, I15, 2(a, E15.5))') "Romberg Y did not converge for chunk &
+  & k1_chunk_min: ", k1_chunk_min, " k2_chunk_min: ", k2_chunk_min, " after iteration: ", j - 1, &
+  & " with max_error_delta: ", max_error_delta, " max_error_charge: ", max_error_charge
   LOG_ABNORMAL(log_string)
 
 END SUBROUTINE ROMBERG_Y

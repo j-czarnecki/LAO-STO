@@ -25,6 +25,7 @@ from DataReaderClass import *
 from DispersionPlotterClass import *
 from SymmetryResolverClass import *
 from GammaAndFillingPlotter import *
+from LogParserClass import *
 import logging
 
 SCRATCH_PATH = os.getenv("SCRATCH")
@@ -175,11 +176,22 @@ def addMissingBandNumber():
                             f.write("\n")
                 f.truncate()
 
+def analyzeLogs():
+    logParser = LogParser()
+    #df = logParser.getDivergentChunks("../log.log")
+    df = logParser.getDivergentChunks(os.path.join(SCRATCH_PATH,
+                                                   "KTO-SC",
+                                                   "KTO-B_phi_B_J_SC_chunking_500_eps4",
+                                                   "RUN_B_phi_0.0_B_magnitude_5.0_E_Fermi_0.0",
+                                                   "log.log"))
+    logParser.plotDivergentChunks(df)
+
 def main():
     logger.info("Starting Analyzer")
     #plotGammas()
-    plotDispersions()
+    #plotDispersions()
     #addMissingBandNumber()
+    analyzeLogs()
 
 
 if __name__ == "__main__":
