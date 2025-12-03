@@ -110,6 +110,57 @@ PURE RECURSIVE SUBROUTINE COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, N)
   END DO
 END SUBROUTINE COMPUTE_CONJUGATE_ELEMENTS
 
+RECURSIVE FUNCTION partition(X, N, low_bound, high_bound) RESULT(pivot_idx)
+  IMPLICIT NONE
+  INTEGER(INT32) :: pivot_idx
+  INTEGER(INT32), INTENT(IN) :: N
+  REAL(REAL64), INTENT(INOUT) :: X(N)
+  INTEGER(INT32), INTENT(IN) :: low_bound, high_bound
+
+  INTEGER(INT32) :: i, j
+  REAL(REAL64) :: pivot, temp
+
+  pivot = X((low_bound + high_bound) / 2)
+  i = low_bound - 1
+  j = high_bound + 1
+
+  DO
+    DO
+      i = i + 1
+      IF (X(i) >= pivot) EXIT
+    END DO
+
+    DO
+      j = j - 1
+      IF (X(j) <= pivot) EXIT
+    END DO
+
+    IF (i >= j) THEN
+      pivot_idx = j
+      RETURN
+    END IF
+
+    temp = X(i)
+    X(i) = X(j)
+    X(j) = temp
+  END DO
+END FUNCTION partition
+
+RECURSIVE SUBROUTINE QSORT(X, N, low_bound, high_bound)
+  IMPLICIT NONE
+  INTEGER(INT32), INTENT(IN) :: N
+  REAL(REAL64), INTENT(INOUT) :: X(N)
+  INTEGER(INT32), INTENT(IN) :: low_bound, high_bound
+
+  INTEGER(INT32) :: pivot_index
+
+  IF (low_bound < high_bound) THEN
+    pivot_index = partition(X, N, low_bound, high_bound)
+    CALL QSORT(X, N, low_bound, pivot_index)
+    CALL QSORT(X, N, pivot_index + 1, high_bound)
+  END IF
+END SUBROUTINE QSORT
+
 !---------------------------------------------------------------------------------------
 !------------------------------ KINETIC TERMS ------------------------------------------
 !---------------------------------------------------------------------------------------

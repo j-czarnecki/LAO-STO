@@ -1200,6 +1200,68 @@ SUBROUTINE test_compute_zeeman()
 END SUBROUTINE test_compute_zeeman
 
 @test
+SUBROUTINE test_compute_zeeman_energies()
+  USE writers
+  COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_zeeman(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  REAL(REAL64) :: Energies(sc_input % discretization % derived % DIM)
+  REAL(REAL64) :: Energies_zeeman(sc_input % discretization % derived % DIM)
+  INTEGER(INT32) :: i, j, ir, jphi
+  INTEGER(INT32) :: n
+  REAL(REAL64) :: spin_sign
+  REAL(REAL64) :: kx, ky, dr, dphi
+
+  INTEGER(INT32) :: nr_points = 3
+  INTEGER(INT32) :: nphi_points = 7
+
+  !Physical variables
+  REAL(REAL64), PARAMETER :: t_D = .5
+  REAL(REAL64), PARAMETER :: t_I = .1
+  REAL(REAL64), PARAMETER :: B(3) = [1, 3, 7]
+  REAL(REAL64), PARAMETER :: g_factor = 6.0
+  INTEGER(INT32), PARAMETER :: n_pi_3_rotations = 6
+
+  dr = 1./nr_points
+  dphi = PI / 2./nphi_points
+
+  DO ir = 0, nr_points
+    DO jphi = -nphi_points, nphi_points
+      kx = ir * dr * COS(jphi * dphi)
+      ky = ir * dr * SIN(jphi * dphi)
+
+      Hamiltonian = CMPLX(0, 0, KIND=REAL64)
+      Energies = 0.0d0
+      CALL COMPUTE_TBA_TERM(Hamiltonian, kx, ky, t_D, t_I, sc_input % discretization)
+      CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM)
+      CALL DIAGONALIZE_HERMITIAN(Hamiltonian, Energies, sc_input % discretization % derived % DIM)
+
+      ! Check energies for rotated
+      Hamiltonian_zeeman = CMPLX(0., 0., KIND=REAL64)
+      Energies_zeeman = 0.0d0
+      CALL COMPUTE_TBA_TERM(Hamiltonian_zeeman, kx, ky, t_D, t_I, sc_input % discretization)
+      CALL COMPUTE_ZEEMAN(B, g_factor, Hamiltonian_zeeman, sc_input % discretization)
+      CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_zeeman, sc_input % discretization % derived % DIM)
+      CALL DIAGONALIZE_HERMITIAN(Hamiltonian_zeeman, Energies_zeeman, sc_input % discretization % derived % DIM)
+
+      ! Now shift no-field energies by Zeeman energy.
+      ! Each Kramer's pair is degenerate without field and then one energy is lifted up,
+      ! and the other lifted down.
+      DO n = 1, sc_input % discretization % derived % DIM
+        spin_sign = (-1)**n
+        ! We can use magnitude of B, as no other magnetic terms are included
+        Energies(n) = Energies(n) + spin_sign * 0.5 * g_factor * muB * NORM2(B)
+      END DO
+      ! Sort again to align with Energies_zeeman layout
+      CALL QSORT(Energies, sc_input % discretization % derived % DIM, 1, sc_input % discretization % derived % DIM)
+
+      DO n = 1, sc_input % discretization % derived % DIM
+        @assertEqual(Energies(n), Energies_zeeman(n), tolerance=1.0e-7, message="Spin-split energies' mismatch")
+      END DO
+    END DO
+  END DO
+END SUBROUTINE test_compute_zeeman_energies
+
+@test
 SUBROUTINE test_compute_orbital_magnetic_coupling()
   USE writers
 
