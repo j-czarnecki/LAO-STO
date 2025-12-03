@@ -51,44 +51,58 @@ SUBROUTINE SET_GAMMA_INITIAL(Gamma_SC, J_nearest_tensor, J_next_tensor, gamma_st
                                      & discretization % derived % LAYER_COUPLINGS, &
                                      & discretization % SUBBANDS)
 
-  INTEGER(INT32) :: spin1, spin2, spin3, spin4
-  LOGICAL :: set_to_nonzero_nearest, set_to_nonzero_next
+  INTEGER(INT32) :: spin1, spin2, spin3, spin4, spin_opposite
+  LOGICAL :: set_to_nonzero_nearest_opposite_spin, set_to_nonzero_next_opposite_spin
+  LOGICAL :: set_to_nonzero_nearest_same_spin, set_to_nonzero_next_same_spin
   REAL(REAL64), PARAMETER :: eps = 1e-9 !! To compare reals
   REAL(REAL64), PARAMETER :: spin_offset_fraction = 0.05
+  REAL(REAL64) :: spin_sign
 
   Gamma_SC = CMPLX(0.0, 0.0, KIND=REAL64)
 
   DO spin1 = 1, SPINS
-    DO spin2 = 1, SPINS
+    spin_opposite = MOD(spin1, SPINS) + 1
+    spin_sign = (-1)**(spin1 + 1)
+    ! Set initial values if we allow certain pairing by energy tensor
+    set_to_nonzero_nearest_opposite_spin = .FALSE.
+    set_to_nonzero_next_opposite_spin = .FALSE.
+    set_to_nonzero_nearest_same_spin = .FALSE.
+    set_to_nonzero_next_same_spin = .FALSE.
 
-      set_to_nonzero_nearest = .FALSE.
-      set_to_nonzero_next = .FALSE.
-
-      DO spin3 = 1, SPINS
-        DO spin4 = 1, SPINS
-          IF (ABS(J_nearest_tensor(spin1, spin2, spin3, spin4)) .GT. eps) set_to_nonzero_nearest = .TRUE.
-          IF (ABS(J_next_tensor(spin1, spin2, spin3, spin4)) .GT. eps) set_to_nonzero_next = .TRUE.
-        END DO
+    DO spin3 = 1, SPINS
+      DO spin4 = 1, SPINS
+        ! Opposite spin
+        IF (ABS(J_nearest_tensor(spin1, spin_opposite, spin3, spin4)) .GT. eps) set_to_nonzero_nearest_opposite_spin = .TRUE.
+        IF (ABS(J_next_tensor(spin1, spin_opposite, spin3, spin4)) .GT. eps) set_to_nonzero_next_opposite_spin = .TRUE.
+        ! Same spin
+        IF (ABS(J_nearest_tensor(spin1, spin1, spin3, spin4)) .GT. eps) set_to_nonzero_nearest_same_spin = .TRUE.
+        IF (ABS(J_next_tensor(spin1, spin1, spin3, spin4)) .GT. eps) set_to_nonzero_next_same_spin = .TRUE.
       END DO
-
-      ! Set initial values if we allow certain pairing by energy tensor
-      IF (set_to_nonzero_nearest) THEN
-        !If opposite spin coupling has been set, then assume spin-singlet and set to minus
-        IF (ABS(Gamma_SC(1, 1, spin2, spin1, 1, 1)) .GT. eps) THEN
-          Gamma_SC(:, :N_NEIGHBOURS, spin1, spin2, :, :) = -(1.0 - spin_offset_fraction) / (1.0 + spin_offset_fraction) * Gamma_SC(1, 1, spin2, spin1, 1, 1)
-        ELSE
-          Gamma_SC(:, :N_NEIGHBOURS, spin1, spin2, :, :) = (1.0 + spin_offset_fraction) * gamma_start_nearest
-        END IF
-      END IF
-      IF (set_to_nonzero_next) THEN
-        IF (ABS(Gamma_SC(1, 4, spin2, spin1, 1, 1)) .GT. eps) THEN
-          Gamma_SC(:, (N_NEIGHBOURS + 1):, spin1, spin2, :, :) = -(1.0 - spin_offset_fraction) / (1.0 + spin_offset_fraction) * Gamma_SC(1, 4, spin2, spin1, 1, 1)
-        ELSE
-          Gamma_SC(:, (N_NEIGHBOURS + 1):, spin1, spin2, :, :) = (1.0 + spin_offset_fraction) * gamma_start_next
-        END IF
-      END IF
-
     END DO
+
+    ! Opposite spin
+    IF (set_to_nonzero_nearest_opposite_spin) THEN
+      IF (ABS(Gamma_SC(1, 1, spin_opposite, spin1, 1, 1)) .GT. eps) THEN
+        Gamma_SC(:, :N_NEIGHBOURS, spin1, spin_opposite, :, :) = -(1.0 - spin_offset_fraction) / (1.0 + spin_offset_fraction) * Gamma_SC(1, 1, spin_opposite, spin1, 1, 1)
+      ELSE
+        Gamma_SC(:, :N_NEIGHBOURS, spin1, spin_opposite, :, :) = (1.0 + spin_offset_fraction) * gamma_start_nearest
+      END IF
+    END IF
+    IF (set_to_nonzero_next_opposite_spin) THEN
+      IF (ABS(Gamma_SC(1, 4, spin_opposite, spin1, 1, 1)) .GT. eps) THEN
+        Gamma_SC(:, (N_NEIGHBOURS + 1):, spin1, spin_opposite, :, :) = -(1.0 - spin_offset_fraction) / (1.0 + spin_offset_fraction) * Gamma_SC(1, 4, spin_opposite, spin1, 1, 1)
+      ELSE
+        Gamma_SC(:, (N_NEIGHBOURS + 1):, spin1, spin_opposite, :, :) = (1.0 + spin_offset_fraction) * gamma_start_next
+      END IF
+    END IF
+
+    ! Same spin
+    IF (set_to_nonzero_nearest_same_spin) THEN
+      Gamma_SC(:, :N_NEIGHBOURS, spin1, spin1, :, :) = (1.0 + spin_sign * spin_offset_fraction) * gamma_start_nearest
+    END IF
+    IF (set_to_nonzero_next_same_spin) THEN
+      Gamma_SC(:, (N_NEIGHBOURS + 1):, spin1, spin1, :, :) = (1.0 + spin_sign * spin_offset_fraction) * gamma_start_next
+    END IF
   END DO
 
   !Printing initial values
