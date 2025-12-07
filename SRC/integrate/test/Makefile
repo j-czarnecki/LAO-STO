@@ -39,7 +39,7 @@ FFLAGS += $(PFUNIT_EXTRA_FFLAGS)
 FFLAGS += $(LIBS)
 FFLAGS += $(INC_DIRS)
 FFLAGS += $(LIBS)
-
+FFLAGS += -g
 local_integrand_test_suite_TESTS := test_local_integrand.pf
 local_integrand_test_suite_REGISTRY :=
 local_integrand_test_suite_OTHER_SOURCES :=

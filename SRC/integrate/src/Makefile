@@ -20,7 +20,7 @@ SRCS := $(SRC_DIR)/integrate/src/local_integrand.f90 \
 OBJS:= $(patsubst $(SRC_DIR)/%.f90,$(OBJ_DIR)/%.o,$(SRCS))
 
 LIBS = -llapack -lblas
-FFLAGS += -fpp -I$(SRC_DIR)/input_output -module $(MOD_DIR)
+FFLAGS += -fpp -g -I$(SRC_DIR)/input_output -module $(MOD_DIR)
 
 .PHONY: all clean libsut.a
 

@@ -103,7 +103,7 @@ SUBROUTINE GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge_dens, 
 END SUBROUTINE GET_LOCAL_CHARGE_AND_DELTA
 
 !dir$ attributes forceinline :: ACCUMULATE_NEAREST_NEIGHBOURS_DELTA
-PURE SUBROUTINE ACCUMULATE_NEAREST_NEIGHBOURS_DELTA(Delta, J_tensor, U, Energies, kx, ky, discretization, T)
+SUBROUTINE ACCUMULATE_NEAREST_NEIGHBOURS_DELTA(Delta, J_tensor, U, Energies, kx, ky, discretization, T)
   !! This subroutine computes integrand
   !! <c_{kl\sigma_1} c_{kl\sigma_2}> * exp(i \vec{k} \vec{\delta_{ij}})
   !! For i,j sites being nearest neighbours.
