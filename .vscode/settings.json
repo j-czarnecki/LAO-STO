@@ -1,0 +1,21 @@
+{
+  "fortran.linter.compiler": "ifx",
+  "fortran.linter.extraArgs": [
+    "-fpp",
+    "-I${workspaceFolder}/SRC/input_output",
+    "-module",
+    "${workspaceFolder}/MOD",
+    "-fsyntax-only"
+  ],
+  "fortran.linter.modOutput": "${workspaceFolder}/MOD",
+  "fortran.provide_hover": true,
+  "fortran.provide_completions": true,
+  "fortran.provide_symbols": true,
+  "fortran.fortls.path": "fortls",
+  "fortran.fortls.disabled": false,
+  "C_Cpp.intelliSenseEngine": "disabled",
+  "files.associations": {
+    "*.f90": "fortran-modern",
+    "*.F90": "fortran-modern"
+  }
+}

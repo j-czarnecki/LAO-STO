@@ -1,0 +1,29 @@
+{
+  "incremental_sync": true,
+  "lowercase_intrinsics": false,
+  "use_signature_help": true,
+  "hover_signature": true,
+  "hover_language": "fortran18",
+  "excl_paths": [
+    "OBJ",
+    "bin"
+  ],
+  "excl_suffixes": [
+    ".o",
+    ".x"
+  ],
+  "source_dirs": [
+    "SRC/**"
+  ],
+  "include_dirs": [
+    "SRC/**"
+  ],
+  "pp_defs": {
+    "DEBUG": ""
+  },
+  "pp_suffixes": [
+    ".F90",
+    ".f90"
+  ],
+  "debug_log": false
+}
