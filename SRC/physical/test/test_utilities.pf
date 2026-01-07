@@ -1,0 +1,131 @@
+MODULE test_utilities
+USE funit
+USE types
+USE utilities
+use, intrinsic :: iso_fortran_env, only: real64, int8, int16, int32, int64
+IMPLICIT NONE
+
+!------------------------------------------------------------------------------
+!-------------------------------- TYPES ---------------------------------------
+!------------------------------------------------------------------------------
+
+TYPE :: entry_check_t
+  INTEGER(INT32) :: i, j !! Indeces of the hamiltonian to check
+  COMPLEX(REAL64) :: elem_value
+END TYPE entry_check_t
+
+!------------------------------------------------------------------------------
+!----------------------------- LOCAL VARIAVBLES -------------------------------
+!------------------------------------------------------------------------------
+
+CONTAINS
+!------------------------------------------------------------------------------
+!---------------------------- SETUP/TEARDOWN ----------------------------------
+!------------------------------------------------------------------------------
+@before
+SUBROUTINE setup()
+
+END SUBROUTINE setup
+
+!------------------------------------------------------------------------------
+!------------------------------- HELPERS --------------------------------------
+!------------------------------------------------------------------------------
+
+!---------------------------------------------------------------------
+!----------------------------- TESTS ---------------------------------
+!---------------------------------------------------------------------
+
+@test
+SUBROUTINE test_matricize_interaction_tensor()
+  IMPLICIT NONE
+  INTEGER(INT32), PARAMETER :: N = 3
+  INTEGER(INT32) :: i, j, k, l
+  REAL(REAL64) :: Tensor(N, N, N, N)
+  REAL(REAL64) :: Matrix(N**2, N**2)
+  INTEGER(INT32) :: Dematricized_indeces(2)
+  INTEGER(INT32) :: counter
+
+  counter = 1
+  DO i = 1, N
+    DO j = 1, N
+      DO k = 1, N
+        DO l = 1, N
+          Tensor(i, j, k, l) = counter
+          counter = counter + 1
+        END DO
+      END DO
+    END DO
+  END DO
+
+  CALL MATRICIZE_INTERACTION_TENSOR(Tensor, N, Matrix)
+
+  @assertEqual(size(Matrix, 1), N**2)
+  @assertEqual(size(Matrix, 2), N**2)
+
+  Dematricized_indeces = get_dematricized_indeces(1, N)
+  @assertEqual(1, Dematricized_indeces(1))
+  @assertEqual(1, Dematricized_indeces(2))
+
+  Dematricized_indeces = get_dematricized_indeces(N + 1, N)
+  @assertEqual(2, Dematricized_indeces(1))
+  @assertEqual(1, Dematricized_indeces(2))
+
+  counter = 1
+  DO i = 1, N**2
+    DO j = 1, N**2
+      @assertEqual(Matrix(i, j), REAL(counter, KIND=REAL64), tolerance=1.0e-7)
+      counter = counter + 1
+    END DO
+  END DO
+
+END SUBROUTINE
+
+@test
+SUBROUTINE test_save_sparse_matrix_in_crs()
+  IMPLICIT NONE
+  INTEGER(INT32), PARAMETER :: N = 5
+  REAL(REAL64) :: Matrix(N, N)
+  REAL(REAL64) :: Values(13)
+  INTEGER(INT32) :: Column_indeces(13)
+  INTEGER(INT32) :: Row_indeces(N + 1)
+  INTEGER(INT32) :: Column_indeces_check(13)
+  INTEGER(INT32) :: Row_indeces_check(N + 1)
+  INTEGER(INT32) :: i, j
+
+  Matrix = TRANSPOSE(RESHAPE([1.0d0, 0.0d0, 2.0d0, 0.0d0, 3.0d0, &
+                              0.0d0, 0.0d0, 4.0d0, 0.0d0, 5.0d0, &
+                              6.0d0, 7.0d0, 8.0d0, 9.0d0, 10.0d0, &
+                              0.0d0, 0.0d0, 11.0d0, 0.0d0, 12.0d0, &
+                              0.0d0, 0.0d0, 0.0d0, 0.0d0, 13.0d0], &
+                             [N, N]))
+
+  Column_indeces_check = [1, 3, 5, 3, 5, 1, 2, 3, 4, 5, 3, 5, 5]
+  Row_indeces_check = [1, 4, 6, 11, 13, 14]
+
+  CALL SAVE_SPARSE_MATRIX_IN_CRS(Matrix, Values, Column_indeces, Row_indeces, 13, N)
+
+  DO i = 1, 13
+    @assertEqual(REAL(i, KIND=REAL64), Values(i), tolerance=1.0e-7)
+    @assertEqual(Column_indeces_check(i), Column_indeces(i))
+  END DO
+  DO i = 1, N + 1
+    @assertEqual(Row_indeces_check(i), Row_indeces(i))
+  END DO
+END SUBROUTINE
+
+@test
+SUBROUTINE test_calculate_number_of_nonzero_elements()
+  IMPLICIT NONE
+  INTEGER(INT32), PARAMETER :: N = 5
+  REAL(REAL64) :: Matrix(N, N)
+  Matrix = TRANSPOSE(RESHAPE([1.0d0, 0.0d0, 2.0d0, 0.0d0, 3.0d0, &
+                              0.0d0, 0.0d0, 4.0d0, 0.0d0, 5.0d0, &
+                              6.0d0, 7.0d0, 8.0d0, 9.0d0, 10.0d0, &
+                              0.0d0, 0.0d0, 11.0d0, 0.0d0, 12.0d0, &
+                              0.0d0, 0.0d0, 0.0d0, 0.0d0, 13.0d0], &
+                             [N, N]))
+
+  @assertEqual(13, calculate_number_of_nonzero_elements(Matrix))
+END SUBROUTINE
+
+END MODULE test_utilities
