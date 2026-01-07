@@ -28,6 +28,7 @@ use, intrinsic :: iso_fortran_env, only: real64, int8, int16, int32, int64
 USE types
 USE parameters
 USE logger
+USE utilities
 IMPLICIT NONE
 SAVE
 PRIVATE
@@ -40,6 +41,7 @@ PUBLIC :: GET_SAFE_GAMMA_SC, GET_GAMMA_SC, GET_SAFE_CHARGE_DENS, GET_CHARGE_DENS
 !Discretization
 INTEGER(INT32) :: k1_steps = 0
 INTEGER(INT32) :: k2_steps = 0
+INTEGER(INT32) :: n_tensor_elems = 0
 INTEGER(INT32) :: SUBLATTICES = 2
 INTEGER(INT32) :: SUBBANDS = 1
 
@@ -63,10 +65,11 @@ INTEGER(INT32) :: orb_affected_tetragonal = 1
 REAL(REAL64) :: v = 0.
 REAL(REAL64) :: V_pdp = 0.
 REAL(REAL64) :: V_pds = 0.
-REAL(REAL64) :: J_SC_tensor(SPINS, SPINS, SPINS, SPINS) = 0.0d0
-REAL(REAL64) :: nearest_interorb_multiplier = 0.0d0
-REAL(REAL64) :: J_SC_NNN_tensor(SPINS, SPINS, SPINS, SPINS) = 0.0d0
-REAL(REAL64) :: next_interorb_multiplier = 0.0d0
+REAL(REAL64), ALLOCATABLE :: J_tensor_values(:)
+INTEGER(INT32), ALLOCATABLE :: i_tensor_idx(:)
+INTEGER(INT32), ALLOCATABLE :: j_tensor_idx(:)
+INTEGER(INT32), ALLOCATABLE :: k_tensor_idx(:)
+INTEGER(INT32), ALLOCATABLE :: l_tensor_idx(:)
 REAL(REAL64) :: U_HUB = 0.
 REAL(REAL64) :: V_HUB = 0.
 REAL(REAL64) :: E_Fermi = 0.
@@ -158,10 +161,11 @@ NAMELIST /physical_params/     &
 & v,                           &
 & V_pdp,                       &
 & V_pds,                       &
-& J_SC_tensor,                 &
-& nearest_interorb_multiplier, &
-& J_SC_NNN_tensor,             &
-& next_interorb_multiplier,    &
+& J_tensor_values,             &
+& i_tensor_idx,                &
+& j_tensor_idx,                &
+& k_tensor_idx,                &
+& l_tensor_idx,                &
 & U_HUB,                       &
 & V_HUB,                       &
 & E_Fermi,                     &
@@ -175,6 +179,7 @@ NAMELIST /physical_params/     &
 NAMELIST /discretization/ &
 & k1_steps,               &
 & k2_steps,               &
+& n_tensor_elems,         &
 & SUBLATTICES,            &
 & SUBBANDS
 
@@ -248,12 +253,15 @@ SUBROUTINE GET_INPUT(nmlfile, sc_input)
   TYPE(sc_input_params_t), INTENT(OUT) :: sc_input !! Structure to be initialized with input parameters
   INTEGER(INT32) :: i, j, k, l
   INTEGER(INT32) :: io_status
+  CHARACTER(500) :: io_msg
+  REAL(REAL64), ALLOCATABLE :: J_tensor(:, :, :, :)
+  REAL(REAL64), ALLOCATABLE :: Matricized_j_tensor(:, :)
 
   OPEN (unit=9, FILE=nmlfile, FORM="FORMATTED", ACTION="READ", STATUS="OLD")
 
-  READ (9, NML=discretization, IOSTAT=io_status)
+  READ (9, NML=discretization, IOSTAT=io_status, IOMSG=io_msg)
   IF (io_status .NE. 0) THEN
-    WRITE (log_string, *) "Error reading discretization ", io_status
+    WRITE (log_string, *) "Error reading discretization ", io_status, TRIM(io_msg)
     LOG_ERROR(log_string)
     STOP "Error reading discretization"
   END IF
@@ -264,22 +272,52 @@ SUBROUTINE GET_INPUT(nmlfile, sc_input)
   IF ((k1_steps .LE. 0) .OR. (k2_steps .LE. 0)) STOP "k_steps must be > 0"
   IF (SUBLATTICES .LE. 0) STOP "SUBLATTICES must be > 0"
   CALL SET_HAMILTONIAN_PARAMS(SUBLATTICES, SUBBANDS, sc_input % discretization)
-  WRITE (log_string, '(7(A, I0))') " SUBLATTICES: ", sc_input % discretization % SUBLATTICES,&
+  WRITE (log_string, '(8(A, I0))') " SUBLATTICES: ", sc_input % discretization % SUBLATTICES,&
                                 & " SUBBANDS: ", sc_input % discretization % SUBBANDS,&
                                 & " ORBITALS: ", sc_input % discretization % ORBITALS, &
                                 & " TBA_DIM: ", sc_input % discretization % derived % TBA_DIM, &
                                 & " DIM_POSITIVE_K: ", sc_input % discretization % derived % DIM_POSITIVE_K, &
                                 & " DIM: ", sc_input % discretization % derived % DIM, &
-                                & " LAYER_COUPLINGS: ", sc_input % discretization % derived % LAYER_COUPLINGS
+                                & " LAYER_COUPLINGS: ", sc_input % discretization % derived % LAYER_COUPLINGS, &
+                                & " n_tensor_elems: ", n_tensor_elems
   LOG_INFO(log_string)
 
   !Write it to sc_input
   sc_input % discretization % k1_steps = k1_steps
   sc_input % discretization % k2_steps = k2_steps
+  sc_input % physical % subband_params % J_tensor % n_nonzero = n_tensor_elems
   sc_input % discretization % derived % dr_k = R_K_MAX / k1_steps
   sc_input % discretization % derived % dphi_k = (PI / 3.0d0) / k2_steps !Slicing every hexagon's triangle into the same number of phi steps
 
   !This is crucial
+  !J tensor
+  ALLOCATE (J_tensor_values(n_tensor_elems))
+  ALLOCATE (i_tensor_idx(n_tensor_elems))
+  ALLOCATE (j_tensor_idx(n_tensor_elems))
+  ALLOCATE (k_tensor_idx(n_tensor_elems))
+  ALLOCATE (l_tensor_idx(n_tensor_elems))
+  J_tensor_values = 0.0d0
+  i_tensor_idx = 0
+  j_tensor_idx = 0
+  k_tensor_idx = 0
+  l_tensor_idx = 0
+
+  ALLOCATE (J_tensor(sc_input % discretization % derived % DIM_POSITIVE_K, &
+    & sc_input % discretization % derived % DIM_POSITIVE_K, &
+    & sc_input % discretization % derived % DIM_POSITIVE_K, &
+    & sc_input % discretization % derived % DIM_POSITIVE_K))
+  ALLOCATE (Matricized_j_tensor(sc_input % discretization % derived % DIM_POSITIVE_K**2, &
+    & sc_input % discretization % derived % DIM_POSITIVE_K**2))
+  ALLOCATE (sc_input % physical % subband_params % J_tensor % Values(n_tensor_elems))
+  ALLOCATE (sc_input % physical % subband_params % J_tensor % Column_indices(n_tensor_elems))
+  ALLOCATE (sc_input % physical % subband_params % J_tensor % Row_indices(sc_input % discretization % derived % DIM_POSITIVE_K**2 + 1))
+  J_tensor = 0.0d0
+  Matricized_j_tensor = 0.0d0
+  sc_input % physical % subband_params % J_tensor % Values = 0.0d0
+  sc_input % physical % subband_params % J_tensor % Column_indices = 0
+  sc_input % physical % subband_params % J_tensor % Row_indices = 0
+
+  !Subband energies
   ALLOCATE (sc_input % physical % subband_params % V_layer(SUBLATTICES))
   ALLOCATE (sc_input % physical % subband_params % Subband_energies(SUBBANDS))
   ALLOCATE (V_layer(SUBLATTICES))
@@ -289,9 +327,9 @@ SUBROUTINE GET_INPUT(nmlfile, sc_input)
 
   !TODO: WRITE BETTER CHECKS!!!!!!!!!!!!!!!!!!
   REWIND (9)
-  READ (9, NML=physical_params, IOSTAT=io_status)
+  READ (9, NML=physical_params, IOSTAT=io_status, IOMSG=io_msg)
   IF (io_status .NE. 0) THEN
-    WRITE (log_string, *) "Error reading physical_params ", io_status
+    WRITE (log_string, *) "Error reading physical_params ", io_status, TRIM(io_msg)
     LOG_ERROR(log_string)
     STOP "Error reading physical_params"
   END IF
@@ -328,10 +366,22 @@ SUBROUTINE GET_INPUT(nmlfile, sc_input)
   WRITE (log_string, '(A, 3E15.5)') "B_field: ", (sc_input % physical % external % B_field(i) / T2au, i=1, 3)
   LOG_INFO(log_string)
 
-  WRITE (log_string, '(A, 16("(",4I3,"):", E15.5, 2X))') 'J_SC_tensor: ', ((((i, j, k, l, J_SC_tensor(i, j, k, l), i=1, SPINS), j=1, SPINS), k=1, SPINS), l=1, SPINS)
-  LOG_INFO(log_string)
+  !TODO: Add printout of J_tensor
+  DO i = 1, n_tensor_elems
+    J_tensor(i_tensor_idx(i), j_tensor_idx(i), k_tensor_idx(i), l_tensor_idx(i)) = J_tensor_values(i)
+  END DO
 
-  WRITE (log_string, '(A, 16("(",4I3,"):", E15.5, 2X))') 'J_SC_NNN_tensor: ', ((((i, j, k, l, J_SC_NNN_tensor(i, j, k, l), i=1, SPINS), j=1, SPINS), k=1, SPINS), l=1, SPINS)
+  CALL MATRICIZE_INTERACTION_TENSOR(J_tensor, sc_input % discretization % derived % DIM_POSITIVE_K, Matricized_j_tensor)
+  CALL SAVE_SPARSE_MATRIX_IN_CRS(Matricized_j_tensor, sc_input % physical % subband_params % J_tensor % Values, &
+    & sc_input % physical % subband_params % J_tensor % Column_indices, sc_input % physical % subband_params % J_tensor % Row_indices,&
+    & n_tensor_elems, sc_input % discretization % derived % DIM_POSITIVE_K**2)
+
+  WRITE (log_string, *) "J_tensor_crs: ", (sc_input % physical % subband_params % J_tensor % Values(i), i=1, n_tensor_elems)
+  LOG_INFO(log_string)
+  WRITE (log_string, *) "J_tensor_crs_column_indices: ", (sc_input % physical % subband_params % J_tensor % Column_indices(i), i=1, n_tensor_elems)
+  LOG_INFO(log_string)
+  WRITE (log_string, *) "J_tensor_crs_row_indices: ", (sc_input % physical % subband_params % J_tensor % Row_indices(i), &
+    & i=1, sc_input % discretization % derived % DIM_POSITIVE_K**2 + 1)
   LOG_INFO(log_string)
 
   !Check input data
@@ -349,10 +399,7 @@ SUBROUTINE GET_INPUT(nmlfile, sc_input)
   sc_input % physical % subband_params % v = v * meV2au
   sc_input % physical % subband_params % V_pdp = V_pdp * meV2au
   sc_input % physical % subband_params % V_pds = V_pds * meV2au
-  sc_input % physical % subband_params % J_SC_tensor = J_SC_tensor * meV2au
-  sc_input % physical % subband_params % nearest_interorb_multiplier = nearest_interorb_multiplier
-  sc_input % physical % subband_params % J_SC_NNN_tensor = J_SC_NNN_tensor * meV2au
-  sc_input % physical % subband_params % next_interorb_multiplier = next_interorb_multiplier
+  sc_input % physical % subband_params % J_tensor % Values = sc_input % physical % subband_params % J_tensor % Values * meV2au
   sc_input % physical % subband_params % U_HUB = U_HUB * meV2au
   sc_input % physical % subband_params % V_HUB = V_HUB * meV2au
   sc_input % physical % subband_params % E_Fermi = E_Fermi * meV2au
@@ -362,9 +409,9 @@ SUBROUTINE GET_INPUT(nmlfile, sc_input)
   sc_input % physical % subband_params % eta_p = sc_input % physical % subband_params % v * SQRT(3.) / 3.905 * nm2au
 
   REWIND (9)
-  READ (9, NML=self_consistency, IOSTAT=io_status)
+  READ (9, NML=self_consistency, IOSTAT=io_status, IOMSG=io_msg)
   IF (io_status .NE. 0) THEN
-    WRITE (log_string, *) "Error reading self_consistency ", io_status
+    WRITE (log_string, *) "Error reading self_consistency ", io_status, TRIM(io_msg)
     LOG_ERROR(log_string)
     STOP "Error reading self_consistency"
   END IF
@@ -408,9 +455,9 @@ SUBROUTINE GET_INPUT(nmlfile, sc_input)
   sc_input % self_consistency % charge_eps_convergence = charge_eps_convergence
 
   REWIND (9)
-  READ (9, NML=romberg_integration, IOSTAT=io_status)
+  READ (9, NML=romberg_integration, IOSTAT=io_status, IOMSG=io_msg)
   IF (io_status .NE. 0) THEN
-    WRITE (log_string, *) "Error reading romberg_integration ", io_status
+    WRITE (log_string, *) "Error reading romberg_integration ", io_status, TRIM(io_msg)
     LOG_ERROR(log_string)
     STOP "Error reading romberg_integration"
   END IF
@@ -440,6 +487,13 @@ SUBROUTINE GET_INPUT(nmlfile, sc_input)
   CLOSE (9)
   DEALLOCATE (V_layer)
   DEALLOCATE (Subband_energies)
+  DEALLOCATE (J_tensor_values)
+  DEALLOCATE (i_tensor_idx)
+  DEALLOCATE (j_tensor_idx)
+  DEALLOCATE (k_tensor_idx)
+  DEALLOCATE (l_tensor_idx)
+  DEALLOCATE (J_tensor)
+  DEALLOCATE (Matricized_j_tensor)
 
 END SUBROUTINE GET_INPUT
 
@@ -569,99 +623,79 @@ SUBROUTINE GET_GAMMA_SC(Gamma_SC, path, discretization)
   !! User should check if the file exists before calling this subroutine
   CHARACTER(LEN=*), INTENT(IN) :: path !! path from which to read Gamma file
   TYPE(discretization_t), INTENT(IN) :: discretization
-  COMPLEX(REAL64), INTENT(OUT) :: Gamma_SC(discretization % ORBITALS, &
-                                      & N_ALL_NEIGHBOURS, &
-                                      & SPINS, &
-                                      & SPINS, &
-                                      & discretization % derived % LAYER_COUPLINGS, &
-                                      & discretization % SUBBANDS) !! Gamma to be filled
+#ifndef BAND_BASIS
+  COMPLEX(REAL64), INTENT(OUT) :: Gamma_SC(N_ALL_NEIGHBOURS + N_NEIGHBOURS, &
+                                        & discretization % derived % DIM_POSITIVE_K, &
+                                        & discretization % derived % DIM_POSITIVE_K, &
+                                        & discretization % SUBBANDS)
+#else
+  COMPLEX(REAL64), INTENT(OUT) :: Gamma_SC(discretization % derived % DIM_POSITIVE_K, &
+                                        & discretization % derived % DIM_POSITIVE_K, &
+                                        & discretization % SUBBANDS)
+#endif
   INTEGER(INT32) :: n, lat, orb, spin1, spin2, band
-  INTEGER(INT32) :: n_read, lat_read, orb_read, spin1_read, spin2_read, band_read
+  INTEGER(INT32) :: n_read, lat1_read, lat2_read, orb1_read, orb2_read, spin1_read, spin2_read, band_read
+  INTEGER(INT32) :: i_band, j_band, i_band_read, j_band_read, neigh_read, neigh
   REAL(REAL64) :: Gamma_re, Gamma_im
   CHARACTER(LEN=20) :: output_format
 
-#ifdef READ_NO_BAND
-  output_format = '(4I5, 2E15.5)'
-#elif defined(READ_NO_TRIPLET)
-  output_format = '(5I5, 2E15.5)'
+#ifndef BAND_BASIS
+  output_format = '(10I5, 2E15.5)'
 #else
-  output_format = '(6I5, 2E15.5)'
+  output_format = '(3I5, 2E15.5)'
 #endif
 
-! Read older versions of simulations
-#if defined(READ_NO_BAND) || defined(READ_NO_TRIPLET)
   OPEN (unit=9, FILE=path, FORM="FORMATTED", ACTION="READ", STATUS="OLD")
-  READ (9, *)
-  DO band = 1, discretization % SUBBANDS
-    DO spin = 1, SPINS
-      DO n = 1, N_NEIGHBOURS
-        DO lat = 1, discretization % derived % LAYER_COUPLINGS
-          DO orb = 1, discretization % ORBITALS
-#ifdef READ_NO_TRIPLET
-            READ (9, output_format) band_read, spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
-            Gamma_SC(orb_read, n_read, spin_read, MOD(spin_read, SPINS) + 1, lat_read, band_read) = CMPLX(Gamma_re, Gamma_im, KIND=REAL64) * meV2au
-#elif defined(READ_NO_BAND)
-            READ (9, output_format) spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
-            Gamma_SC(orb_read, n_read, spin_read, MOD(spin_read, SPINS) + 1, lat_read, band) = CMPLX(Gamma_re, Gamma_im, KIND=REAL64) * meV2au
-#endif
-          END DO
-        END DO
-        READ (9, *)
-        READ (9, *)
+  READ (9, *) !! Skip header
+#ifndef BAND_BASIS
+  DO i_band = 1, discretization % derived % DIM_POSITIVE_K
+    DO j_band = 1, discretization % derived % DIM_POSITIVE_K
+      DO neigh = 1, N_ALL_NEIGHBOURS + N_NEIGHBOURS
+        READ (9, output_format) band_read, i_band_read, j_band_read, &
+                              & orb1_read, orb2_read, lat1_read, lat2_read, spin1_read, spin2_read, &
+                              & neigh_read, Gamma_re, Gamma_im
+        IF (neigh_read .NE. neigh) THEN
+          WRITE (log_string, *) "Error reading Gamma_SC file: neighbour index mismatch"
+          LOG_ERROR(log_string)
+          STOP "Error reading Gamma_SC file: neighbour index mismatch"
+        END IF
+        IF (i_band_read .NE. i_band) THEN
+          WRITE (log_string, *) "Error reading Gamma_SC file: i_band index mismatch"
+          LOG_ERROR(log_string)
+          STOP "Error reading Gamma_SC file: i_band index mismatch"
+        END IF
+        IF (j_band_read .NE. j_band) THEN
+          WRITE (log_string, *) "Error reading Gamma_SC file: j_band index mismatch"
+          LOG_ERROR(log_string)
+          STOP "Error reading Gamma_SC file: j_band index mismatch"
+        END IF
+        Gamma_SC(neigh_read, i_band_read, j_band_read, band_read) = CMPLX(Gamma_re, Gamma_im, KIND=REAL64) * meV2au
       END DO
-      DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
-        DO lat = 1, discretization % SUBLATTICES
-          DO orb = 1, discretization % ORBITALS
-#ifdef READ_NO_TRIPLET
-            READ (9, output_format) band_read, spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
-            Gamma_SC(orb_read, n_read, spin_read, MOD(spin_read, SPINS) + 1, lat_read, band_read) = CMPLX(Gamma_re, Gamma_im, KIND=REAL64) * meV2au
-#elif defined(READ_NO_BAND)
-            READ (9, output_format) spin_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
-            Gamma_SC(orb_read, n_read, spin_read, MOD(spin_read, SPINS) + 1, lat_read, band) = CMPLX(Gamma_re, Gamma_im, KIND=REAL64) * meV2au
-#endif
-          END DO
-        END DO
-        READ (9, *)
-        READ (9, *)
-      END DO
+      READ (9, *) !! Skip separator lines
+      READ (9, *)
     END DO
   END DO
-  CLOSE (9)
-
-! Read newest version of simulation, supporting bands and triplet pairing
 #else
-  OPEN (unit=9, FILE=path, FORM="FORMATTED", ACTION="READ", STATUS="OLD")
-  READ (9, *)
-  DO band = 1, discretization % SUBBANDS
-    DO spin1 = 1, SPINS
-      DO spin2 = 1, SPINS
-        DO n = 1, N_NEIGHBOURS
-          DO lat = 1, discretization % derived % LAYER_COUPLINGS
-            DO orb = 1, discretization % ORBITALS
-              READ (9, output_format) band_read, spin1_read, spin2_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
-              Gamma_SC(orb_read, n_read, spin1_read, spin2_read, lat_read, band_read) = CMPLX(Gamma_re, Gamma_im, KIND=REAL64) * meV2au
-            END DO
-          END DO
-          READ (9, *)
-          READ (9, *)
-        END DO
-        DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
-          DO lat = 1, discretization % SUBLATTICES
-            DO orb = 1, discretization % ORBITALS
-              READ (9, output_format) band_read, spin1_read, spin2_read, n_read, lat_read, orb_read, Gamma_re, Gamma_im
-              Gamma_SC(orb_read, n_read, spin1_read, spin2_read, lat_read, band_read) = CMPLX(Gamma_re, Gamma_im, KIND=REAL64) * meV2au
-            END DO
-          END DO
-          READ (9, *)
-          READ (9, *)
-        END DO
-      END DO
+  DO i_band = 1, discretization % derived % DIM_POSITIVE_K
+    DO j_band = 1, discretization % derived % DIM_POSITIVE_K
+      READ (9, output_format) band_read, i_band_read, j_band_read, Gamma_re, Gamma_im
+      IF (i_band_read .NE. i_band) THEN
+        WRITE (log_string, *) "Error reading Gamma_SC file: i_band index mismatch"
+        LOG_ERROR(log_string)
+        STOP "Error reading Gamma_SC file: i_band index mismatch"
+      END IF
+      IF (j_band_read .NE. j_band) THEN
+        WRITE (log_string, *) "Error reading Gamma_SC file: j_band index mismatch"
+        LOG_ERROR(log_string)
+        STOP "Error reading Gamma_SC file: j_band index mismatch"
+      END IF
+      Gamma_SC(i_band_read, j_band_read, band_read) = CMPLX(Gamma_re, Gamma_im, KIND=REAL64) * meV2au
     END DO
+    READ (9, *) !! Skip separator lines
+    READ (9, *)
   END DO
-  CLOSE (9)
-! End older-newest versioning ifdef
 #endif
-
+  CLOSE (9)
 END SUBROUTINE GET_GAMMA_SC
 
 SUBROUTINE GET_SAFE_CHARGE_DENS(Charge_dens, input_path, discretization)
@@ -692,26 +726,47 @@ SUBROUTINE GET_CHARGE_DENS(Charge_dens, path, discretization)
   CHARACTER(LEN=*), INTENT(IN) :: path !! Path to file
   REAL(REAL64), INTENT(OUT) :: Charge_dens(discretization % derived % DIM_POSITIVE_K, discretization % SUBBANDS) !! Charge density to be filled
   INTEGER(INT32) :: spin, lat, orb, n, band, band_read
+  INTEGER(INT32) :: spin_read, lat_read, orb_read
+  INTEGER(INT32) :: i_band, i_band_read
   CHARACTER(LEN=20) :: output_format
 
-#ifndef READ_OLD
-  output_format = '(4I5, 1E15.5)'
+#ifndef BAND_BASIS
+  output_format = '(5I5, 1E15.5)'
 #else
-  output_format = '(3I5, 1E15.5)'
+  output_format = '(2I5, 1E15.5)'
 #endif
 
   OPEN (unit=9, FILE=path, FORM="FORMATTED", ACTION="READ", STATUS="OLD")
   READ (9, *)
   DO band = 1, discretization % SUBBANDS
-    DO n = 1, discretization % derived % DIM_POSITIVE_K
-#ifndef READ_OLD
-      READ (9, output_format) band_read, spin, lat, orb, Charge_dens(n, band)
+    DO i_band = 1, discretization % derived % DIM_POSITIVE_K
+#ifndef BAND_BASIS
+      READ (9, output_format) band_read, i_band_read, orb_read, lat_read, spin_read, Charge_dens(i_band_read, band_read)
+      IF (band_read .NE. band) THEN
+        WRITE (log_string, *) "Error reading Charge_dens file: band index mismatch"
+        LOG_ERROR(log_string)
+        STOP "Error reading Charge_dens file: band index mismatch"
+      END IF
+      IF (i_band_read .NE. i_band) THEN
+        WRITE (log_string, *) "Error reading Charge_dens file: i_band index mismatch"
+        LOG_ERROR(log_string)
+        STOP "Error reading Charge_dens file: i_band index mismatch"
+      END IF
 #else
-      READ (9, output_format) spin, lat, orb, Charge_dens(n, band)
+      READ (9, output_format) band_read, i_band_read, Charge_dens(i_band_read, band_read)
+      IF (band_read .NE. band) THEN
+        WRITE (log_string, *) "Error reading Charge_dens file: band index mismatch"
+        LOG_ERROR(log_string)
+        STOP "Error reading Charge_dens file: band index mismatch"
+      END IF
+      IF (i_band_read .NE. i_band) THEN
+        WRITE (log_string, *) "Error reading Charge_dens file: i_band index mismatch"
+        LOG_ERROR(log_string)
+        STOP "Error reading Charge_dens file: i_band index mismatch"
+      END IF
 #endif
     END DO
   END DO
-
   CLOSE (9)
 
 END SUBROUTINE GET_CHARGE_DENS

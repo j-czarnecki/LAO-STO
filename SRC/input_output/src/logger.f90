@@ -35,7 +35,7 @@ CHARACTER(LEN=MAX_LOG_LEN) :: log_string
 CONTAINS
 
 RECURSIVE SUBROUTINE INIT_LOGGER(filename)
-  CHARACTER(LEN=*), INTENT(IN) :: filename
+  CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: filename
   INTEGER(INT32) :: i
   CHARACTER(LEN=120) :: license_lines(21)
   license_lines(1) = 'Copyright (C) 2025 Julian Czarnecki'//REPEAT(' ', 120 - 35)
@@ -60,7 +60,7 @@ RECURSIVE SUBROUTINE INIT_LOGGER(filename)
   license_lines(20) = 'https://arxiv.org/abs/2508.05075'//REPEAT(' ', 120 - 30)
   license_lines(21) = REPEAT(' ', 120)
 
-  IF (filename == "") THEN
+  IF (.NOT. PRESENT(filename)) THEN
     OPEN (unit=LOGGER_UNIT, FILE="./log.log", FORM="FORMATTED", ACTION="WRITE")
   ELSE
     OPEN (unit=LOGGER_UNIT, FILE="./"//TRIM(filename)//".log", FORM="FORMATTED", ACTION="WRITE")
@@ -86,9 +86,10 @@ RECURSIVE SUBROUTINE LOG_STRING_DEBUG(logMsg)
   INTEGER(INT32) :: Values(8)
   CALL DATE_AND_TIME(VALUES=Values)
   !Add time printing
-  WRITE (LOGGER_UNIT, '(7(I0, a), a, I0, a, a)') Values(1), '-', Values(2), '-', Values(3), ' ', Values(5), ':', Values(6), ':', Values(7), '.', Values(8), ' ',&
-  &'TID = ', omp_get_thread_num(), ' ',&
-  &'DEBUG: '//TRIM(logMsg)
+  WRITE (LOGGER_UNIT, '(7(I0, a), a, I0, a, a)') Values(1), '-', Values(2), '-', Values(3), ' ', Values(5), ':', &
+    & Values(6), ':', Values(7), '.', Values(8), ' ',&
+    & 'TID = ', omp_get_thread_num(), ' ',&
+    & 'DEBUG: '//TRIM(logMsg)
   FLUSH (LOGGER_UNIT)
 END SUBROUTINE
 
@@ -98,9 +99,10 @@ RECURSIVE SUBROUTINE LOG_STRING_INFO(logMsg)
 
   CALL DATE_AND_TIME(VALUES=Values)
   !Add time printing
-  WRITE (LOGGER_UNIT, '(7(I0, a), a, I0, a, a)') Values(1), '-', Values(2), '-', Values(3), ' ', Values(5), ':', Values(6), ':', Values(7), '.', Values(8), ' ',&
-  &'TID = ', omp_get_thread_num(), ' ',&
-  &"INFO: "//TRIM(logMsg)
+  WRITE (LOGGER_UNIT, '(7(I0, a), a, I0, a, a)') Values(1), '-', Values(2), '-', Values(3), ' ', Values(5), ':', &
+    & Values(6), ':', Values(7), '.', Values(8), ' ',&
+    & 'TID = ', omp_get_thread_num(), ' ',&
+    & "INFO: "//TRIM(logMsg)
   FLUSH (LOGGER_UNIT)
 END SUBROUTINE
 
@@ -110,9 +112,10 @@ RECURSIVE SUBROUTINE LOG_STRING_ABNORMAL(logMsg)
 
   CALL DATE_AND_TIME(VALUES=Values)
   !Add time printing
-  WRITE (LOGGER_UNIT, '(7(I0, a), a, I0, a, a)') Values(1), '-', Values(2), '-', Values(3), ' ', Values(5), ':', Values(6), ':', Values(7), '.', Values(8), ' ',&
-  &'TID = ', omp_get_thread_num(), ' ',&
-  &"ABNORMAL: "//TRIM(logMsg)
+  WRITE (LOGGER_UNIT, '(7(I0, a), a, I0, a, a)') Values(1), '-', Values(2), '-', Values(3), ' ', Values(5), ':', &
+    & Values(6), ':', Values(7), '.', Values(8), ' ',&
+    & 'TID = ', omp_get_thread_num(), ' ',&
+    & "ABNORMAL: "//TRIM(logMsg)
   FLUSH (LOGGER_UNIT)
 
 END SUBROUTINE
@@ -123,9 +126,10 @@ RECURSIVE SUBROUTINE LOG_STRING_ERROR(logMsg)
 
   CALL DATE_AND_TIME(VALUES=Values)
   !Add time printing
-  WRITE (LOGGER_UNIT, '(7(I0, a), a, I0, a, a)') Values(1), '-', Values(2), '-', Values(3), ' ', Values(5), ':', Values(6), ':', Values(7), '.', Values(8), ' ',&
-  &'TID = ', omp_get_thread_num(), ' ',&
-  &"ERROR: "//TRIM(logMsg)
+  WRITE (LOGGER_UNIT, '(7(I0, a), a, I0, a, a)') Values(1), '-', Values(2), '-', Values(3), ' ', Values(5), ':', &
+    & Values(6), ':', Values(7), '.', Values(8), ' ',&
+    & 'TID = ', omp_get_thread_num(), ' ',&
+    & "ERROR: "//TRIM(logMsg)
   FLUSH (LOGGER_UNIT)
 
 END SUBROUTINE

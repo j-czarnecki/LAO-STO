@@ -1,0 +1,213 @@
+!! This file is part of LAO-STO.
+!!
+!! Copyright (C) 2025 Julian Czarnecki
+!!
+!! This program is free software: you can redistribute it and/or modify
+!! it under the terms of the GNU General Public License as published by
+!! the Free Software Foundation, either version 3 of the License, or
+!! (at your option) any later version.
+!!
+!! This program is distributed in the hope that it will be useful,
+!! but WITHOUT ANY WARRANTY; without even the implied warranty of
+!! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!! GNU General Public License for more details.
+!!
+!! You should have received a copy of the GNU General Public License
+!! along with this program.  If not, see <https://www.gnu.org/licenses/>.
+!!
+!! If you use this code for scientific research, please cite:
+!! J. Czarnecki et. al.,
+!! "Superconducting gap symmetry of 2DEG at (111)-oriented LaAlO3/SrTiO3 interface",
+!! arXiv:2508.05075 (2025).
+!! https://arxiv.org/abs/2508.05075
+
+MODULE test_reader
+USE funit
+USE, INTRINSIC :: iso_fortran_env, ONLY: real64, int32
+USE reader
+USE types
+USE parameters
+IMPLICIT NONE
+
+CONTAINS
+
+@test
+SUBROUTINE test_get_input()
+  TYPE(sc_input_params_t) :: sc_input
+  CHARACTER(LEN=*), PARAMETER :: test_nml = "OutputData/test_get_input.nml"
+  REAL(REAL64), PARAMETER :: tol = 1.0d-6
+
+  CALL GET_INPUT(test_nml, sc_input)
+
+  ! Discretization
+  @assertEqual(2, sc_input % discretization % k1_steps)
+  @assertEqual(2, sc_input % discretization % k2_steps)
+  @assertEqual(2, sc_input % discretization % SUBLATTICES)
+  @assertEqual(1, sc_input % discretization % SUBBANDS)
+  @assertEqual(3, sc_input % discretization % ORBITALS)
+  @assertEqual(6, sc_input % discretization % derived % TBA_DIM)
+  @assertEqual(12, sc_input % discretization % derived % DIM_POSITIVE_K)
+  @assertEqual(24, sc_input % discretization % derived % DIM)
+  @assertEqual(2, sc_input % discretization % derived % LAYER_COUPLINGS)
+  @assertEqual(4, sc_input % physical % subband_params % J_tensor % n_nonzero)
+
+  ! Physical params (in atomic units)
+  @assertEqual(0.1, sc_input % physical % external % T, tol)
+  @assertEqual(100.0 * meV2au, sc_input % physical % subband_params % t_D, tol)
+  @assertEqual(10.0 * meV2au, sc_input % physical % subband_params % t_I, tol)
+  @assertEqual(1.0 * meV2au, sc_input % physical % subband_params % t_Rashba, tol)
+  @assertEqual(5.0 * meV2au, sc_input % physical % subband_params % lambda_SOC, tol)
+  @assertEqual(-5.0 * meV2au, sc_input % physical % subband_params % delta_trigonal, tol)
+  @assertEqual(2.5 * meV2au, sc_input % physical % subband_params % zeta_tetragonal, tol)
+  @assertEqual(2, sc_input % physical % subband_params % orb_affected_tetragonal)
+  @assertEqual(50.0 * meV2au, sc_input % physical % subband_params % v, tol)
+  @assertEqual(10.0 * meV2au, sc_input % physical % subband_params % V_pdp, tol)
+  @assertEqual(-20.0 * meV2au, sc_input % physical % subband_params % V_pds, tol)
+  @assertEqual(15.0 * meV2au, sc_input % physical % subband_params % U_HUB, tol)
+  @assertEqual(7.5 * meV2au, sc_input % physical % subband_params % V_HUB, tol)
+  @assertEqual(-50.0 * meV2au, sc_input % physical % subband_params % E_Fermi, tol)
+  @assertEqual(100.0 * meV2au, sc_input % physical % subband_params % V_layer(1), tol)
+  @assertEqual(200.0 * meV2au, sc_input % physical % subband_params % V_layer(2), tol)
+  @assertEqual(25.0 * meV2au, sc_input % physical % subband_params % Subband_energies(1), tol)
+  @assertEqual(2.0, sc_input % physical % subband_params % g_factor, tol)
+
+  ! J_tensor in CRS format
+  @assertEqual(4, sc_input % physical % subband_params % J_tensor % n_nonzero)
+  @assertEqual(1.0 * meV2au, sc_input % physical % subband_params % J_tensor % Values(1), tol)
+  @assertEqual(2.0 * meV2au, sc_input % physical % subband_params % J_tensor % Values(2), tol)
+  @assertEqual(3.0 * meV2au, sc_input % physical % subband_params % J_tensor % Values(3), tol)
+  @assertEqual(4.0 * meV2au, sc_input % physical % subband_params % J_tensor % Values(4), tol)
+  @assertEqual(1, sc_input % physical % subband_params % J_tensor % Column_indices(1))
+  @assertEqual(14, sc_input % physical % subband_params % J_tensor % Column_indices(2))
+  @assertEqual(27, sc_input % physical % subband_params % J_tensor % Column_indices(3))
+  @assertEqual(40, sc_input % physical % subband_params % J_tensor % Column_indices(4))
+
+  ! Self-consistency
+  @assertFalse(sc_input % self_consistency % read_gamma_from_file)
+  @assertFalse(sc_input % self_consistency % read_charge_from_file)
+  @assertEqual(0.5 * meV2au, sc_input % self_consistency % gamma_start, tol)
+  @assertEqual(0.5 * meV2au, sc_input % self_consistency % gamma_nnn_start, tol)
+  @assertEqual(0.05, sc_input % self_consistency % charge_start, tol)
+  @assertEqual(2, sc_input % self_consistency % max_sc_iter)
+  @assertEqual(0.1, sc_input % self_consistency % sc_alpha, tol)
+  @assertEqual(0.5, sc_input % self_consistency % sc_alpha_adapt, tol)
+  @assertEqual(0.001 * meV2au, sc_input % self_consistency % gamma_eps_convergence, tol)
+  @assertEqual(0.001, sc_input % self_consistency % charge_eps_convergence, tol)
+
+  ! Romberg integration
+  @assertEqual(1e-2, sc_input % romberg % romb_eps_x, tol)
+  @assertEqual(2, sc_input % romberg % interpolation_deg_x)
+  @assertEqual(2, sc_input % romberg % max_grid_refinements_x)
+  @assertEqual(1e-2, sc_input % romberg % romb_eps_y, tol)
+  @assertEqual(2, sc_input % romberg % interpolation_deg_y)
+  @assertEqual(2, sc_input % romberg % max_grid_refinements_y)
+END SUBROUTINE test_get_input
+
+@test
+SUBROUTINE test_get_postprocessing_input()
+  TYPE(post_input_params_t) :: post_input
+  CHARACTER(LEN=*), PARAMETER :: test_nml = "OutputData/test_get_postprocessing_input.nml"
+  REAL(REAL64), PARAMETER :: tol = 1.0d-10
+
+  CALL GET_POSTPROCESSING_INPUT(test_nml, post_input)
+
+  ! SC gap calculation
+  @assertTrue(post_input % sc_gap % enable)
+  @assertEqual('/test/path/sc_gap/', TRIM(post_input % sc_gap % path))
+  @assertEqual(0.5 * meV2au, post_input % sc_gap % dE, tol)
+  @assertEqual(15, post_input % sc_gap % Nk_points)
+  @assertEqual(30, post_input % sc_gap % Nk_points_refined)
+
+  ! Chern number calculation
+  @assertTrue(post_input % chern % enable)
+  @assertEqual('/test/path/chern/', TRIM(post_input % chern % path))
+  @assertEqual(25, post_input % chern % Nk_points)
+
+  ! Dispersion relation calculation
+  @assertTrue(post_input % dispersion % enable)
+  @assertEqual('/test/path/dispersion/', TRIM(post_input % dispersion % path))
+  @assertTrue(post_input % dispersion % include_sc)
+  @assertEqual(20, post_input % dispersion % Nr_points)
+  @assertEqual(18, post_input % dispersion % Nphi_points)
+
+  ! DOS calculation
+  @assertTrue(post_input % dos % enable)
+  @assertEqual('/test/path/dos/', TRIM(post_input % dos % path))
+  @assertEqual(-15.0 * meV2au, post_input % dos % E_min, tol)
+  @assertEqual(15.0 * meV2au, post_input % dos % E_max, tol)
+  @assertEqual(0.2 * meV2au, post_input % dos % dE0, tol)
+  @assertEqual(0.05 * meV2au, post_input % dos % zeta_DOS, tol)
+  @assertTrue(post_input % dos % include_sc)
+  @assertEqual(12, post_input % dos % Nk_points)
+  @assertEqual(24, post_input % dos % Nk_points_refined)
+
+  ! Gamma_k calculation
+  @assertTrue(post_input % gamma_k % enable)
+  @assertEqual('/test/path/gamma_k/', TRIM(post_input % gamma_k % path))
+  @assertEqual(16, post_input % gamma_k % Nk_points)
+
+  ! Projections calculation
+  @assertTrue(post_input % projections % enable)
+  @assertEqual('/test/path/projections/', TRIM(post_input % projections % path))
+  @assertEqual(14, post_input % projections % Nr_points)
+  @assertEqual(22, post_input % projections % Nphi_points)
+END SUBROUTINE test_get_postprocessing_input
+
+@test
+SUBROUTINE test_get_gamma_sc()
+  TYPE(discretization_t) :: discretization
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:,:,:,:)
+  INTEGER(INT32) :: i_band, j_band, neigh, band
+  REAL(REAL64) :: expected_re, expected_im, idx
+  REAL(REAL64), PARAMETER :: tol = 1.0d-10
+  CHARACTER(LEN=*), PARAMETER :: test_path = "OutputData/Gamma_SC_final.tdat"
+
+  CALL SET_HAMILTONIAN_PARAMS(2, 1, discretization)
+  ALLOCATE(Gamma_SC(N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS, discretization % derived % DIM_POSITIVE_K, &
+                    discretization % derived % DIM_POSITIVE_K, discretization % SUBBANDS))
+
+  CALL GET_GAMMA_SC(Gamma_SC, test_path, discretization)
+
+  idx = 1.0d0
+  DO band = 1, discretization % SUBBANDS
+    DO i_band = 1, discretization % derived % DIM_POSITIVE_K
+      DO j_band = 1, discretization % derived % DIM_POSITIVE_K
+        DO neigh = 1, N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS
+          expected_re = idx * meV2au
+          expected_im = (idx + 0.1d0) * meV2au
+          @assertEqual(expected_re, REAL(Gamma_SC(neigh, i_band, j_band, band)), tol)
+          @assertEqual(expected_im, AIMAG(Gamma_SC(neigh, i_band, j_band, band)), tol)
+          idx = idx + 1.0d0
+        END DO
+      END DO
+    END DO
+  END DO
+
+  DEALLOCATE(Gamma_SC)
+END SUBROUTINE test_get_gamma_sc
+
+@test
+SUBROUTINE test_get_charge_dens()
+  TYPE(discretization_t) :: discretization
+  REAL(REAL64), ALLOCATABLE :: Charge_dens(:, :)
+  INTEGER(INT32) :: n, band
+  REAL(REAL64) :: expected
+  REAL(REAL64), PARAMETER :: tol = 1.0d-10
+  CHARACTER(LEN=*), PARAMETER :: test_path = "OutputData/Charge_dens_final.tdat"
+
+  CALL SET_HAMILTONIAN_PARAMS(2, 1, discretization)
+  ALLOCATE (Charge_dens(discretization % derived % DIM_POSITIVE_K, discretization % SUBBANDS))
+
+  CALL GET_CHARGE_DENS(Charge_dens, test_path, discretization)
+
+  DO band = 1, discretization % SUBBANDS
+    DO n = 1, discretization % derived % DIM_POSITIVE_K
+      expected = REAL(n, REAL64)
+      @assertEqual(expected, Charge_dens(n, band), tol)
+    END DO
+  END DO
+
+  DEALLOCATE (Charge_dens)
+END SUBROUTINE test_get_charge_dens
+
+END MODULE test_reader
