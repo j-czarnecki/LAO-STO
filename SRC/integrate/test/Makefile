@@ -5,13 +5,14 @@ BUILD_DIR := build
 
 .PHONY: all run clean tidy
 
-all: local_integrand_test_suite tidy
+all: local_integrand_test_suite integrate_test_suite tidy
 
 run:
 	./local_integrand_test_suite
+	./integrate_test_suite
 
 clean:
-	$(RM) -rf $(BUILD_DIR) local_integrand_test_suite OutputData/*.dat
+	$(RM) -rf $(BUILD_DIR) local_integrand_test_suite integrate_test_suite OutputData/*.dat
 
 tidy:
 	@echo "Tidying up build artifacts..."
@@ -39,7 +40,7 @@ FFLAGS += $(PFUNIT_EXTRA_FFLAGS)
 FFLAGS += $(LIBS)
 FFLAGS += $(INC_DIRS)
 FFLAGS += $(LIBS)
-FFLAGS += -g
+FFLAGS += -g -O0
 local_integrand_test_suite_TESTS := test_local_integrand.pf
 local_integrand_test_suite_REGISTRY :=
 local_integrand_test_suite_OTHER_SOURCES :=
@@ -47,3 +48,11 @@ local_integrand_test_suite_OTHER_LIBRARIES := -L$(SUT_LIB_DIR) -lsut $(LIBS)
 local_integrand_test_suite_OTHER_INCS := $(INC_DIRS)
 
 $(eval $(call make_pfunit_test,local_integrand_test_suite))
+
+integrate_test_suite_TESTS := test_integrate.pf
+integrate_test_suite_REGISTRY :=
+integrate_test_suite_OTHER_SOURCES :=
+integrate_test_suite_OTHER_LIBRARIES := -L$(SUT_LIB_DIR) -lsut $(LIBS)
+integrate_test_suite_OTHER_INCS := $(INC_DIRS)
+
+$(eval $(call make_pfunit_test,integrate_test_suite))

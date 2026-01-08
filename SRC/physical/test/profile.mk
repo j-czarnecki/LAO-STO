@@ -17,8 +17,8 @@ SRCS := $(SRC_DIR)/physical/src/hamiltonians.f90 \
 
 OBJS:= $(patsubst $(SRC_DIR)/%.f90,$(OBJ_DIR)/%.o,$(SRCS))
 
-LIBS = -llapack -lblas
-FFLAGS += -fpp -I$(SRC_DIR)/input_output -module $(MOD_DIR)
+LIBS = -qmkl
+FFLAGS += -qmkl -fpp -I$(SRC_DIR)/input_output -module $(MOD_DIR)
 OPT_FLAGS := -O3 -ipo -qopt-report
 FFLAGS += $(OPT_FLAGS)
 

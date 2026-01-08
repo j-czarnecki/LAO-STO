@@ -25,7 +25,6 @@ MODULE hamiltonians
 use, intrinsic :: iso_fortran_env, only: real64, int8, int16, int32, int64
 USE utilities
 USE parameters
-USE reader
 USE types
 IMPLICIT NONE
 CONTAINS
@@ -438,10 +437,12 @@ PURE RECURSIVE SUBROUTINE COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC, discretizati
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
   COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM) !! Hamiltonian of the system that is to be filled
-  COMPLEX(REAL64), INTENT(IN) :: Gamma_SC(discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, discretization % derived % LAYER_COUPLINGS) !! Superconducting energies
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_SC(N_ALL_NEIGHBOURS + N_NEIGHBOURS, &
+                                        & discretization % derived % DIM_POSITIVE_K, &
+                                        & discretization % derived % DIM_POSITIVE_K) !! Superconducting energies
   REAL(REAL64), INTENT(IN) :: kx !! Wavevector in X direction
   REAL(REAL64), INTENT(IN) :: ky !! Wavevector in Y direction
-  INTEGER(INT32) :: orb, lat, spin1, spin2, row, col, gamma_lat_index
+  INTEGER(INT32) :: orb, lat, spin1, spin2, row, col, col_gamma, gamma_lat_index
   INTEGER(INT32) :: spin1_block, spin2_block, spin1_idx, spin2_idx
   INTEGER(INT32) :: current_lat_block, next_lat_block, lat_idx
   INTEGER(INT32) :: neigh
@@ -467,17 +468,19 @@ PURE RECURSIVE SUBROUTINE COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC, discretizati
           !Ti1 - Ti2 coupling
           gamma_lat_index = 2 * lat + 2
           row = spin1_block + current_lat_block + orb
-          col = discretization % derived % DIM_POSITIVE_K + spin2_block + next_lat_block + orb
+          col_gamma = spin2_block + next_lat_block + orb
+          col = col_gamma + discretization % derived % DIM_POSITIVE_K
           DO neigh = 1, N_NEIGHBOURS
-            Hamiltonian(row, col) = Hamiltonian(row, col) + Gamma_SC(orb, neigh, spin1_idx, spin2_idx, gamma_lat_index) * Pairings_nearest(neigh)
+            Hamiltonian(row, col) = Hamiltonian(row, col) + Gamma_SC(neigh, row, col_gamma) * Pairings_nearest(neigh)
           END DO
 
           !Ti2 - Ti1 coupling
           gamma_lat_index = 2 * lat + 1
           row = spin1_block + next_lat_block + orb
-          col = discretization % derived % DIM_POSITIVE_K + spin2_block + current_lat_block + orb
-          DO neigh = 1, N_NEIGHBOURS
-            Hamiltonian(row, col) = Hamiltonian(row, col) + Gamma_SC(orb, neigh, spin1_idx, spin2_idx, gamma_lat_index) * Pairings_nearest(N_NEIGHBOURS + neigh)
+          col_gamma = spin2_block + current_lat_block + orb
+          col = col_gamma + discretization % derived % DIM_POSITIVE_K
+          DO neigh = N_NEIGHBOURS + 1, N_NEAREST_NEIGHBOURS
+            Hamiltonian(row, col) = Hamiltonian(row, col) + Gamma_SC(neigh, row, col_gamma) * Pairings_nearest(neigh)
           END DO
         END DO
       END DO
@@ -496,10 +499,10 @@ PURE RECURSIVE SUBROUTINE COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC, discretizati
           spin2_block = spin2 * discretization % derived % TBA_DIM
           spin2_idx = spin2 + 1
           row = spin1_block + current_lat_block + orb
-          col = discretization % derived % DIM_POSITIVE_K + spin2_block + current_lat_block + orb
-
+          col_gamma = spin2_block + current_lat_block + orb
+          col = col_gamma + discretization % derived % DIM_POSITIVE_K
           DO neigh = 1, N_NEXT_NEIGHBOURS
-            Hamiltonian(row, col) = Hamiltonian(row, col) + Gamma_SC(orb, N_NEIGHBOURS + neigh, spin1_idx, spin2_idx, lat_idx) * Pairings_next(neigh)
+            Hamiltonian(row, col) = Hamiltonian(row, col) + Gamma_SC(N_NEAREST_NEIGHBOURS + neigh, row, col_gamma) * Pairings_next(neigh)
           END DO
         END DO
       END DO
@@ -507,6 +510,31 @@ PURE RECURSIVE SUBROUTINE COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC, discretizati
   END DO
 
 END SUBROUTINE COMPUTE_SC
+
+PURE RECURSIVE SUBROUTINE COMPUTE_SC_BAND(Hamiltonian, kx, ky, Gamma_SC, discretization)
+    !! Computes the superconducting coupling at given (kx,ky) point
+  IMPLICIT NONE
+  TYPE(discretization_t), INTENT(IN) :: discretization
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM) !! Hamiltonian of the system that is to be filled
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_SC(discretization % derived % DIM_POSITIVE_K, &
+                                        & discretization % derived % DIM_POSITIVE_K) !! Superconducting energies
+  REAL(REAL64), INTENT(IN) :: kx !! Wavevector in X direction
+  REAL(REAL64), INTENT(IN) :: ky !! Wavevector in Y direction
+  INTEGER(INT32) :: orb, lat, spin1, spin2, row, col, col_gamma, gamma_lat_index
+  INTEGER(INT32) :: spin1_block, spin2_block, spin1_idx, spin2_idx
+  INTEGER(INT32) :: current_lat_block, next_lat_block, lat_idx
+
+  INTEGER(INT32) :: i, j
+
+  DO j = 1, discretization % derived % DIM_POSITIVE_K
+    col = j + discretization % derived % DIM_POSITIVE_K
+    DO i = 1, discretization % derived % DIM_POSITIVE_K
+      !TODO: Possibly it should be multiplied by k-space form factor
+      Hamiltonian(i, col) = Hamiltonian(i, col) + Gamma_SC(i, j)
+    END DO
+  END DO
+
+END SUBROUTINE COMPUTE_SC_BAND
 
 PURE RECURSIVE SUBROUTINE COMPUTE_HUBBARD(Hamiltonian, Charge_dens, U_HUB, V_HUB, discretization)
   IMPLICIT NONE

@@ -42,9 +42,14 @@ IMPLICIT NONE
 
 COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian(:, :), Hamiltonian_const(:, :), Hamiltonian_const_band(:, :), U_transformation(:, :)
 REAL(REAL64), ALLOCATABLE :: Energies(:)
-COMPLEX(REAL64), ALLOCATABLE :: Delta_local(:, :, :, :, :, :), Delta_new(:, :, :, :, :, :)
+#ifndef BAND_BASIS
+COMPLEX(REAL64), ALLOCATABLE :: Delta_local(:, :, :, :), Delta_new(:, :, :, :)
+COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :, :), Gamma_SC_new(:, :, :, :)
+#else
+COMPLEX(REAL64), ALLOCATABLE :: Delta_local(:, :, :), Delta_new(:, :, :)
+COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :), Gamma_SC_new(:, :, :)
+#endif
 REAL(REAL64), ALLOCATABLE :: Delta_broyden(:), Delta_new_broyden(:)
-COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :), Gamma_SC_new(:, :, :, :, :, :)
 REAL(REAL64), ALLOCATABLE :: Charge_dens(:, :), Charge_dens_new(:, :), Charge_dens_local(:, :)
 
 TYPE(sc_input_params_t) :: sc_input
@@ -65,7 +70,7 @@ INTEGER(INT32) :: max_num_threads
 
 max_num_threads = omp_get_max_threads()
 
-CALL INIT_LOGGER("")
+CALL INIT_LOGGER()
 WRITE (log_string, *) "Max num threads", max_num_threads
 LOG_INFO(log_string)
 
@@ -77,13 +82,6 @@ ASSOCIATE (SUBLATTICES => sc_input % discretization % SUBLATTICES, &
          & DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
          & DIM => sc_input % discretization % derived % DIM, &
          & LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS)
-  !N_NEIGHBOURS + N_NEXT_NEIGHBOURS = 9, to implement both pairings
-  !2 because spin up-down and down-up,
-  !2 because of complex number
-  !LAYER_COUPLINGS because of Ti1-Ti2 coupling and Ti2 - Ti1 coupling (stored in this order) for nearest-neighbours
-  !DIM_POSITIVE_K included due to Charge density self-consistency
-  delta_real_elems = SUBBANDS * (DIM_POSITIVE_K + ORBITALS * SPINS * SPINS * 2 * (N_NEIGHBOURS * LAYER_COUPLINGS + N_NEXT_NEIGHBOURS * SUBLATTICES))
-
   !Basis
   !c_{k,yz,Ti1,up}, c_{k,zx,Ti1,up}, c_{k,xy,Ti1,up},
   !c_{k,yz,Ti2,up}, c_{k,zx,Ti2,up}, c_{k,xy,Ti2,up},
@@ -95,15 +93,24 @@ ASSOCIATE (SUBLATTICES => sc_input % discretization % SUBLATTICES, &
   ALLOCATE (Hamiltonian_const_band(DIM, DIM))
   ALLOCATE (U_transformation(DIM, DIM))
   ALLOCATE (Energies(DIM))
-  ALLOCATE (Delta_local(ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, LAYER_COUPLINGS, SUBBANDS))
+#ifndef BAND_BASIS
+  ALLOCATE (Delta_local(N_ALL_NEIGHBOURS + N_NEIGHBOURS, DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+  ALLOCATE (Delta_new(N_ALL_NEIGHBOURS + N_NEIGHBOURS, DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+  ALLOCATE (Gamma_SC(N_ALL_NEIGHBOURS + N_NEIGHBOURS, DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+  ALLOCATE (Gamma_SC_new(N_ALL_NEIGHBOURS + N_NEIGHBOURS, DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+#else
+  ALLOCATE (Delta_local(DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+  ALLOCATE (Delta_new(DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+  ALLOCATE (Gamma_SC(DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+  ALLOCATE (Gamma_SC_new(DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+#endif
   !Fourth dimension for coupling between sublattices/layers
   !Coupling with nearest neighbours is inter-layer, thus we include both
   !Ti1 - Ti2 coupling and Ti2 - Ti1 coupling separately.
   !For next-to-nearest neighbours we only include Ti1-Ti1 etc. coupling
   !Due to its intra-layer character
-  ALLOCATE (Delta_new(ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, LAYER_COUPLINGS, SUBBANDS))
-  ALLOCATE (Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, LAYER_COUPLINGS, SUBBANDS))
-  ALLOCATE (Gamma_SC_new(ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, LAYER_COUPLINGS, SUBBANDS))
+  delta_real_elems = 2 * size(Gamma_SC) + DIM_POSITIVE_K
+
   ALLOCATE (Delta_broyden(delta_real_elems))   !Flattened Gamma array
   ALLOCATE (Delta_new_broyden(delta_real_elems))
   ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
@@ -128,9 +135,10 @@ ASSOCIATE (sc => sc_input % self_consistency, &
     CALL GET_GAMMA_SC(Gamma_SC, TRIM(sc % path_to_gamma_start), sc_input % discretization)
   ELSE
     LOG_INFO("Initializing Gamma_SC")
+    Gamma_SC = CMPLX(0., 0., KIND=REAL64)
+    ! TODO: Think about different initialization techniques I can use here.
     CALL SET_GAMMA_INITIAL(Gamma_SC, &
-                          & sb % J_SC_tensor, &
-                          & sb % J_SC_NNN_tensor, &
+                          & sb % J_tensor, &
                           & sc % gamma_start, &
                           & sc % gamma_nnn_start, &
                           & sc_input % discretization)
@@ -177,13 +185,22 @@ DO sc_iter = 1, sc_input % self_consistency % max_sc_iter
           ! WRITE(log_string, *) 'Integrating over chunk: ', i, j
           ! LOG_INFO(log_string)
           phi_k_min = n_triangle * (PI / 3.0d0) + j_phi * sc_input % discretization % derived % dphi_k
-          CALL ROMBERG_Y(Hamiltonian_const_band, Gamma_SC(:, :, :, :, :, band), Charge_dens(:, band), &
+#ifndef BAND_BASIS
+          CALL ROMBERG_Y(Hamiltonian_const_band, Gamma_SC(:, :, :, band), Charge_dens(:, band), &
           & i_r, sc_input % discretization % k1_steps, phi_k_min, phi_k_min + sc_input % discretization % derived % dphi_k, &
-          & Delta_local(:, :, :, :, :, band), Charge_dens_local(:, band), sc_input)
-
+          & Delta_local(:, :, :, band), Charge_dens_local(:, band), sc_input)
+#else
+          CALL ROMBERG_Y(Hamiltonian_const_band, Gamma_SC(:, :, band), Charge_dens(:, band), &
+          & i_r, sc_input % discretization % k1_steps, phi_k_min, phi_k_min + sc_input % discretization % derived % dphi_k, &
+          & Delta_local(:, :, band), Charge_dens_local(:, band), sc_input)
+#endif
           !This has to be atomic operations, since Delta_new and Charge_dens would be global variables for all threads
           !$omp critical (update_delta_and_charge)
-          Delta_new(:, :, :, :, :, band) = Delta_new(:, :, :, :, :, band) + Delta_local(:, :, :, :, :, band)
+#ifndef BAND_BASIS
+          Delta_new(:, :, :, band) = Delta_new(:, :, :, band) + Delta_local(:, :, :, band)
+#else
+          Delta_new(:, :, band) = Delta_new(:, :, band) + Delta_local(:, :, band)
+#endif
           Charge_dens_new(:, band) = Charge_dens_new(:, band) + Charge_dens_local(:, band)
           !$omp end critical (update_delta_and_charge)
         END DO
@@ -197,10 +214,13 @@ DO sc_iter = 1, sc_input % self_consistency % max_sc_iter
   !#########################################################################################################################
   !This is a critical section - only one thread can execute that and all thread should have ended their job up to that point
   !#########################################################################################################################
+  !TODO: Check, because probably this is not needed anymor
+  !CALL GET_GAMMAS_FROM_DELTAS(Gamma_SC_new, Delta_new, sc_input % discretization, sc_input % physical % subband_params % nearest_interorb_multiplier, sc_input % physical % subband_params % next_interorb_multiplier)
+  Gamma_SC_new = Delta_new
+  CALL PRINT_GAMMA(Gamma_SC_new, "Gamma_SC_new", sc_input % discretization)
 
-  CALL GET_GAMMAS_FROM_DELTAS(Gamma_SC_new, Delta_new, sc_input % discretization, sc_input % physical % subband_params % nearest_interorb_multiplier, sc_input % physical % subband_params % next_interorb_multiplier)
   CALL CHECK_CONVERGENCE(sc_flag, Gamma_SC, Gamma_SC_new, Charge_dens, Charge_dens_new, &
-  & gamma_max_error_prev, gamma_max_error, charge_max_error_prev, charge_max_error, sc_iter, sc_input % self_consistency, sc_input % discretization)
+    & gamma_max_error_prev, gamma_max_error, charge_max_error_prev, charge_max_error, sc_iter, sc_input % self_consistency, sc_input % discretization)
 
   IF (sc_flag) THEN
     LOG_INFO("Convergence reached!")

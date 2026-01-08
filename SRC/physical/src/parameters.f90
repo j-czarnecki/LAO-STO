@@ -33,6 +33,7 @@ COMPLEX(REAL64), PARAMETER :: c_one = (1.0d0, 0.0d0)
 
 !Constants for hexagonal lattice and looping
 INTEGER(INT32), PARAMETER :: N_NEIGHBOURS = 3
+INTEGER(INT32), PARAMETER :: N_NEAREST_NEIGHBOURS = 6 !! Number of nearest neighbours in elementary cell
 INTEGER(INT32), PARAMETER :: N_NEXT_NEIGHBOURS = 6
 INTEGER(INT32), PARAMETER :: N_ALL_NEIGHBOURS = N_NEIGHBOURS + N_NEXT_NEIGHBOURS
 INTEGER(INT32), PARAMETER :: SPINS = 2
@@ -53,9 +54,12 @@ REAL(REAL64), PARAMETER :: A_TILDE = SQRT(2./3.) * 0.3905 * nm2au !length
 ! Integration constants
 REAL(REAL64), PARAMETER :: K1_MAX = 1. !Full Brillouin zone to integrate over
 REAL(REAL64), PARAMETER :: K2_MAX = 1.
-REAL(REAL64), PARAMETER :: KX_MAX = 4.0d0 * PI / (3.0d0 * SQRT(3.0d0)) !This defines maximum kx of hexagon corresponding to the first Brillouin Zone
-REAL(REAL64), PARAMETER :: KY_MAX = 2.0d0 * PI / 3.0d0 !This defines maximum ky of hexagon corresponding to the first Brillouin Zone
-REAL(REAL64), PARAMETER :: R_K_MAX = 4.0d0 * PI / (3.0d0 * SQRT(3.0d0)) !This defines the radius of circle that the first Brillouin Zone hexagon is inscribed in.
+REAL(REAL64), PARAMETER :: KX_MAX = 4.0d0 * PI / (3.0d0 * SQRT(3.0d0)) ! This defines maximum kx of hexagon
+                                                                       ! corresponding to the first Brillouin Zone
+REAL(REAL64), PARAMETER :: KY_MAX = 2.0d0 * PI / 3.0d0 ! This defines maximum ky of hexagon
+                                                       ! corresponding to the first Brillouin Zone
+REAL(REAL64), PARAMETER :: R_K_MAX = 4.0d0 * PI / (3.0d0 * SQRT(3.0d0)) ! This defines the radius of circle
+                                                                        ! that the first Brillouin Zone hexagon is inscribed in.
 REAL(REAL64), PARAMETER :: JACOBIAN = 8 * PI**2 / (3.*SQRT(3.0d0))
 INTEGER(INT32), PARAMETER :: N_BZ_SECTIONS = 6
 

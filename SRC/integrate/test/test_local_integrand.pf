@@ -1,6 +1,7 @@
 MODULE test_local_integrand
 USE funit
 USE types
+USE reader
 USE local_integrand
 use, intrinsic :: iso_fortran_env, only: real64, int8, int16, int32, int64
 IMPLICIT NONE
@@ -34,10 +35,6 @@ SUBROUTINE setup()
   sc_input % physical % subband_params % v = 0.
   sc_input % physical % subband_params % V_pdp = 1.
   sc_input % physical % subband_params % V_pds = 1.
-  sc_input % physical % subband_params % J_SC_tensor = 0
-  sc_input % physical % subband_params % nearest_interorb_multiplier = 0
-  sc_input % physical % subband_params % J_SC_NNN_tensor = 0
-  sc_input % physical % subband_params % next_interorb_multiplier = 0
   sc_input % physical % subband_params % U_HUB = 0
   sc_input % physical % subband_params % V_HUB = 0
   sc_input % physical % subband_params % E_Fermi = 0
@@ -131,370 +128,539 @@ SUBROUTINE test_accumulate_charge_density()
 END SUBROUTINE test_accumulate_charge_density
 
 @test
-SUBROUTINE test_accumulate_nearest_neighbours_delta()
+SUBROUTINE test_accumulate_delta_real_space()
   IMPLICIT NONE
-  COMPLEX(REAL64) :: Delta(sc_input % discretization % ORBITALS,&
-                          & N_ALL_NEIGHBOURS, &
-                          & SPINS, &
-                          & SPINS, &
-                          & sc_input % discretization % derived % LAYER_COUPLINGS)
+  REAL(REAL64) :: J_tensor(sc_input % discretization % derived % DIM_POSITIVE_K,&
+                         & sc_input % discretization % derived % DIM_POSITIVE_K, &
+                         & sc_input % discretization % derived % DIM_POSITIVE_K, &
+                         & sc_input % discretization % derived % DIM_POSITIVE_K) !! Interaction tensor
+  REAL(REAL64) :: J_tensor_matrix(sc_input % discretization % derived % DIM_POSITIVE_K**2, &
+                                & sc_input % discretization % derived % DIM_POSITIVE_K**2) !! Interaction tensor
+  COMPLEX(REAL64) :: Delta(N_ALL_NEIGHBOURS + N_NEIGHBOURS, &
+                         & sc_input % discretization % derived % DIM_POSITIVE_K, &
+                         & sc_input % discretization % derived % DIM_POSITIVE_K) !! Accumulator for integrand
   COMPLEX(REAL64) :: U(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM) !! Unitary matrix that diagonalizes the Hamiltonian - from ZGEEV
   REAL(REAL64) :: Energies(sc_input % discretization % derived % DIM) !! Energies for given wavevector
   REAL(REAL64) :: T !! Temperature
-  REAL(REAL64) :: J_tensor(SPINS, SPINS, SPINS, SPINS) !! Interaction tensor
   REAL(REAL64) :: kx, ky !! Wavevector coordinates
 
   INTEGER(INT32) :: i, j
   INTEGER(INT32) :: spin1, spin2, orb, lat, neigh
 
   Delta = 0.
-  Energies = -1.
+  ! This will make only electron bands occupied
+  Energies(:sc_input % discretization % derived % DIM_POSITIVE_K) = -1.
+  Energies(sc_input % discretization % derived % DIM_POSITIVE_K + 1:) = 1.
   T = 0.
   kx = 0.
   ky = 0.
 
   J_tensor = 0.
-  !Singlet coupling only
-  J_tensor(1, 2, 2, 1) = 1.
-  J_tensor(2, 1, 1, 2) = 1.
-
-  !This way we make hole band irrelevant
-  U = 0.
-  DO i = 1, sc_input % discretization % derived % DIM
-    U(i, i) = 1.
+  !Intraband coupling in the spin-orbital-sublattice basis
+  DO i = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+    J_tensor(i, i, i, i) = 1.
   END DO
 
-  CALL ACCUMULATE_NEAREST_NEIGHBOURS_DELTA(Delta, J_tensor, U, Energies, kx, ky, sc_input % discretization, T)
+  !! Prepare for function
+  CALL MATRICIZE_INTERACTION_TENSOR(J_tensor, sc_input % discretization % derived % DIM_POSITIVE_K, J_tensor_matrix)
 
-  !Since I have no electron-hole mixing in unitary matrix U, I will have no superconducting coupling at all
-  DO orb = 1, sc_input % discretization % ORBITALS
-    DO spin1 = 1, SPINS
-      DO spin2 = 1, SPINS
-        DO neigh = 1, N_ALL_NEIGHBOURS
-          DO lat = 1, sc_input % discretization % derived % LAYER_COUPLINGS
-            @assertEqual(0., Delta(orb, neigh, spin1, spin2, lat), tolerance=1.0e-7)
-          END DO
+  ASSOCIATE (J_tensor => sc_input % physical % subband_params % J_tensor)
+
+    J_tensor % n_nonzero = &
+      & calculate_number_of_nonzero_elements(J_tensor_matrix)
+    @assertEqual(sc_input % discretization % derived % DIM_POSITIVE_K, J_tensor % n_nonzero, message='Unexpected number of nonzero elements')
+
+    ALLOCATE (J_tensor % Values(J_tensor % n_nonzero))
+    ALLOCATE (J_tensor % Column_indices(J_tensor % n_nonzero))
+    ALLOCATE (J_tensor % Row_indices(sc_input % discretization % derived % DIM_POSITIVE_K**2 + 1))
+
+    CALL SAVE_SPARSE_MATRIX_IN_CRS(J_tensor_matrix, J_tensor % Values, &
+      & J_tensor % Column_indices, &
+      & J_tensor % Row_indices, &
+      & J_tensor % n_nonzero, sc_input % discretization % derived % DIM_POSITIVE_K**2)
+
+    !TODO: Change it to parametrized TC
+    ! ----- SCENARIO 1 -----
+    !This way we make hole band irrelevant
+    U = 0.
+    DO i = 1, sc_input % discretization % derived % DIM
+      U(i, i) = 1.
+    END DO
+
+    CALL ACCUMULATE_DELTA_REAL_SPACE(Delta, J_tensor % Values, &
+      & J_tensor % Column_indices, &
+      & J_tensor % Row_indices, &
+      & U, Energies, kx, ky, sc_input % discretization, &
+      & J_tensor % n_nonzero, T)
+
+    !Since I have no electron-hole mixing in unitary matrix U, I will have no superconducting coupling at all
+    DO neigh = 1, N_ALL_NEIGHBOURS + N_NEIGHBOURS
+      DO i = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+        DO j = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+          @assertEqual(0., Delta(neigh, i, j), tolerance=1.0e-7)
         END DO
       END DO
     END DO
-  END DO
 
-  !Now set mixing between electron and hole bands in the same lattice
-  U = 0.
-  !This way we make hole band irrelevant
-  DO i = 1, sc_input % discretization % derived % DIM
-    U(i, i) = 1.
-    IF (i <= sc_input % discretization % derived % DIM_POSITIVE_K) THEN
-      U(i, i + sc_input % discretization % derived % DIM_POSITIVE_K) = 0.1
-    END IF
-  END DO
-  CALL COMPUTE_CONJUGATE_ELEMENTS(U, sc_input % discretization % derived % DIM)
+    !! TODO: Currently this is not physical, because intralayer coupling should not induce interlayer anomalous averages.
+    !! TODO: Think about betterr testing for this case.
+    ! ----- SCENARIO 2 -----
+    !Now set mixing between electron and hole bands for the same set of quantum numbers
+    U = 0.
+    DO i = 1, sc_input % discretization % derived % DIM
+      U(i, i) = 1.
+      IF (i <= sc_input % discretization % derived % DIM_POSITIVE_K) THEN
+        U(i, i + sc_input % discretization % derived % DIM_POSITIVE_K) = 0.1
+      END IF
+    END DO
+    CALL COMPUTE_CONJUGATE_ELEMENTS(U, sc_input % discretization % derived % DIM)
 
-  Delta = 0.
-  CALL ACCUMULATE_NEAREST_NEIGHBOURS_DELTA(Delta, J_tensor, U, Energies, kx, ky, sc_input % discretization, T)
+    Delta = 0.
+    CALL ACCUMULATE_DELTA_REAL_SPACE(Delta, J_tensor % Values, &
+      & J_tensor % Column_indices, &
+      & J_tensor % Row_indices, &
+      & U, Energies, kx, ky, sc_input % discretization, &
+      & J_tensor % n_nonzero, T)
 
-  !But for the interlayer coupling, it should give zero
-  DO orb = 1, sc_input % discretization % ORBITALS
-    DO spin1 = 1, SPINS
-      DO spin2 = 1, SPINS
-        DO neigh = 1, N_ALL_NEIGHBOURS
-          DO lat = 1, sc_input % discretization % derived % LAYER_COUPLINGS
-            @assertEqual(0., Delta(orb, neigh, spin1, spin2, lat), tolerance=1.0e-7)
-          END DO
+    !But for the interlayer coupling, it should give zero
+    DO neigh = 1, N_ALL_NEIGHBOURS + N_NEIGHBOURS
+      DO i = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+        DO j = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+          ! Because we only compute for nearest neighbours
+          !! All off-diagonal terms should be zero
+          IF (i /= j) THEN
+            @assertEqual(0., Delta(neigh, i, j), tolerance=1.0e-7)
+          ELSE
+            @assertEqual(0.1, Delta(neigh, i, j), tolerance=1.0e-7)
+          END IF
         END DO
       END DO
     END DO
-  END DO
+  END ASSOCIATE
 
-END SUBROUTINE test_accumulate_nearest_neighbours_delta
+END SUBROUTINE test_accumulate_delta_real_space
+
+! @test
+! SUBROUTINE test_accumulate_delta_real_space_k_symmetry()
+!   IMPLICIT NONE
+!   COMPLEX(REAL64) :: Hamiltonian_const(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+!   COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+!   COMPLEX(REAL64) :: Hamiltonian_rotated(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+!   COMPLEX(REAL64) :: Hamiltonian_minus_k(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+!   REAL(REAL64) :: Charge(sc_input % discretization % derived % DIM)
+
+!   REAL(REAL64) :: J_tensor(sc_input % discretization % derived % DIM_POSITIVE_K,&
+!                          & sc_input % discretization % derived % DIM_POSITIVE_K, &
+!                          & sc_input % discretization % derived % DIM_POSITIVE_K, &
+!                          & sc_input % discretization % derived % DIM_POSITIVE_K) !! Interaction tensor
+!   REAL(REAL64) :: J_tensor_matrix(sc_input % discretization % derived % DIM_POSITIVE_K**2, &
+!                                 & sc_input % discretization % derived % DIM_POSITIVE_K**2) !! Interaction tensor
+!   COMPLEX(REAL64) :: Delta(N_ALL_NEIGHBOURS + N_NEIGHBOURS, &
+!                          & sc_input % discretization % derived % DIM_POSITIVE_K, &
+!                          & sc_input % discretization % derived % DIM_POSITIVE_K) !! Accumulator for integrand
+!   COMPLEX(REAL64) :: U(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM) !! Unitary matrix that diagonalizes the Hamiltonian - from ZGEEV
+!   REAL(REAL64) :: Energies(sc_input % discretization % derived % DIM) !! Energies for given wavevector
+!   REAL(REAL64) :: T !! Temperature
+!   REAL(REAL64) :: kx, ky !! Wavevector coordinates
+
+!   INTEGER(INT32), PARAMETER :: nr_points = 7
+!   INTEGER(INT32), PARAMETER :: nphi_points = 11
+
+!   INTEGER(INT32) :: opposite_spin
+!   REAL(REAL64) :: r_k, phi_k, phi_k_minus !! Wavevector coordinates
+!   REAL(REAL64) :: dr, dphi
+
+!   INTEGER(INT32) :: ir, jphi
+!   INTEGER(INT32) :: i, j, n
+!   INTEGER(INT32) :: spin1, spin2, orb, lat, neigh
+!   INTEGER(INT32) :: Degrees_of_freedom(4), Degrees_of_freedom_coupled(4)
+!   INTEGER(INT32) :: spin_inv, lat_inv
+!   INTEGER(INT32) :: index_coupled
+!   dr = 1./nr_points
+!   dphi = PI / 2./nphi_points
+
+!   !Symmetry of superconducting state
+!   !Singlet coupling only
+!   Charge = 0.
+!   ASSOCIATE( J_tensor => sc_input % physical % subband_params % J_tensor)
+!     !TODO: Change it to parametric TC
+!     ! ----- SCENARIO 1 -----
+!     J_tensor = 0.
+!     !Intraband coupling in the spin-orbital-sublattice basis
+!     DO i = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+!       Degrees_of_freedom = get_degress_of_freedom_from_index(i, sc_input % discretization)
+!       !! Assuming no Cooper pair hopping i.e. superconductivity in band given by set of quantum numbers
+!       !! {orb, lat, spin, nambu} is mediated only by the same set of quantum numbers.
+!       spin_inv = MOD(Degrees_of_freedom(3) - 1, 2) + 1
+!       lat_inv = MOD(Degrees_of_freedom(2), sc_input_discretization % SUBLATTICES) + 1
+!       Degrees_of_freedom_coupled = [Degrees_of_freedom(1), lat_inv, spin_inv, Degrees_of_freedom(4)]
+!       index_coupled = get_index_from_degress_of_freedom(Degrees_of_freedom_coupled, sc_input % discretization)
+!       J_tensor(index, index_coupled, index_coupled, index) = 1.
+!       J_tensor(index_coupled, index, index, index_coupled) = 1.
+!     END DO
+
+!     !! Prepare for function
+!     CALL MATRICIZE_INTERACTION_TENSOR(J_tensor, sc_input % discretization % derived % DIM_POSITIVE_K, J_tensor_matrix)
+!     J_tensor % n_nonzero = &
+!       & calculate_number_of_nonzero_elements(J_tensor_matrix)
+!     @assertEqual(sc_input % discretization % derived % DIM_POSITIVE_K, J_tensor % n_nonzero, message='Unexpected number of nonzero elements')
+
+!     ALLOCATE (J_tensor % Values(J_tensor % n_nonzero))
+!     ALLOCATE (J_tensor % Column_indices(J_tensor % n_nonzero))
+!     ALLOCATE (J_tensor % Row_indices(sc_input % discretization % derived % DIM_POSITIVE_K**2 + 1))
+
+!     CALL SAVE_SPARSE_MATRIX_IN_CRS(J_tensor_matrix, J_tensor % Values, &
+!       & J_tensor % Column_indices, &
+!       & J_tensor % Row_indices, &
+!       & J_tensor % n_nonzero, sc_input % discretization % derived % DIM_POSITIVE_K**2)
+
+!     Hamiltonian_const = 0.
+!     CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const, sc_input % discretization, sc_input % physical)
+!     CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const, sc_input % discretization % derived % DIM)
+!     !Main test loop
+!     DO ir = 0, nr_points
+!       DO jphi = -nphi_points, nphi_points
+!         r_k = ir * dr
+!         phi_k = jphi * dphi
+!         phi_k_minus = phi_k + PI
+
+!         Delta = 0.
+!         Delta_minus_k = 0.
+!         Charge_local = 0.
+!         CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge, r_k, phi_k, Delta, Charge_local, sc_input % discretization, sc_input % physical)
+!         CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge, r_k, phi_k_minus, Delta_minus_k, Charge_local, sc_input % discretization, sc_input % physical)
+
+!         !But for the interlayer coupling, it should give zero
+!         DO orb = 1, sc_input % discretization % ORBITALS
+!           DO spin1 = 1, SPINS
+!             DO spin2 = 1, SPINS
+!               DO neigh = 1, N_ALL_NEIGHBOURS
+!                 DO lat = 1, sc_input % discretization % derived % LAYER_COUPLINGS
+!                   ! Conjugation due to k --> -k leading to minus sign in complex exponential
+!                   IF (neigh .le. N_NEIGHBOURS) THEN
+!                     @assertEqual(Delta(orb, neigh, spin1, spin2, lat), -CONJG(Delta_minus_k(orb, neigh, spin2, spin1, lat)), tolerance=1.0e-7, message='Singlet symmetry broken')
+!                   ELSE
+!                     @assertEqual(0, Delta(orb, neigh, spin1, spin2, lat), tolerance=1.0e-7, message='Unexpected finite element')
+!                   END IF
+!                 END DO
+!               END DO
+!             END DO
+!           END DO
+!         END DO
+!       END DO
+!     END DO
+
+!     DEALLOCATE(J_tensor % Values)
+!     DEALLOCATE(J_tensor % Column_indices)
+!     DEALLOCATE(J_tensor % Row_indices)
+
+!     ! ----- SCENARIO 2 -----
+!     J_tensor = 0.
+!     !Intraband coupling in the spin-orbital-sublattice basis
+!     DO i = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+!       J_tensor(i,i,i,i) = 1.
+!     END DO
+
+!     !! Prepare for function
+!     CALL MATRICIZE_INTERACTION_TENSOR(J_tensor, sc_input % discretization % derived % DIM_POSITIVE_K, J_tensor_matrix)
+!     J_tensor % n_nonzero = &
+!       & calculate_number_of_nonzero_elements(J_tensor_matrix)
+!     @assertEqual(sc_input % discretization % derived % DIM_POSITIVE_K, J_tensor % n_nonzero, message='Unexpected number of nonzero elements')
+
+!     ALLOCATE (J_tensor % Values(J_tensor % n_nonzero))
+!     ALLOCATE (J_tensor % Column_indices(J_tensor % n_nonzero))
+!     ALLOCATE (J_tensor % Row_indices(sc_input % discretization % derived % DIM_POSITIVE_K**2 + 1))
+
+!     CALL SAVE_SPARSE_MATRIX_IN_CRS(J_tensor_matrix, J_tensor % Values, &
+!       & J_tensor % Column_indices, &
+!       & J_tensor % Row_indices, &
+!       & J_tensor % n_nonzero, sc_input % discretization % derived % DIM_POSITIVE_K**2)
+
+!     !Triplet symmetry only
+!     Charge = 0.
+!     Gamma_SC = 0.
+!     !Setting fully-symmetric pairing symmetry
+
+!     Hamiltonian_const = 0.
+!     CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const, sc_input % discretization, sc_input % physical)
+!     CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const, sc_input % discretization % derived % DIM)
+!     !Main test loop
+!     DO ir = 1, nr_points
+!       DO jphi = -nphi_points, nphi_points
+!         r_k = ir * dr
+!         phi_k = jphi * dphi
+!         phi_k_minus = phi_k + PI
+
+!         Delta = 0.
+!         Delta_minus_k = 0.
+!         Charge_local = 0.
+!         CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge, r_k, phi_k, Delta, Charge_local, sc_input % discretization, sc_input % physical)
+!         CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge, r_k, phi_k_minus, Delta_minus_k, Charge_local, sc_input % discretization, sc_input % physical)
+
+!         !But for the interlayer coupling, it should give zero
+!         DO orb = 1, sc_input % discretization % ORBITALS
+!           DO spin1 = 1, SPINS
+!             DO spin2 = 1, SPINS
+!               DO neigh = 1, N_ALL_NEIGHBOURS
+!                 DO lat = 1, sc_input % discretization % derived % LAYER_COUPLINGS
+!                   ! Conjugation due to k --> -k leading to minus sign in complex exponential
+!                   IF (spin1 .eq. spin2) THEN
+!                     opposite_spin = MOD(spin1, SPINS) + 1
+!                     IF (neigh .le. N_NEIGHBOURS) THEN
+!                       !TODO: Validate that this is a meaningful check
+!                       @assertEqual(Delta(orb, neigh, spin1, spin2, lat), CONJG(Delta_minus_k(orb, neigh, opposite_spin, opposite_spin, lat)), tolerance=1e-7, message='Triplet symmetry broken')
+!                     ELSE
+!                       @assertEqual(0., Delta(orb, neigh, spin1, spin2, lat), tolerance=1e-7, message='Unexpected finite element')
+!                     END IF
+!                   ELSE
+!                     @assertEqual(0., Delta(orb, neigh, spin1, spin2, lat), tolerance=1e-7, message='Unexpected finite element')
+!                   END IF
+!                 END DO
+!               END DO
+!             END DO
+!           END DO
+!         END DO
+!       END DO
+!     END DO
+
+!     DEALLOCATE (J_tensor % Values)
+!     DEALLOCATE (J_tensor % Column_indices)
+!     DEALLOCATE (J_tensor % Row_indices)
+!   END ASSOCIATE
+! END SUBROUTINE
+
+! @test
+! SUBROUTINE test_accumulate_next_neighbours_delta_k_symmetry()
+!   IMPLICIT NONE
+!   COMPLEX(REAL64) :: Hamiltonian_const(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+!   COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+!   COMPLEX(REAL64) :: Hamiltonian_rotated(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+!   COMPLEX(REAL64) :: Hamiltonian_minus_k(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+!   COMPLEX(REAL64) :: Gamma_SC(sc_input % discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, sc_input % discretization % derived % LAYER_COUPLINGS) !! Superconducting energies
+!   REAL(REAL64) :: Charge(sc_input % discretization % derived % DIM)
+!   REAL(REAL64) :: Charge_local(sc_input % discretization % derived % DIM)
+!   COMPLEX(REAL64) :: Delta(sc_input % discretization % ORBITALS,&
+!                           & N_ALL_NEIGHBOURS, &
+!                           & SPINS, &
+!                           & SPINS, &
+!                           & sc_input % discretization % derived % LAYER_COUPLINGS)
+!   COMPLEX(REAL64) :: Delta_minus_k(sc_input % discretization % ORBITALS,&
+!                                   & N_ALL_NEIGHBOURS, &
+!                                   & SPINS, &
+!                                   & SPINS, &
+!                                   & sc_input % discretization % derived % LAYER_COUPLINGS)
+
+!   INTEGER(INT32), PARAMETER :: nr_points = 7
+!   INTEGER(INT32), PARAMETER :: nphi_points = 11
+
+!   INTEGER(INT32) :: opposite_spin
+!   REAL(REAL64) :: r_k, phi_k, phi_k_minus !! Wavevector coordinates
+!   REAL(REAL64) :: dr, dphi
+
+!   INTEGER(INT32) :: ir, jphi
+!   INTEGER(INT32) :: i, j, n
+!   INTEGER(INT32) :: spin1, spin2, orb, lat, neigh
+
+!   dr = 1./nr_points
+!   dphi = PI / 2./nphi_points
+
+!   !Symmetry of superconducting state
+!   !Singlet coupling only
+!   Charge = 0.
+!   Gamma_SC = 0.
+!   !Setting fully-symmetric pairing symmetry
+!   !coupling for next nearest neighbours
+!   Gamma_SC(:, (N_NEIGHBOURS + 1):, 1, 2, :) = CMPLX(1, 0., KIND=REAL64)
+!   Gamma_SC(:, (N_NEIGHBOURS + 1):, 2, 1, :) = CMPLX(-1, 0., KIND=REAL64)
+
+!   !Initial
+!   sc_input % physical % subband_params % J_SC_NNN_tensor = 0.
+!   sc_input % physical % subband_params % J_SC_NNN_tensor(1, 2, 2, 1) = 1.
+!   sc_input % physical % subband_params % J_SC_NNN_tensor(2, 1, 1, 2) = 1.
+!   !Imposed by symmetry
+!   sc_input % physical % subband_params % J_SC_NNN_tensor(1, 2, 1, 2) = -1.
+!   sc_input % physical % subband_params % J_SC_NNN_tensor(2, 1, 2, 1) = -1.
+
+!   Hamiltonian_const = 0.
+!   CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const, sc_input % discretization, sc_input % physical)
+!   CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const, sc_input % discretization % derived % DIM)
+!   !Main test loop
+!   DO ir = 0, nr_points
+!     DO jphi = -nphi_points, nphi_points
+!       r_k = ir * dr
+!       phi_k = jphi * dphi
+!       phi_k_minus = phi_k + PI
+
+!       Delta = 0.
+!       Delta_minus_k = 0.
+!       Charge_local = 0.
+!       CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge, r_k, phi_k, Delta, Charge_local, sc_input % discretization, sc_input % physical)
+!       CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge, r_k, phi_k_minus, Delta_minus_k, Charge_local, sc_input % discretization, sc_input % physical)
+
+!       !But for the interlayer coupling, it should give zero
+!       DO orb = 1, sc_input % discretization % ORBITALS
+!         DO spin1 = 1, SPINS
+!           DO spin2 = 1, SPINS
+!             DO neigh = 1, N_ALL_NEIGHBOURS
+!               DO lat = 1, sc_input % discretization % derived % LAYER_COUPLINGS
+!                 ! Conjugation due to k --> -k leading to minus sign in complex exponential
+!                 IF (neigh .gt. N_NEIGHBOURS) THEN
+!                   @assertEqual(Delta(orb, neigh, spin1, spin2, lat), -CONJG(Delta_minus_k(orb, neigh, spin2, spin1, lat)), tolerance=1.0e-7, message='Singlet symmetry broken')
+!                 ELSE
+!                   @assertEqual(0, Delta(orb, neigh, spin1, spin2, lat), tolerance=1.0e-7, message='Unexpected finite element')
+!                 END IF
+!               END DO
+!             END DO
+!           END DO
+!         END DO
+!       END DO
+!     END DO
+!   END DO
+
+!   !Symmetry of superconducting state
+!   !Singlet coupling only
+!   Charge = 0.
+!   Gamma_SC = 0.
+!   !Setting fully-symmetric pairing symmetry
+!   !coupling for next nearest neighbours
+!   Gamma_SC(:, (N_NEIGHBOURS + 1):, 1, 1, :) = CMPLX(1, 0., KIND=REAL64)
+!   Gamma_SC(:, (N_NEIGHBOURS + 1):, 2, 2, :) = CMPLX(1, 0., KIND=REAL64)
+
+!   !Initial
+!   sc_input % physical % subband_params % J_SC_NNN_tensor = 0.
+!   sc_input % physical % subband_params % J_SC_NNN_tensor(1, 1, 1, 1) = 1.
+!   sc_input % physical % subband_params % J_SC_NNN_tensor(2, 2, 2, 2) = 1.
+
+!   Hamiltonian_const = 0.
+!   CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const, sc_input % discretization, sc_input % physical)
+!   CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const, sc_input % discretization % derived % DIM)
+!   !Main test loop
+!   DO ir = 1, nr_points
+!     DO jphi = -nphi_points, nphi_points
+!       r_k = ir * dr
+!       phi_k = jphi * dphi
+!       phi_k_minus = phi_k + PI
+
+!       Delta = 0.
+!       Delta_minus_k = 0.
+!       Charge_local = 0.
+!       CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge, r_k, phi_k, Delta, Charge_local, sc_input % discretization, sc_input % physical)
+!       CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge, r_k, phi_k_minus, Delta_minus_k, Charge_local, sc_input % discretization, sc_input % physical)
+
+!       !But for the interlayer coupling, it should give zero
+!       DO orb = 1, sc_input % discretization % ORBITALS
+!         DO spin1 = 1, SPINS
+!           DO spin2 = 1, SPINS
+!             DO neigh = 1, N_ALL_NEIGHBOURS
+!               DO lat = 1, sc_input % discretization % derived % LAYER_COUPLINGS
+!                 ! Conjugation due to k --> -k leading to minus sign in complex exponential
+!                 IF (spin1 .eq. spin2) THEN
+!                   opposite_spin = MOD(spin1, SPINS) + 1
+!                   IF (neigh .gt. N_NEIGHBOURS) THEN
+!                     !TODO: Validate that this is a meaningful check
+!                     @assertEqual(Delta(orb, neigh, spin1, spin2, lat), CONJG(Delta_minus_k(orb, neigh, opposite_spin, opposite_spin, lat)), tolerance=1e-7, message='Triplet symmetry broken')
+!                   ELSE
+!                     @assertEqual(0., Delta(orb, neigh, spin1, spin2, lat), tolerance=1e-7, message='Unexpected finite element')
+!                   END IF
+!                 ELSE
+!                   @assertEqual(0., Delta(orb, neigh, spin1, spin2, lat), tolerance=1e-7, message='Unexpected finite element')
+!                 END IF
+!               END DO
+!             END DO
+!           END DO
+!         END DO
+!       END DO
+!     END DO
+!   END DO
+! END SUBROUTINE
 
 @test
-SUBROUTINE test_accumulate_nearest_neighbours_delta_k_symmetry()
+SUBROUTINE test_accumulate_delta_k_space()
   IMPLICIT NONE
-  COMPLEX(REAL64) :: Hamiltonian_const(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
-  COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
-  COMPLEX(REAL64) :: Hamiltonian_rotated(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
-  COMPLEX(REAL64) :: Hamiltonian_minus_k(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
-  COMPLEX(REAL64) :: Gamma_SC(sc_input % discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, sc_input % discretization % derived % LAYER_COUPLINGS) !! Superconducting energies
-  REAL(REAL64) :: Charge(sc_input % discretization % derived % DIM)
-  REAL(REAL64) :: Charge_local(sc_input % discretization % derived % DIM)
-  COMPLEX(REAL64) :: Delta(sc_input % discretization % ORBITALS,&
-                          & N_ALL_NEIGHBOURS, &
-                          & SPINS, &
-                          & SPINS, &
-                          & sc_input % discretization % derived % LAYER_COUPLINGS)
-  COMPLEX(REAL64) :: Delta_minus_k(sc_input % discretization % ORBITALS,&
-                                  & N_ALL_NEIGHBOURS, &
-                                  & SPINS, &
-                                  & SPINS, &
-                                  & sc_input % discretization % derived % LAYER_COUPLINGS)
+  COMPLEX(REAL64) :: Delta(sc_input % discretization % derived % DIM_POSITIVE_K, &
+                         & sc_input % discretization % derived % DIM_POSITIVE_K) !! Accumulator for integrand
+  REAL(REAL64) :: J_tensor(sc_input % discretization % derived % DIM_POSITIVE_K, &
+                         & sc_input % discretization % derived % DIM_POSITIVE_K, &
+                         & sc_input % discretization % derived % DIM_POSITIVE_K, &
+                         & sc_input % discretization % derived % DIM_POSITIVE_K) !! Interaction tensor
+  REAL(REAL64) :: J_tensor_matrix(sc_input % discretization % derived % DIM_POSITIVE_K**2, &
+                                & sc_input % discretization % derived % DIM_POSITIVE_K**2) !! Interaction tensor
+  REAL(REAL64), ALLOCATABLE :: Values_j_tensor(:) !! Interaction tensor
+  INTEGER(INT32), ALLOCATABLE :: Column_indices_j_tensor(:) !! Interaction tensor
+  INTEGER(INT32), ALLOCATABLE :: Row_indices_j_tensor(:) !! Interaction tensor
+  COMPLEX(REAL64) :: U(sc_input % discretization % derived % DIM, &
+                     & sc_input % discretization % derived % DIM) !! Unitary matrix that diagonalizes the Hamiltonian - from ZGEEV
+  REAL(REAL64) :: Energies(sc_input % discretization % derived % DIM) !! Energies for given wavevector
+  REAL(REAL64) :: kx, ky !! Wavevector coordinates
+  REAL(REAL64) :: T !! Temperature
 
-  INTEGER(INT32), PARAMETER :: nr_points = 1
-  INTEGER(INT32), PARAMETER :: nphi_points = 1
-
-  INTEGER(INT32) :: opposite_spin
-  REAL(REAL64) :: r_k, phi_k, phi_k_minus !! Wavevector coordinates
-  REAL(REAL64) :: dr, dphi
+  INTEGER(INT32), PARAMETER :: nr_points = 7
+  INTEGER(INT32), PARAMETER :: nphi_points = 11
 
   INTEGER(INT32) :: ir, jphi
-  INTEGER(INT32) :: i, j, n
-  INTEGER(INT32) :: spin1, spin2, orb, lat, neigh
+  REAL(REAL64) :: dr, dphi, r_k, phi_k
+
+  INTEGER(INT32) :: i, j, neigh, nonzero_elems
+
+  T = 0
+  Energies(:sc_input % discretization % derived % DIM_POSITIVE_K) = -1
+  Energies(sc_input % discretization % derived % DIM_POSITIVE_K + 1:) = 1
+
+  !Setting only intraband interaction
+  J_tensor = 0.
+  DO i = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+    J_tensor(i, i, i, i) = 1
+  END DO
+
+  !! Prepare for function
+  CALL MATRICIZE_INTERACTION_TENSOR(J_tensor, sc_input % discretization % derived % DIM_POSITIVE_K, J_tensor_matrix)
+
+  nonzero_elems = calculate_number_of_nonzero_elements(J_tensor_matrix)
+  @assertEqual(sc_input % discretization % derived % DIM_POSITIVE_K, nonzero_elems, message='Unexpected number of nonzero elements')
+
+  ALLOCATE (Values_j_tensor(nonzero_elems))
+  ALLOCATE (Column_indices_j_tensor(nonzero_elems))
+  ALLOCATE (Row_indices_j_tensor(sc_input % discretization % derived % DIM_POSITIVE_K**2 + 1))
+
+  CALL SAVE_SPARSE_MATRIX_IN_CRS(J_tensor_matrix, Values_j_tensor, Column_indices_j_tensor, Row_indices_j_tensor, &
+    & nonzero_elems, sc_input % discretization % derived % DIM_POSITIVE_K**2)
+
+  !Generating a simple parmutation matrix
+  U = 1
 
   dr = 1./nr_points
   dphi = PI / 2./nphi_points
-
-  !Symmetry of superconducting state
-  !Singlet coupling only
-  Charge = 0.
-  Gamma_SC = 0.
-  !Setting fully-symmetric pairing symmetry
-  Gamma_SC(:, :N_NEIGHBOURS, 1, 2, :) = CMPLX(1, 0., KIND=REAL64)
-  Gamma_SC(:, :N_NEIGHBOURS, 2, 1, :) = CMPLX(-1, 0., KIND=REAL64)
-  !coupling for next nearest neighbours
-  !Gamma_SC(:, (N_NEIGHBOURS + 1):, 1, 2, :) = CMPLX(gamma_next, 0., KIND=REAL64)
-  !Gamma_SC(:, (N_NEIGHBOURS + 1):, 2, 1, :) = CMPLX(-gamma_next, 0., KIND=REAL64)
-
-  !Initial
-  sc_input % physical % subband_params % J_SC_tensor(1, 2, 2, 1) = 1.
-  sc_input % physical % subband_params % J_SC_tensor(2, 1, 1, 2) = 1.
-  !Imposed by symmetry
-  sc_input % physical % subband_params % J_SC_tensor(1, 2, 1, 2) = -1.
-  sc_input % physical % subband_params % J_SC_tensor(2, 1, 2, 1) = -1.
-
-  Hamiltonian_const = 0.
-  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const, sc_input % discretization, sc_input % physical)
-  CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const, sc_input % discretization % derived % DIM)
-  !Main test loop
   DO ir = 0, nr_points
     DO jphi = -nphi_points, nphi_points
       r_k = ir * dr
       phi_k = jphi * dphi
-      phi_k_minus = phi_k + PI
+      ! r_k = 1
+      ! phi_k = 0
+      kx = r_k * COS(phi_k)
+      ky = r_k * SIN(phi_k)
 
       Delta = 0.
-      Delta_minus_k = 0.
-      Charge_local = 0.
-      CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge, r_k, phi_k, Delta, Charge_local, sc_input % discretization, sc_input % physical)
-      CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge, r_k, phi_k_minus, Delta_minus_k, Charge_local, sc_input % discretization, sc_input % physical)
+      CALL ACCUMULATE_DELTA_K_SPACE(Delta, Values_j_tensor, Column_indices_j_tensor, Row_indices_j_tensor, &
+        & U, Energies, kx, ky, sc_input % discretization, nonzero_elems, T)
 
-      !But for the interlayer coupling, it should give zero
-      DO orb = 1, sc_input % discretization % ORBITALS
-        DO spin1 = 1, SPINS
-          DO spin2 = 1, SPINS
-            DO neigh = 1, N_ALL_NEIGHBOURS
-              DO lat = 1, sc_input % discretization % derived % LAYER_COUPLINGS
-                ! Conjugation due to k --> -k leading to minus sign in complex exponential
-                IF (neigh .le. N_NEIGHBOURS) THEN
-                  @assertEqual(Delta(orb, neigh, spin1, spin2, lat), -CONJG(Delta_minus_k(orb, neigh, spin2, spin1, lat)), tolerance=1.0e-7, message='Singlet symmetry broken')
-                ELSE
-                  @assertEqual(0, Delta(orb, neigh, spin1, spin2, lat), tolerance=1.0e-7, message='Unexpected finite element')
-                END IF
-              END DO
-            END DO
-          END DO
+      !Printout the Delta
+      DO i = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+        DO j = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+          IF (i .eq. j) THEN
+            @assertEqual(12., ABS(Delta(i, j)), tolerance=1e-7)
+          ELSE
+            @assertEqual(0., ABS(Delta(i, j)), tolerance=1e-7)
+          END IF
         END DO
       END DO
+
     END DO
   END DO
 
-  !Triplet symmetry only
-  Charge = 0.
-  Gamma_SC = 0.
-  !Setting fully-symmetric pairing symmetry
-  Gamma_SC(:, :N_NEIGHBOURS, 1, 1, :) = CMPLX(1, 0., KIND=REAL64)
-  Gamma_SC(:, :N_NEIGHBOURS, 2, 2, :) = CMPLX(1, 0., KIND=REAL64)
+  DEALLOCATE (Values_j_tensor)
+  DEALLOCATE (Column_indices_j_tensor)
+  DEALLOCATE (Row_indices_j_tensor)
 
-  !Initial
-  sc_input % physical % subband_params % J_SC_tensor = 0.
-  sc_input % physical % subband_params % J_SC_tensor(1, 1, 1, 1) = 1.
-  sc_input % physical % subband_params % J_SC_tensor(2, 2, 2, 2) = 1.
-
-  Hamiltonian_const = 0.
-  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const, sc_input % discretization, sc_input % physical)
-  CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const, sc_input % discretization % derived % DIM)
-  !Main test loop
-  DO ir = 1, nr_points
-    DO jphi = -nphi_points, nphi_points
-      r_k = ir * dr
-      phi_k = jphi * dphi
-      phi_k_minus = phi_k + PI
-
-      Delta = 0.
-      Delta_minus_k = 0.
-      Charge_local = 0.
-      CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge, r_k, phi_k, Delta, Charge_local, sc_input % discretization, sc_input % physical)
-      CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge, r_k, phi_k_minus, Delta_minus_k, Charge_local, sc_input % discretization, sc_input % physical)
-
-      !But for the interlayer coupling, it should give zero
-      DO orb = 1, sc_input % discretization % ORBITALS
-        DO spin1 = 1, SPINS
-          DO spin2 = 1, SPINS
-            DO neigh = 1, N_ALL_NEIGHBOURS
-              DO lat = 1, sc_input % discretization % derived % LAYER_COUPLINGS
-                ! Conjugation due to k --> -k leading to minus sign in complex exponential
-                IF (spin1 .eq. spin2) THEN
-                  opposite_spin = MOD(spin1, SPINS) + 1
-                  IF (neigh .le. N_NEIGHBOURS) THEN
-                    !TODO: Validate that this is a meaningful check
-                    @assertEqual(Delta(orb, neigh, spin1, spin2, lat), CONJG(Delta_minus_k(orb, neigh, opposite_spin, opposite_spin, lat)), tolerance=1e-7, message='Triplet symmetry broken')
-                  ELSE
-                    @assertEqual(0., Delta(orb, neigh, spin1, spin2, lat), tolerance=1e-7, message='Unexpected finite element')
-                  END IF
-                ELSE
-                  @assertEqual(0., Delta(orb, neigh, spin1, spin2, lat), tolerance=1e-7, message='Unexpected finite element')
-                END IF
-              END DO
-            END DO
-          END DO
-        END DO
-      END DO
-    END DO
-  END DO
-END SUBROUTINE
-
-@test
-SUBROUTINE test_accumulate_next_neighbours_delta_k_symmetry()
-  IMPLICIT NONE
-  COMPLEX(REAL64) :: Hamiltonian_const(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
-  COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
-  COMPLEX(REAL64) :: Hamiltonian_rotated(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
-  COMPLEX(REAL64) :: Hamiltonian_minus_k(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
-  COMPLEX(REAL64) :: Gamma_SC(sc_input % discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, sc_input % discretization % derived % LAYER_COUPLINGS) !! Superconducting energies
-  REAL(REAL64) :: Charge(sc_input % discretization % derived % DIM)
-  REAL(REAL64) :: Charge_local(sc_input % discretization % derived % DIM)
-  COMPLEX(REAL64) :: Delta(sc_input % discretization % ORBITALS,&
-                          & N_ALL_NEIGHBOURS, &
-                          & SPINS, &
-                          & SPINS, &
-                          & sc_input % discretization % derived % LAYER_COUPLINGS)
-  COMPLEX(REAL64) :: Delta_minus_k(sc_input % discretization % ORBITALS,&
-                                  & N_ALL_NEIGHBOURS, &
-                                  & SPINS, &
-                                  & SPINS, &
-                                  & sc_input % discretization % derived % LAYER_COUPLINGS)
-
-  INTEGER(INT32), PARAMETER :: nr_points = 1
-  INTEGER(INT32), PARAMETER :: nphi_points = 1
-
-  INTEGER(INT32) :: opposite_spin
-  REAL(REAL64) :: r_k, phi_k, phi_k_minus !! Wavevector coordinates
-  REAL(REAL64) :: dr, dphi
-
-  INTEGER(INT32) :: ir, jphi
-  INTEGER(INT32) :: i, j, n
-  INTEGER(INT32) :: spin1, spin2, orb, lat, neigh
-
-  dr = 1./nr_points
-  dphi = PI / 2./nphi_points
-
-  !Symmetry of superconducting state
-  !Singlet coupling only
-  Charge = 0.
-  Gamma_SC = 0.
-  !Setting fully-symmetric pairing symmetry
-  !coupling for next nearest neighbours
-  Gamma_SC(:, (N_NEIGHBOURS + 1):, 1, 2, :) = CMPLX(1, 0., KIND=REAL64)
-  Gamma_SC(:, (N_NEIGHBOURS + 1):, 2, 1, :) = CMPLX(-1, 0., KIND=REAL64)
-
-  !Initial
-  sc_input % physical % subband_params % J_SC_NNN_tensor = 0.
-  sc_input % physical % subband_params % J_SC_NNN_tensor(1, 2, 2, 1) = 1.
-  sc_input % physical % subband_params % J_SC_NNN_tensor(2, 1, 1, 2) = 1.
-  !Imposed by symmetry
-  sc_input % physical % subband_params % J_SC_NNN_tensor(1, 2, 1, 2) = -1.
-  sc_input % physical % subband_params % J_SC_NNN_tensor(2, 1, 2, 1) = -1.
-
-  Hamiltonian_const = 0.
-  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const, sc_input % discretization, sc_input % physical)
-  CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const, sc_input % discretization % derived % DIM)
-  !Main test loop
-  DO ir = 0, nr_points
-    DO jphi = -nphi_points, nphi_points
-      r_k = ir * dr
-      phi_k = jphi * dphi
-      phi_k_minus = phi_k + PI
-
-      Delta = 0.
-      Delta_minus_k = 0.
-      Charge_local = 0.
-      CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge, r_k, phi_k, Delta, Charge_local, sc_input % discretization, sc_input % physical)
-      CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge, r_k, phi_k_minus, Delta_minus_k, Charge_local, sc_input % discretization, sc_input % physical)
-
-      !But for the interlayer coupling, it should give zero
-      DO orb = 1, sc_input % discretization % ORBITALS
-        DO spin1 = 1, SPINS
-          DO spin2 = 1, SPINS
-            DO neigh = 1, N_ALL_NEIGHBOURS
-              DO lat = 1, sc_input % discretization % derived % LAYER_COUPLINGS
-                ! Conjugation due to k --> -k leading to minus sign in complex exponential
-                IF (neigh .gt. N_NEIGHBOURS) THEN
-                  @assertEqual(Delta(orb, neigh, spin1, spin2, lat), -CONJG(Delta_minus_k(orb, neigh, spin2, spin1, lat)), tolerance=1.0e-7, message='Singlet symmetry broken')
-                ELSE
-                  @assertEqual(0, Delta(orb, neigh, spin1, spin2, lat), tolerance=1.0e-7, message='Unexpected finite element')
-                END IF
-              END DO
-            END DO
-          END DO
-        END DO
-      END DO
-    END DO
-  END DO
-
-  !Symmetry of superconducting state
-  !Singlet coupling only
-  Charge = 0.
-  Gamma_SC = 0.
-  !Setting fully-symmetric pairing symmetry
-  !coupling for next nearest neighbours
-  Gamma_SC(:, (N_NEIGHBOURS + 1):, 1, 1, :) = CMPLX(1, 0., KIND=REAL64)
-  Gamma_SC(:, (N_NEIGHBOURS + 1):, 2, 2, :) = CMPLX(1, 0., KIND=REAL64)
-
-  !Initial
-  sc_input % physical % subband_params % J_SC_NNN_tensor = 0.
-  sc_input % physical % subband_params % J_SC_NNN_tensor(1, 1, 1, 1) = 1.
-  sc_input % physical % subband_params % J_SC_NNN_tensor(2, 2, 2, 2) = 1.
-
-  Hamiltonian_const = 0.
-  CALL COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian_const, sc_input % discretization, sc_input % physical)
-  CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_const, sc_input % discretization % derived % DIM)
-  !Main test loop
-  DO ir = 1, nr_points
-    DO jphi = -nphi_points, nphi_points
-      r_k = ir * dr
-      phi_k = jphi * dphi
-      phi_k_minus = phi_k + PI
-
-      Delta = 0.
-      Delta_minus_k = 0.
-      Charge_local = 0.
-      CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge, r_k, phi_k, Delta, Charge_local, sc_input % discretization, sc_input % physical)
-      CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge, r_k, phi_k_minus, Delta_minus_k, Charge_local, sc_input % discretization, sc_input % physical)
-
-      !But for the interlayer coupling, it should give zero
-      DO orb = 1, sc_input % discretization % ORBITALS
-        DO spin1 = 1, SPINS
-          DO spin2 = 1, SPINS
-            DO neigh = 1, N_ALL_NEIGHBOURS
-              DO lat = 1, sc_input % discretization % derived % LAYER_COUPLINGS
-                ! Conjugation due to k --> -k leading to minus sign in complex exponential
-                IF (spin1 .eq. spin2) THEN
-                  opposite_spin = MOD(spin1, SPINS) + 1
-                  IF (neigh .gt. N_NEIGHBOURS) THEN
-                    !TODO: Validate that this is a meaningful check
-                    @assertEqual(Delta(orb, neigh, spin1, spin2, lat), CONJG(Delta_minus_k(orb, neigh, opposite_spin, opposite_spin, lat)), tolerance=1e-7, message='Triplet symmetry broken')
-                  ELSE
-                    @assertEqual(0., Delta(orb, neigh, spin1, spin2, lat), tolerance=1e-7, message='Unexpected finite element')
-                  END IF
-                ELSE
-                  @assertEqual(0., Delta(orb, neigh, spin1, spin2, lat), tolerance=1e-7, message='Unexpected finite element')
-                END IF
-              END DO
-            END DO
-          END DO
-        END DO
-      END DO
-    END DO
-  END DO
 END SUBROUTINE
 
 END MODULE test_local_integrand

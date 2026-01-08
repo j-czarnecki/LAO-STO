@@ -33,7 +33,7 @@ USE writers
 IMPLICIT NONE
 CONTAINS
 
-SUBROUTINE SET_GAMMA_INITIAL(Gamma_SC, J_nearest_tensor, J_next_tensor, gamma_start_nearest, gamma_start_next, discretization)
+SUBROUTINE SET_GAMMA_INITIAL(Gamma_SC, J_tensor_crs, gamma_start_nearest, gamma_start_next, discretization)
   !! This subroutine sets initial values of superconducting couplings
   !! based on the energy tensors i.e. sets values relevant to the non-zero elements of tensors
   !! to gamma_start_nearest(next) and others to zero.
@@ -41,67 +41,38 @@ SUBROUTINE SET_GAMMA_INITIAL(Gamma_SC, J_nearest_tensor, J_next_tensor, gamma_st
   !! This way, it could be run several times to find the lowest-energy solution.
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization !! Discretization parameters used in calculations
-  REAL(REAL64), INTENT(IN) :: J_nearest_tensor(SPINS, SPINS, SPINS, SPINS) !! Interaction energy between different spins for nearest neighbours
-  REAL(REAL64), INTENT(IN) :: J_next_tensor(SPINS, SPINS, SPINS, SPINS) !! Interaction energy between different spins for next neighbours
+  TYPE(crs_matrix_t), INTENT(IN) :: J_tensor_crs !! Interaction tensor for superconducting coupling
   REAL(REAL64), INTENT(IN) :: gamma_start_nearest, gamma_start_next !! Starting value of superconducting coupling for nearest neighbours and next neighbours
-  COMPLEX(REAL64), INTENT(OUT) :: Gamma_SC(discretization % ORBITALS, &
-                                     & N_ALL_NEIGHBOURS, &
-                                     & SPINS, &
-                                     & SPINS, &
-                                     & discretization % derived % LAYER_COUPLINGS, &
-                                     & discretization % SUBBANDS)
-
+#ifndef BAND_BASIS
+  COMPLEX(REAL64), INTENT(OUT) :: Gamma_SC(N_ALL_NEIGHBOURS + N_NEIGHBOURS, &
+                                         & discretization % derived % DIM_POSITIVE_K, &
+                                         & discretization % derived % DIM_POSITIVE_K, &
+                                         & discretization % SUBBANDS)
+#else
+  COMPLEX(REAL64), INTENT(OUT) :: Gamma_SC(discretization % derived % DIM_POSITIVE_K, &
+                                         & discretization % derived % DIM_POSITIVE_K, &
+                                         & discretization % SUBBANDS)
+#endif
   INTEGER(INT32) :: spin1, spin2, spin3, spin4, spin_opposite
   LOGICAL :: set_to_nonzero_nearest_opposite_spin, set_to_nonzero_next_opposite_spin
   LOGICAL :: set_to_nonzero_nearest_same_spin, set_to_nonzero_next_same_spin
   REAL(REAL64), PARAMETER :: eps = 1e-9 !! To compare reals
   REAL(REAL64), PARAMETER :: spin_offset_fraction = 0.05
   REAL(REAL64) :: spin_sign
-
+  INTEGER(INT32) :: i
+  INTEGER(INT32) :: Dematricized_indices(2)
+  INTEGER(INT32) :: last_crs_row_index
   Gamma_SC = CMPLX(0.0, 0.0, KIND=REAL64)
 
-  DO spin1 = 1, SPINS
-    spin_opposite = MOD(spin1, SPINS) + 1
-    spin_sign = (-1)**(spin1 + 1)
-    ! Set initial values if we allow certain pairing by energy tensor
-    set_to_nonzero_nearest_opposite_spin = .FALSE.
-    set_to_nonzero_next_opposite_spin = .FALSE.
-    set_to_nonzero_nearest_same_spin = .FALSE.
-    set_to_nonzero_next_same_spin = .FALSE.
-
-    DO spin3 = 1, SPINS
-      DO spin4 = 1, SPINS
-        ! Opposite spin
-        IF (ABS(J_nearest_tensor(spin1, spin_opposite, spin3, spin4)) .GT. eps) set_to_nonzero_nearest_opposite_spin = .TRUE.
-        IF (ABS(J_next_tensor(spin1, spin_opposite, spin3, spin4)) .GT. eps) set_to_nonzero_next_opposite_spin = .TRUE.
-        ! Same spin
-        IF (ABS(J_nearest_tensor(spin1, spin1, spin3, spin4)) .GT. eps) set_to_nonzero_nearest_same_spin = .TRUE.
-        IF (ABS(J_next_tensor(spin1, spin1, spin3, spin4)) .GT. eps) set_to_nonzero_next_same_spin = .TRUE.
-      END DO
-    END DO
-
-    ! Opposite spin
-    IF (set_to_nonzero_nearest_opposite_spin) THEN
-      IF (ABS(Gamma_SC(1, 1, spin_opposite, spin1, 1, 1)) .GT. eps) THEN
-        Gamma_SC(:, :N_NEIGHBOURS, spin1, spin_opposite, :, :) = -(1.0 - spin_offset_fraction) / (1.0 + spin_offset_fraction) * Gamma_SC(1, 1, spin_opposite, spin1, 1, 1)
-      ELSE
-        Gamma_SC(:, :N_NEIGHBOURS, spin1, spin_opposite, :, :) = (1.0 + spin_offset_fraction) * gamma_start_nearest
-      END IF
-    END IF
-    IF (set_to_nonzero_next_opposite_spin) THEN
-      IF (ABS(Gamma_SC(1, 4, spin_opposite, spin1, 1, 1)) .GT. eps) THEN
-        Gamma_SC(:, (N_NEIGHBOURS + 1):, spin1, spin_opposite, :, :) = -(1.0 - spin_offset_fraction) / (1.0 + spin_offset_fraction) * Gamma_SC(1, 4, spin_opposite, spin1, 1, 1)
-      ELSE
-        Gamma_SC(:, (N_NEIGHBOURS + 1):, spin1, spin_opposite, :, :) = (1.0 + spin_offset_fraction) * gamma_start_next
-      END IF
-    END IF
-
-    ! Same spin
-    IF (set_to_nonzero_nearest_same_spin) THEN
-      Gamma_SC(:, :N_NEIGHBOURS, spin1, spin1, :, :) = (1.0 + spin_sign * spin_offset_fraction) * gamma_start_nearest
-    END IF
-    IF (set_to_nonzero_next_same_spin) THEN
-      Gamma_SC(:, (N_NEIGHBOURS + 1):, spin1, spin1, :, :) = (1.0 + spin_sign * spin_offset_fraction) * gamma_start_next
+  DO i = 1, discretization % derived % DIM_POSITIVE_K**2
+    !! If he row pointer are the same, it means that i-th row consists of zeros only
+    IF (J_tensor_crs % Row_indices(i + 1) .NE. J_tensor_crs % Row_indices(i)) THEN
+      Dematricized_indices = get_dematricized_indeces(i, discretization % derived % DIM_POSITIVE_K)
+#ifndef BAND_BASIS
+      Gamma_SC(:, Dematricized_indices(1), Dematricized_indices(2), :) = gamma_start_nearest
+#else
+      Gamma_SC(Dematricized_indices(1), Dematricized_indices(2), :) = gamma_start_nearest
+#endif
     END IF
   END DO
 
@@ -189,59 +160,40 @@ SUBROUTINE CHECK_CONVERGENCE(sc_flag, Gamma_old, Gamma_new, Charge_dens, Charge_
   TYPE(discretization_t), INTENT(IN) :: discretization
   TYPE(self_consistency_t), INTENT(INOUT) :: self_consistency
   LOGICAL, INTENT(INOUT) :: sc_flag
-  COMPLEX(REAL64), INTENT(IN) :: Gamma_old(discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, discretization % derived % LAYER_COUPLINGS, discretization % SUBBANDS)
-  COMPLEX(REAL64), INTENT(IN) :: Gamma_new(discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, discretization % derived % LAYER_COUPLINGS, discretization % SUBBANDS)
+#ifndef BAND_BASIS
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_old(N_ALL_NEIGHBOURS + N_NEIGHBOURS, &
+                                         & discretization % derived % DIM_POSITIVE_K, &
+                                         & discretization % derived % DIM_POSITIVE_K, &
+                                         & discretization % SUBBANDS)
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_new(N_ALL_NEIGHBOURS + N_NEIGHBOURS, &
+                                         & discretization % derived % DIM_POSITIVE_K, &
+                                         & discretization % derived % DIM_POSITIVE_K, &
+                                         & discretization % SUBBANDS)
+#else
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_old(discretization % derived % DIM_POSITIVE_K, &
+                                         & discretization % derived % DIM_POSITIVE_K, &
+                                         & discretization % SUBBANDS)
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_new(discretization % derived % DIM_POSITIVE_K, &
+                                         & discretization % derived % DIM_POSITIVE_K, &
+                                         & discretization % SUBBANDS)
+#endif
   REAL(REAL64), INTENT(IN) :: Charge_dens(discretization % derived % DIM_POSITIVE_K, discretization % SUBBANDS)
   REAL(REAL64), INTENT(IN) :: Charge_dens_new(discretization % derived % DIM_POSITIVE_K, discretization % SUBBANDS)
   REAL(REAL64), INTENT(INOUT) :: gamma_max_error_prev, gamma_max_error, charge_max_error_prev, charge_max_error
   INTEGER(INT32), INTENT(IN) :: sc_iter
-  INTEGER(INT32) :: band, spin1, spin2, orb, n, lat
-  REAL(REAL64) :: gamma_error, charge_error
 
   gamma_max_error_prev = gamma_max_error
   charge_max_error_prev = charge_max_error
   gamma_max_error = 0.
   charge_max_error = 0.
   !Here we check whether convergence was reached
-  sc_flag = .TRUE.
-  DO band = 1, discretization % SUBBANDS
-    DO spin1 = 1, SPINS
-      DO spin2 = 1, SPINS
-        DO orb = 1, discretization % ORBITALS
-          DO n = 1, N_NEIGHBOURS
-            DO lat = 1, discretization % derived % LAYER_COUPLINGS
-              !It should be considered whether relative or absolute error must be checked
-              gamma_error = ABS(ABS(Gamma_new(orb, n, spin1, spin2, lat, band)) - ABS(Gamma_old(orb, n, spin1, spin2, lat, band)))
-              !Gamma convergence checking
-              IF (gamma_error > self_consistency % gamma_eps_convergence) THEN
-                sc_flag = .FALSE.
-                !EXIT !Maybe go to???
-              END IF
+  sc_flag = .FALSE.
+  gamma_max_error = MAXVAL(ABS(ABS(Gamma_new) - ABS(Gamma_old)))
+  charge_max_error = MAXVAL(ABS(Charge_dens - Charge_dens_new))
+  IF (gamma_max_error < self_consistency % gamma_eps_convergence .AND. charge_max_error < self_consistency % charge_eps_convergence) THEN
+    sc_flag = .TRUE.
+  END IF
 
-              !Find biggest error in current iteration
-              IF (gamma_error > gamma_max_error) gamma_max_error = gamma_error
-
-            END DO
-          END DO
-          DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
-            DO lat = 1, discretization % SUBLATTICES
-              !It should be considered whether relative or absolute error must be checked
-              gamma_error = ABS(ABS(Gamma_new(orb, n, spin1, spin2, lat, band)) - ABS(Gamma_old(orb, n, spin1, spin2, lat, band)))
-              !Gamma convergence checking
-              IF (gamma_error > self_consistency % gamma_eps_convergence) THEN
-                sc_flag = .FALSE.
-                !EXIT !Maybe go to???
-              END IF
-
-              !Find biggest error in current iteration
-              IF (gamma_error > gamma_max_error) gamma_max_error = gamma_error
-
-            END DO
-          END DO
-        END DO
-      END DO
-    END DO
-  END DO
   !Change Broyden mixing parameter if simulation diverges between iterations
   !To avoid oscillations near convergence
   IF (ABS(gamma_max_error) > ABS(gamma_max_error_prev) .AND. (sc_iter > 1)) THEN
@@ -250,25 +202,28 @@ SUBROUTINE CHECK_CONVERGENCE(sc_flag, Gamma_old, Gamma_new, Charge_dens, Charge_
     LOG_ABNORMAL(log_string)
     self_consistency % sc_alpha = self_consistency % sc_alpha * self_consistency % sc_alpha_adapt
   END IF
-
-  DO band = 1, discretization % SUBBANDS
-    DO n = 1, discretization % derived % DIM_POSITIVE_K
-      charge_error = ABS(Charge_dens(n, band) - Charge_dens_new(n, band))
-      IF (charge_error > self_consistency % charge_eps_convergence) THEN
-        sc_flag = .FALSE.
-      END IF
-
-      IF (charge_error > charge_max_error) charge_max_error = charge_error
-    END DO
-  END DO
-
 END SUBROUTINE CHECK_CONVERGENCE
 
 SUBROUTINE FLATTEN_FOR_BROYDEN(Gamma_old, Gamma_new, Charge_dens, Charge_dens_new, Broyden_vector_new, Broyden_vector, broyden_length, discretization)
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
-  COMPLEX(REAL64), INTENT(IN) :: Gamma_old(discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, discretization % derived % LAYER_COUPLINGS, discretization % SUBBANDS)
-  COMPLEX(REAL64), INTENT(IN) :: Gamma_new(discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, discretization % derived % LAYER_COUPLINGS, discretization % SUBBANDS)
+#ifndef BAND_BASIS
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_old(N_ALL_NEIGHBOURS + N_NEIGHBOURS, &
+                                          & discretization % derived % DIM_POSITIVE_K, &
+                                          & discretization % derived % DIM_POSITIVE_K, &
+                                          & discretization % SUBBANDS)
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_new(N_ALL_NEIGHBOURS + N_NEIGHBOURS, &
+                                          & discretization % derived % DIM_POSITIVE_K, &
+                                          & discretization % derived % DIM_POSITIVE_K, &
+                                          & discretization % SUBBANDS)
+#else
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_old(discretization % derived % DIM_POSITIVE_K, &
+                                          & discretization % derived % DIM_POSITIVE_K, &
+                                          & discretization % SUBBANDS)
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_new(discretization % derived % DIM_POSITIVE_K, &
+                                          & discretization % derived % DIM_POSITIVE_K, &
+                                          & discretization % SUBBANDS)
+#endif
   REAL(REAL64), INTENT(IN) :: Charge_dens(discretization % derived % DIM_POSITIVE_K, discretization % SUBBANDS)
   REAL(REAL64), INTENT(IN) :: Charge_dens_new(discretization % derived % DIM_POSITIVE_K, discretization % SUBBANDS)
   INTEGER(INT32), INTENT(IN) :: broyden_length
@@ -276,39 +231,43 @@ SUBROUTINE FLATTEN_FOR_BROYDEN(Gamma_old, Gamma_new, Charge_dens, Charge_dens_ne
   REAL(REAL64), INTENT(OUT) :: Broyden_vector(broyden_length)
 
   INTEGER(INT32) :: band, spin1, spin2, orb, n, lat, broyden_index
+  INTEGER(INT32) :: broyden_index_new
 
+  INTEGER(INT32) :: i_band, j_band, neigh
   broyden_index = 1
+#ifndef BAND_BASIS
   DO band = 1, discretization % SUBBANDS
-    DO spin1 = 1, SPINS
-      DO spin2 = 1, SPINS
-        DO orb = 1, discretization % ORBITALS
-          DO n = 1, N_NEIGHBOURS
-            DO lat = 1, discretization % derived % LAYER_COUPLINGS
-              Broyden_vector(broyden_index) = REAL(Gamma_old(orb, n, spin1, spin2, lat, band))
-              Broyden_vector_new(broyden_index) = REAL(Gamma_new(orb, n, spin1, spin2, lat, band))
-              broyden_index = broyden_index + 1
+    DO i_band = 1, discretization % derived % DIM_POSITIVE_K
+      DO j_band = 1, discretization % derived % DIM_POSITIVE_K
+        DO neigh = 1, N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS
+          Broyden_vector(broyden_index) = REAL(Gamma_old(neigh, i_band, j_band, band))
+          Broyden_vector_new(broyden_index) = REAL(Gamma_new(neigh, i_band, j_band, band))
+          broyden_index = broyden_index + 1
 
-              Broyden_vector(broyden_index) = AIMAG(Gamma_old(orb, n, spin1, spin2, lat, band))
-              Broyden_vector_new(broyden_index) = AIMAG(Gamma_new(orb, n, spin1, spin2, lat, band))
-              broyden_index = broyden_index + 1
-            END DO
-          END DO
-          DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
-            DO lat = 1, discretization % SUBLATTICES
-              Broyden_vector(broyden_index) = REAL(Gamma_old(orb, n, spin1, spin2, lat, band))
-              Broyden_vector_new(broyden_index) = REAL(Gamma_new(orb, n, spin1, spin2, lat, band))
-              broyden_index = broyden_index + 1
-
-              Broyden_vector(broyden_index) = AIMAG(Gamma_old(orb, n, spin1, spin2, lat, band))
-              Broyden_vector_new(broyden_index) = AIMAG(Gamma_new(orb, n, spin1, spin2, lat, band))
-              broyden_index = broyden_index + 1
-            END DO
-          END DO
-
+          Broyden_vector(broyden_index) = AIMAG(Gamma_old(neigh, i_band, j_band, band))
+          Broyden_vector_new(broyden_index) = AIMAG(Gamma_new(neigh, i_band, j_band, band))
+          broyden_index = broyden_index + 1
         END DO
       END DO
     END DO
   END DO
+#else
+  DO band = 1, discretization % SUBBANDS
+    DO i_band = 1, discretization % derived % DIM_POSITIVE_K
+      DO j_band = 1, discretization % derived % DIM_POSITIVE_K
+        Broyden_vector(broyden_index) = REAL(Gamma_old(i_band, j_band, band))
+        Broyden_vector_new(broyden_index) = REAL(Gamma_new(i_band, j_band, band))
+        broyden_index = broyden_index + 1
+
+        Broyden_vector(broyden_index) = AIMAG(Gamma_old(i_band, j_band, band))
+        Broyden_vector_new(broyden_index) = AIMAG(Gamma_new(i_band, j_band, band))
+        broyden_index = broyden_index + 1
+      END DO
+    END DO
+  END DO
+
+#endif
+
   !Must be +1!!!
   DO band = 1, discretization % SUBBANDS
     DO n = 1, discretization % derived % DIM_POSITIVE_K
@@ -317,6 +276,7 @@ SUBROUTINE FLATTEN_FOR_BROYDEN(Gamma_old, Gamma_new, Charge_dens, Charge_dens_ne
       broyden_index = broyden_index + 1
     END DO
   END DO
+
   !Sanity check
   IF (broyden_index - 1 /= broyden_length) THEN
     WRITE (log_string, *) 'Broyden index - 1 /= delta_real_elems', broyden_index - 1, broyden_length
@@ -327,39 +287,52 @@ END SUBROUTINE FLATTEN_FOR_BROYDEN
 SUBROUTINE RESHAPE_FROM_BROYDEN(Gamma_SC, Charge_dens, Broyden_vector, broyden_length, discretization)
   IMPLICIT NONE
   TYPE(discretization_t), INTENT(IN) :: discretization
-  COMPLEX(REAL64), INTENT(OUT) :: Gamma_SC(discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, discretization % derived % LAYER_COUPLINGS, discretization % SUBBANDS)
+#ifndef BAND_BASIS
+  COMPLEX(REAL64), INTENT(OUT) :: Gamma_SC(N_ALL_NEIGHBOURS + N_NEIGHBOURS, &
+                                         & discretization % derived % DIM_POSITIVE_K, &
+                                         & discretization % derived % DIM_POSITIVE_K, &
+                                         & discretization % SUBBANDS)
+#else
+  COMPLEX(REAL64), INTENT(OUT) :: Gamma_SC(discretization % derived % DIM_POSITIVE_K, &
+                                         & discretization % derived % DIM_POSITIVE_K, &
+                                         & discretization % SUBBANDS)
+#endif
   REAL(REAL64), INTENT(OUT) :: Charge_dens(discretization % derived % DIM_POSITIVE_K, discretization % SUBBANDS)
   INTEGER(INT32), INTENT(IN) :: broyden_length
   REAL(REAL64), INTENT(IN) :: Broyden_vector(broyden_length)
 
   INTEGER(INT32) :: band, spin1, spin2, orb, n, lat, broyden_index
+  INTEGER(INT32) :: i_band, j_band, neigh
   broyden_index = 1
+#ifndef BAND_BASIS
   DO band = 1, discretization % SUBBANDS
-    DO spin1 = 1, SPINS
-      DO spin2 = 1, SPINS
-        DO orb = 1, discretization % ORBITALS
-          DO n = 1, N_NEIGHBOURS
-            DO lat = 1, discretization % derived % LAYER_COUPLINGS
-              Gamma_SC(orb, n, spin1, spin2, lat, band) = CMPLX(Broyden_vector(broyden_index), Broyden_vector(broyden_index + 1), KIND=REAL64)
-              broyden_index = broyden_index + 2
-            END DO
-          END DO
-          DO n = N_NEIGHBOURS + 1, N_ALL_NEIGHBOURS
-            DO lat = 1, discretization % SUBLATTICES
-              Gamma_SC(orb, n, spin1, spin2, lat, band) = CMPLX(Broyden_vector(broyden_index), Broyden_vector(broyden_index + 1), KIND=REAL64)
-              broyden_index = broyden_index + 2
-            END DO
-          END DO
+    DO i_band = 1, discretization % derived % DIM_POSITIVE_K
+      DO j_band = 1, discretization % derived % DIM_POSITIVE_K
+        DO neigh = 1, N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS
+          Gamma_SC(neigh, i_band, j_band, band) = CMPLX(Broyden_vector(broyden_index), Broyden_vector(broyden_index + 1), KIND=REAL64)
+          broyden_index = broyden_index + 2
         END DO
       END DO
     END DO
   END DO
+#else
+  DO band = 1, discretization % SUBBANDS
+    DO i_band = 1, discretization % derived % DIM_POSITIVE_K
+      DO j_band = 1, discretization % derived % DIM_POSITIVE_K
+        Gamma_SC(i_band, j_band, band) = CMPLX(Broyden_vector(broyden_index), Broyden_vector(broyden_index + 1), KIND=REAL64)
+        broyden_index = broyden_index + 2
+      END DO
+    END DO
+  END DO
+#endif
+
   DO band = 1, discretization % SUBBANDS
     DO n = 1, discretization % derived % DIM_POSITIVE_K
       Charge_dens(n, band) = Broyden_vector(broyden_index)
       broyden_index = broyden_index + 1
     END DO
   END DO
+
   !Sanity check
   IF (broyden_index - 1 /= broyden_length) THEN
     WRITE (log_string, *) 'Broyden index - 1 /= delta_real_elems', broyden_index - 1, broyden_length

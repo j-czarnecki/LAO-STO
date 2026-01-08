@@ -1346,10 +1346,6 @@ SUBROUTINE test_compute_full_hamiltonian()
   physical_params % subband_params % v = 0.
   physical_params % subband_params % V_pdp = 1.
   physical_params % subband_params % V_pds = 1.
-  physical_params % subband_params % J_SC_tensor = 0
-  physical_params % subband_params % nearest_interorb_multiplier = 0
-  physical_params % subband_params % J_SC_NNN_tensor = 0
-  physical_params % subband_params % next_interorb_multiplier = 0
   physical_params % subband_params % U_HUB = 0
   physical_params % subband_params % V_HUB = 0
   physical_params % subband_params % E_Fermi = 0
@@ -1406,7 +1402,9 @@ SUBROUTINE test_compute_sc()
 
   REAL(REAL64), PARAMETER :: gamma_nearest = 1.
   REAL(REAL64), PARAMETER :: gamma_next = 3.
-  COMPLEX(REAL64) :: Gamma_SC(sc_input % discretization % ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, sc_input % discretization % derived % LAYER_COUPLINGS) !! Superconducting energies
+  COMPLEX(REAL64) :: Gamma_SC(N_ALL_NEIGHBOURS + N_NEIGHBOURS, &
+                            & sc_input % discretization % derived % DIM_POSITIVE_K, &
+                            & sc_input % discretization % derived % DIM_POSITIVE_K) !! Superconducting energies
 
   REAL(REAL64) :: phi_rot
   INTEGER(INT32) :: nr_points = 3
@@ -1414,6 +1412,9 @@ SUBROUTINE test_compute_sc()
   INTEGER(INT32) :: n_pi_3_rotations = 1
   INTEGER(INT32) :: row, col
   INTEGER(INT32) :: i, j, ir, jphi
+  INTEGER(INT32) :: spin, spin_inv, orb, lat, lat_inv, neigh
+  INTEGER(INT32) :: current_lat_block, next_lat_block
+  INTEGER(INT32) :: row_gamma, col_gamma
   REAL(REAL64) :: kx, ky, dr, dphi, kx_minus, ky_minus, kx_rot, ky_rot
 
   COMPLEX(REAL64) :: exp_sum_nearest
@@ -1427,15 +1428,48 @@ SUBROUTINE test_compute_sc()
              DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
              TBA_DIM => sc_input % discretization % derived % TBA_DIM, &
              LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS, &
-             ORBITALS => sc_input % discretization % ORBITALS)
+             ORBITALS => sc_input % discretization % ORBITALS, &
+             & SUBLATTICES => sc_input % discretization % SUBLATTICES)
 
     Gamma_SC = 0.
     !Setting fully-symmetric pairing symmetry
-    Gamma_SC(:, :N_NEIGHBOURS, 1, 2, :) = CMPLX(gamma_nearest, 0., KIND=REAL64)
-    Gamma_SC(:, :N_NEIGHBOURS, 2, 1, :) = CMPLX(-gamma_nearest, 0., KIND=REAL64)
-    !coupling for next nearest neighbours
-    Gamma_SC(:, (N_NEIGHBOURS + 1):, 1, 2, :) = CMPLX(gamma_next, 0., KIND=REAL64)
-    Gamma_SC(:, (N_NEIGHBOURS + 1):, 2, 1, :) = CMPLX(-gamma_next, 0., KIND=REAL64)
+    DO orb = 1, ORBITALS
+      DO spin = 0, SPINS - 1
+        spin_inv = MOD(spin + 1, 2)
+        DO lat = 0, SUBLATTICES - 2
+          current_lat_block = lat * ORBITALS
+          next_lat_block = current_lat_block + ORBITALS
+
+          row_gamma = orb + spin * TBA_DIM + current_lat_block
+          col_gamma = orb + spin_inv * TBA_DIM + next_lat_block
+          DO neigh = 1, N_NEIGHBOURS
+            Gamma_SC(neigh, row_gamma, col_gamma) = (-1)**spin * gamma_nearest
+          END DO
+          row_gamma = orb + spin * TBA_DIM + next_lat_block
+          col_gamma = orb + spin_inv * TBA_DIM + current_lat_block
+          DO neigh = N_NEIGHBOURS + 1, N_NEAREST_NEIGHBOURS
+            Gamma_SC(neigh, row_gamma, col_gamma) = (-1)**spin * gamma_nearest
+          END DO
+        END DO
+      END DO
+    END DO
+
+    DO orb = 1, ORBITALS
+      DO spin = 0, SPINS - 1
+        spin_inv = MOD(spin + 1, 2)
+        DO lat = 0, SUBLATTICES - 1
+          current_lat_block = lat * ORBITALS
+
+          row_gamma = orb + spin * TBA_DIM + current_lat_block
+          col_gamma = orb + spin_inv * TBA_DIM + current_lat_block
+          DO neigh = N_NEAREST_NEIGHBOURS + 1, N_ALL_NEIGHBOURS + N_NEIGHBOURS
+            Gamma_SC(neigh, row_gamma, col_gamma) = (-1)**spin * gamma_next
+          END DO
+
+        END DO
+      END DO
+    END DO
+
 
     DO ir = 0, nr_points
       DO jphi = -nphi_points, nphi_points
@@ -1519,5 +1553,119 @@ SUBROUTINE test_compute_sc()
     END DO
   END ASSOCIATE
 END SUBROUTINE test_compute_sc
+
+!TODO: Think about more advanced testing of this hamiltonian
+@test
+SUBROUTINE test_compute_sc_band()
+  USE writers
+
+  COMPLEX(REAL64) :: Hamiltonian(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_rotated(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_minus_k(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  LOGICAL :: Was_checked(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
+  TYPE(entry_check_t), ALLOCATABLE :: Checks(:)
+
+  REAL(REAL64), PARAMETER :: gamma_nearest = 1.
+  REAL(REAL64), PARAMETER :: gamma_next = 3.
+  COMPLEX(REAL64) :: Gamma_SC(sc_input % discretization % derived % DIM_POSITIVE_K, &
+                            & sc_input % discretization % derived % DIM_POSITIVE_K) !! Superconducting energies
+
+  REAL(REAL64) :: phi_rot
+  INTEGER(INT32) :: nr_points = 3
+  INTEGER(INT32) :: nphi_points = 7
+  INTEGER(INT32) :: n_pi_3_rotations = 1
+  INTEGER(INT32) :: row, col
+  INTEGER(INT32) :: i, j, ir, jphi
+  INTEGER(INT32) :: spin, spin_inv, orb, lat, lat_inv, neigh
+  INTEGER(INT32) :: current_lat_block, next_lat_block
+  INTEGER(INT32) :: row_gamma, col_gamma
+  REAL(REAL64) :: kx, ky, dr, dphi, kx_minus, ky_minus, kx_rot, ky_rot
+
+  COMPLEX(REAL64) :: exp_sum_nearest
+  COMPLEX(REAL64) :: exp_sum_next
+
+  Was_checked = .FALSE.
+  dr = 1./nr_points
+  dphi = PI / 2./nphi_points
+
+  ASSOCIATE (DIM => sc_input % discretization % derived % DIM, &
+             DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+             TBA_DIM => sc_input % discretization % derived % TBA_DIM, &
+             LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS, &
+             ORBITALS => sc_input % discretization % ORBITALS, &
+             & SUBLATTICES => sc_input % discretization % SUBLATTICES)
+
+    Gamma_SC = 0.
+    !Setting fully-symmetric pairing symmetry
+    DO i = 1, DIM_POSITIVE_K
+      Gamma_SC(i, i) = gamma_nearest
+    END DO
+    !Checks
+    Checks = [ &
+              !Nearest neighbours
+              ! ==== up - down ====
+              entry_check_t(1, DIM_POSITIVE_K + 1, gamma_nearest), &
+              entry_check_t(2, DIM_POSITIVE_K + 2, gamma_nearest), &
+              entry_check_t(3, DIM_POSITIVE_K + 3, gamma_nearest), &
+              entry_check_t(4, DIM_POSITIVE_K + 4, gamma_nearest), &
+              entry_check_t(5, DIM_POSITIVE_K + 5, gamma_nearest), &
+              entry_check_t(6, DIM_POSITIVE_K + 6, gamma_nearest), &
+              entry_check_t(7, DIM_POSITIVE_K + 7, gamma_nearest), &
+              entry_check_t(8, DIM_POSITIVE_K + 8, gamma_nearest), &
+              entry_check_t(9, DIM_POSITIVE_K + 9, gamma_nearest), &
+              entry_check_t(10, DIM_POSITIVE_K + 10, gamma_nearest), &
+              entry_check_t(11, DIM_POSITIVE_K + 11, gamma_nearest), &
+              entry_check_t(12, DIM_POSITIVE_K + 12, gamma_nearest)]
+
+    DO ir = 0, nr_points
+      DO jphi = -nphi_points, nphi_points
+        kx = ir * dr * COS(jphi * dphi)
+        ky = ir * dr * SIN(jphi * dphi)
+
+        Hamiltonian = CMPLX(0., 0., KIND=REAL64)
+        CALL COMPUTE_SC_BAND(Hamiltonian, kx, ky, Gamma_SC, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM)
+
+        CALL PRINT_HAMILTONIAN(Hamiltonian, sc_input % discretization % derived % DIM, "H_SC_band")
+
+        DO i = 1, size(Checks)
+          !Electron part
+          row = Checks(i) % i
+          col = Checks(i) % j
+          Was_checked(row, col) = .TRUE.
+          Was_checked(col, row) = .TRUE.
+          !Top triangle
+          @assertEqual(Checks(i) % elem_value, Hamiltonian(row, col), tolerance=1.0e-7)
+          !Bottom triangle
+          @assertEqual(CONJG(Checks(i) % elem_value), Hamiltonian(col, row), tolerance=1.0e-7)
+        END DO
+
+        CALL check_zero_elems(Hamiltonian, Was_checked, DIM)
+
+        Hamiltonian_minus_k = CMPLX(0., 0., KIND=REAL64)
+        kx_minus = -kx
+        ky_minus = -ky
+        CALL COMPUTE_SC_BAND(Hamiltonian_minus_k, kx_minus, ky_minus, Gamma_SC, sc_input % discretization)
+        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_minus_k, DIM)
+        CALL check_time_reversal_symmetry(Hamiltonian, Hamiltonian_minus_k, DIM)
+
+        ! THis no longer works, because I work in the band basis, not spin/orbital/sublattice basis
+        ! for which the rotation operation was derived.
+        ! Instead, this will always be invariant in the band basis, as we assume no k-dependence yet.
+
+        !Check rotational symmetry
+        ! Hamiltonian_rotated = CMPLX(0., 0., KIND=REAL64)
+        ! phi_rot = n_pi_3_rotations * PI / 3
+        ! kx_rot = ir * dr * COS(jphi * dphi - phi_rot)
+        ! ky_rot = ir * dr * SIN(jphi * dphi - phi_rot)
+        ! CALL COMPUTE_SC_BAND(Hamiltonian_rotated, kx_rot, ky_rot, Gamma_SC, sc_input % discretization)
+        ! CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian_rotated, DIM)
+        ! CALL PRINT_HAMILTONIAN(Hamiltonian_rotated, sc_input % discretization % derived % DIM, "H_SC_band_rotated")
+        ! CALL check_rotational_symmetry(n_pi_3_rotations, Hamiltonian, Hamiltonian_rotated, DIM)
+
+      END DO
+    END DO
+  END ASSOCIATE
+END SUBROUTINE test_compute_sc_band
 
 END MODULE test_hamiltonians

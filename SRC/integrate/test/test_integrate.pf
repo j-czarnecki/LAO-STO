@@ -1,0 +1,111 @@
+!! This file is part of LAO-STO.
+!!
+!! Copyright (C) 2025 Julian Czarnecki
+!!
+!! This program is free software: you can redistribute it and/or modify
+!! it under the terms of the GNU General Public License as published by
+!! the Free Software Foundation, either version 3 of the License, or
+!! (at your option) any later version.
+!!
+!! This program is distributed in the hope that it will be useful,
+!! but WITHOUT ANY WARRANTY; without even the implied warranty of
+!! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+!! GNU General Public License for more details.
+!!
+!! You should have received a copy of the GNU General Public License
+!! along with this program.  If not, see <https://www.gnu.org/licenses/>.
+!!
+!! If you use this code for scientific research, please cite:
+!! J. Czarnecki et. al.,
+!! "Superconducting gap symmetry of 2DEG at (111)-oriented LaAlO3/SrTiO3 interface",
+!! arXiv:2508.05075 (2025).
+!! https://arxiv.org/abs/2508.05075
+
+MODULE test_integrate
+USE funit
+USE types
+USE integrate
+use, intrinsic :: iso_fortran_env, only: real64, int8, int16, int32, int64
+IMPLICIT NONE
+
+!------------------------------------------------------------------------------
+!----------------------------- LOCAL VARIABLES --------------------------------
+!------------------------------------------------------------------------------
+TYPE(sc_input_params_t) :: sc_input
+
+CONTAINS
+!------------------------------------------------------------------------------
+!---------------------------- SETUP/TEARDOWN ----------------------------------
+!------------------------------------------------------------------------------
+@before
+SUBROUTINE setup()
+  !TODO: Initialize sc_input parameters for testing
+  !TODO: Set discretization parameters
+  !TODO: Set romberg integration parameters
+  !TODO: Set physical parameters
+END SUBROUTINE setup
+
+@after
+SUBROUTINE teardown()
+  !TODO: Clean up any allocated memory
+END SUBROUTINE teardown
+
+!------------------------------------------------------------------------------
+!------------------------------- HELPERS --------------------------------------
+!------------------------------------------------------------------------------
+
+!TODO: Add helper functions for test setup
+
+!------------------------------------------------------------------------------
+!----------------------------- TESTS ------------------------------------------
+!------------------------------------------------------------------------------
+
+!TODO: Think about edge-case testing for POLINT
+
+@test
+SUBROUTINE test_polint_quadratic()
+  COMPLEX(REAL64) :: X(3), Y(3)
+  COMPLEX(REAL64) :: x_target, y_approx, dy
+  INTEGER(INT32) :: i
+
+  !Quadratic: f(x) = x^2, points at x=0,1,2
+  DO i = 1, 3
+    X(i) = CMPLX(REAL(i - 1, REAL64), 0.0_REAL64, KIND=REAL64)
+    Y(i) = CMPLX(REAL(i - 1, REAL64)**2, 0.0_REAL64, KIND=REAL64)
+  END DO
+
+  !Test at x=0.5, expect 0.25
+  x_target = CMPLX(0.5_REAL64, 0.0_REAL64, KIND=REAL64)
+  CALL POLINT(X, Y, 3, x_target, y_approx, dy)
+  @assertEqual(0.25_REAL64, REAL(y_approx), tolerance=1.0e-10)
+  PRINT *, "Dy (quadratic at 0.5): ", dy
+
+  !Test at x=1.5, expect 2.25
+  x_target = CMPLX(1.5_REAL64, 0.0_REAL64, KIND=REAL64)
+  CALL POLINT(X, Y, 3, x_target, y_approx, dy)
+  @assertEqual(2.25_REAL64, REAL(y_approx), tolerance=1.0e-10)
+  PRINT *, "Dy (quadratic at 1.5): ", dy
+
+  !Test linear approximation at 0.5, expect 0.5
+  x_target = CMPLX(5.0_REAL64, 0.0_REAL64, KIND=REAL64)
+  CALL POLINT(X(1), Y(1), 2, x_target, y_approx, dy)
+  @assertEqual(5.0_REAL64, REAL(y_approx), tolerance=1.0e-10)
+  PRINT *, "Dy (linear at 0.5): ", dy
+END SUBROUTINE test_polint_quadratic
+
+@test
+SUBROUTINE test_polint_linear()
+  COMPLEX(REAL64) :: X(2), Y(2)
+  COMPLEX(REAL64) :: x_target, y_approx, dy
+
+  !Linear: f(x) = 2x + 1
+  X = [CMPLX(0.0_REAL64, 0.0_REAL64, KIND=REAL64), CMPLX(1.0_REAL64, 0.0_REAL64, KIND=REAL64)]
+  Y = [CMPLX(1.0_REAL64, 0.0_REAL64, KIND=REAL64), CMPLX(3.0_REAL64, 0.0_REAL64, KIND=REAL64)]
+
+  !Test at x=0.5, expect 2.0
+  x_target = CMPLX(0.5_REAL64, 0.0_REAL64, KIND=REAL64)
+  CALL POLINT(X, Y, 2, x_target, y_approx, dy)
+  @assertEqual(2.0_REAL64, REAL(y_approx), tolerance=1.0e-10)
+END SUBROUTINE test_polint_linear
+
+END MODULE test_integrate

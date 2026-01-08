@@ -24,6 +24,7 @@
 MODULE utilities
 use, intrinsic :: iso_fortran_env, only: real64, int8, int16, int32, int64
 USE parameters
+USE types
 IMPLICIT NONE
 CONTAINS
 
@@ -86,9 +87,9 @@ SUBROUTINE DIAGONALIZE_GENERALIZED(Hamiltonian, Eigenvalues, U_transformation, N
   END IF
 
   !Removing phase ambiguity
-  DO i = 1, N
-    U_transformation(:, i) = U_transformation(:, i) * CONJG(U_transformation(1, i)) / ABS(U_transformation(1, i))
-  END DO
+  ! DO i = 1, N
+  !   U_transformation(:, i) = U_transformation(:, i) * CONJG(U_transformation(1, i)) / ABS(U_transformation(1, i))
+  ! END DO
   Eigenvalues(:) = REAL(W(:))
 
   DEALLOCATE (W)
@@ -109,57 +110,6 @@ PURE RECURSIVE SUBROUTINE COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, N)
     END DO
   END DO
 END SUBROUTINE COMPUTE_CONJUGATE_ELEMENTS
-
-RECURSIVE FUNCTION partition(X, N, low_bound, high_bound) RESULT(pivot_idx)
-  IMPLICIT NONE
-  INTEGER(INT32) :: pivot_idx
-  INTEGER(INT32), INTENT(IN) :: N
-  REAL(REAL64), INTENT(INOUT) :: X(N)
-  INTEGER(INT32), INTENT(IN) :: low_bound, high_bound
-
-  INTEGER(INT32) :: i, j
-  REAL(REAL64) :: pivot, temp
-
-  pivot = X((low_bound + high_bound) / 2)
-  i = low_bound - 1
-  j = high_bound + 1
-
-  DO
-    DO
-      i = i + 1
-      IF (X(i) >= pivot) EXIT
-    END DO
-
-    DO
-      j = j - 1
-      IF (X(j) <= pivot) EXIT
-    END DO
-
-    IF (i >= j) THEN
-      pivot_idx = j
-      RETURN
-    END IF
-
-    temp = X(i)
-    X(i) = X(j)
-    X(j) = temp
-  END DO
-END FUNCTION partition
-
-RECURSIVE SUBROUTINE QSORT(X, N, low_bound, high_bound)
-  IMPLICIT NONE
-  INTEGER(INT32), INTENT(IN) :: N
-  REAL(REAL64), INTENT(INOUT) :: X(N)
-  INTEGER(INT32), INTENT(IN) :: low_bound, high_bound
-
-  INTEGER(INT32) :: pivot_index
-
-  IF (low_bound < high_bound) THEN
-    pivot_index = partition(X, N, low_bound, high_bound)
-    CALL QSORT(X, N, low_bound, pivot_index)
-    CALL QSORT(X, N, pivot_index + 1, high_bound)
-  END IF
-END SUBROUTINE QSORT
 
 !---------------------------------------------------------------------------------------
 !------------------------------ KINETIC TERMS ------------------------------------------
@@ -506,6 +456,60 @@ RECURSIVE FUNCTION r_max_phi(phi) RESULT(r_max)
   r_max = R_K_MAX * SQRT(3.0d0) / (2.0d0 * COS(phi - PI / 6.0d0))
 END FUNCTION r_max_phi
 
+!---------------------------------------------------------------------------------------
+!------------------------------ MATHS AND ALGORITHMS -----------------------------------
+!---------------------------------------------------------------------------------------
+RECURSIVE FUNCTION partition(X, N, low_bound, high_bound) RESULT(pivot_idx)
+  IMPLICIT NONE
+  INTEGER(INT32) :: pivot_idx
+  INTEGER(INT32), INTENT(IN) :: N
+  REAL(REAL64), INTENT(INOUT) :: X(N)
+  INTEGER(INT32), INTENT(IN) :: low_bound, high_bound
+
+  INTEGER(INT32) :: i, j
+  REAL(REAL64) :: pivot, temp
+
+  pivot = X((low_bound + high_bound) / 2)
+  i = low_bound - 1
+  j = high_bound + 1
+
+  DO
+    DO
+      i = i + 1
+      IF (X(i) >= pivot) EXIT
+    END DO
+
+    DO
+      j = j - 1
+      IF (X(j) <= pivot) EXIT
+    END DO
+
+    IF (i >= j) THEN
+      pivot_idx = j
+      RETURN
+    END IF
+
+    temp = X(i)
+    X(i) = X(j)
+    X(j) = temp
+  END DO
+END FUNCTION partition
+
+RECURSIVE SUBROUTINE QSORT(X, N, low_bound, high_bound)
+  IMPLICIT NONE
+  INTEGER(INT32), INTENT(IN) :: N
+  REAL(REAL64), INTENT(INOUT) :: X(N)
+  INTEGER(INT32), INTENT(IN) :: low_bound, high_bound
+
+  INTEGER(INT32) :: pivot_index
+
+  IF (low_bound < high_bound) THEN
+    pivot_index = partition(X, N, low_bound, high_bound)
+    CALL QSORT(X, N, low_bound, pivot_index)
+    CALL QSORT(X, N, pivot_index + 1, high_bound)
+  END IF
+END SUBROUTINE QSORT
+
 FUNCTION kronecker_product(A, B) result(K)
   IMPLICIT NONE
   COMPLEX(REAL64), intent(in) :: A(:, :), B(:, :)
@@ -518,6 +522,136 @@ FUNCTION kronecker_product(A, B) result(K)
     end do
   end do
 END FUNCTION kronecker_product
+
+!---------------------- SPARSE MATRIX STORAGE ---------------------------------------------
+
+PURE RECURSIVE SUBROUTINE MATRICIZE_INTERACTION_TENSOR(Tensor, n_index_elems, Matricized_tensor)
+  !! Given a tensor V_{ijkl} it returns a 2D matrix representation V_{(ij)(kl)}
+  IMPLICIT NONE
+  INTEGER(INT32), INTENT(IN) :: n_index_elems !! Number of elements a single index can take
+  REAL(REAL64), INTENT(IN) :: Tensor(n_index_elems, n_index_elems, n_index_elems, n_index_elems) !! Original tensor
+  REAL(REAL64), INTENT(OUT) :: Matricized_tensor(n_index_elems * n_index_elems, n_index_elems * n_index_elems) !! Matricized tensor
+
+  INTEGER(INT32) :: i, j, k, l
+  DO i = 1, n_index_elems
+    DO j = 1, n_index_elems
+      DO k = 1, n_index_elems
+        DO l = 1, n_index_elems
+          Matricized_tensor(get_matricized_index(i, j, n_index_elems), get_matricized_index(k, l, n_index_elems)) = Tensor(i, j, k, l)
+        END DO
+      END DO
+    END DO
+  END DO
+END SUBROUTINE MATRICIZE_INTERACTION_TENSOR
+
+!TODO: Utilize that the matrix has to be hermitian/symmetric with respect to certain transformations
+SUBROUTINE SAVE_SPARSE_MATRIX_IN_CRS(Matrix, Values, Column_indeces, Row_pointers, n_nonzero, matrix_size)
+  !! Given a sparse matrix it saves it in a compressed row storage format.
+  !! An assumption is that the matrix has to be hermitian.
+  IMPLICIT NONE
+  INTEGER(INT32), INTENT(IN) :: n_nonzero
+  INTEGER(INT32), INTENT(IN) :: matrix_size
+  REAL(REAL64), INTENT(IN) :: Matrix(matrix_size, matrix_size)
+  REAL(REAL64), INTENT(OUT) :: Values(n_nonzero)
+  INTEGER(INT32), INTENT(OUT) :: Column_indeces(n_nonzero)
+  INTEGER(INT32), INTENT(OUT) :: Row_pointers(matrix_size + 1)
+
+  INTEGER(INT32) :: i, j, n_current_nonzero_value
+
+  Row_pointers(1) = 1
+  n_current_nonzero_value = 1
+  DO i = 1, matrix_size
+    DO j = 1, matrix_size
+      IF (Matrix(i, j) .NE. CMPLX(0.0d0, 0.0d0)) THEN
+        Values(n_current_nonzero_value) = Matrix(i, j)
+        Column_indeces(n_current_nonzero_value) = j
+        n_current_nonzero_value = n_current_nonzero_value + 1
+      END IF
+    END DO
+    Row_pointers(i + 1) = n_current_nonzero_value
+  END DO
+
+  IF (n_current_nonzero_value - 1 .NE. n_nonzero) STOP "Error in saving sparse matrix in CRS format - number of elements nonzero is not correct"
+END SUBROUTINE SAVE_SPARSE_MATRIX_IN_CRS
+
+PURE RECURSIVE FUNCTION calculate_number_of_nonzero_elements(Matrix) RESULT(n)
+  IMPLICIT NONE
+  INTEGER(INT32) :: n
+  REAL(REAL64), INTENT(IN) :: Matrix(:, :)
+
+  INTEGER(INT32) :: i, j
+
+  n = 0
+  DO i = 1, SIZE(Matrix, 1)
+    DO j = 1, SIZE(Matrix, 2)
+      IF (Matrix(i, j) .NE. CMPLX(0.0d0, 0.0d0)) THEN
+        n = n + 1
+      END IF
+    END DO
+  END DO
+END FUNCTION calculate_number_of_nonzero_elements
+
+PURE RECURSIVE FUNCTION get_matricized_index(i, j, n_index_elems) RESULT(index)
+  !! Given two indeces of a tensor V_{ijkl} it returns a single index in 2D matrix representation
+  !! V_{(ij)(kl)}
+  IMPLICIT NONE
+  INTEGER(INT32) :: index
+  INTEGER(INT32), INTENT(IN) :: i, j !! Indeces from which the combined single index has to be calculated
+  INTEGER(INT32), INTENT(IN) :: n_index_elems !! Number of values the i or j index can take.
+
+  index = (i - 1) * n_index_elems + j
+END FUNCTION get_matricized_index
+
+PURE RECURSIVE FUNCTION get_dematricized_indeces(matricized_index, n_index_elems) RESULT(Indeces)
+  !! Given a single index in 2D matrix representation it returns the indeces of a tensor V_{ijkl}
+  !! from V_{(ij)(kl)}
+  IMPLICIT NONE
+  INTEGER(INT32) :: Indeces(2)
+  INTEGER(INT32), INTENT(IN) :: matricized_index !! Single index in 2D matrix representation
+  INTEGER(INT32), INTENT(IN) :: n_index_elems !! Number of values the i or j index can take.
+
+  Indeces(1) = (matricized_index - 1) / n_index_elems + 1
+  Indeces(2) = matricized_index - (Indeces(1) - 1) * n_index_elems
+END FUNCTION get_dematricized_indeces
+
+PURE RECURSIVE FUNCTION get_index_from_degress_of_freedom(Degrees_of_freedom, discretization) RESULT(index)
+  !! Given set of quantum numbers returns and index that will be ascribed to this is in the Hamiltonian
+  IMPLICIT NONE
+  TYPE(discretization_t), INTENT(IN) :: discretization !! Discretization parameters
+  INTEGER(INT32) :: index !! Index in the Hamiltonian
+  INTEGER(INT32), INTENT(IN) :: Degrees_of_freedom(4) !! [orb, lat, spin, nambu]
+                                                      !! Orbital number [1 ... ORBITALS]
+                                                      !! Sublattice number [1 ... SUBLATTICES]
+                                                      !! Spin number [1 2]
+                                                      !! Electron/hole part [1 2]
+
+  INTEGER(INT32) :: orb, lat, spin, nambu
+
+  orb = Degrees_of_freedom(1)
+  lat = Degrees_of_freedom(2)
+  spin = Degrees_of_freedom(3)
+  nambu = Degrees_of_freedom(4)
+
+  index = orb + (lat - 1) * discretization % ORBITALS + (spin - 1) * discretization % derived % TBA_DIM + &
+    & (nambu - 1) * discretization % derived % DIM_POSITIVE_K
+END FUNCTION get_index_from_degress_of_freedom
+
+PURE RECURSIVE FUNCTION get_degress_of_freedom_from_index(index, discretization) RESULT(Degrees_of_freedom)
+  !! Given an index in the Hamiltonian returns the set of quantum numbers
+  IMPLICIT NONE
+  TYPE(discretization_t), INTENT(IN) :: discretization !! Discretization parameters
+  INTEGER(INT32) :: Degrees_of_freedom(4) !! [orb, lat, spin, nambu]
+                                          !! Orbital number [1 ... ORBITALS]
+                                          !! Sublattice number [1 ... SUBLATTICES]
+                                          !! Spin number [1 2]
+                                          !! Electron/hole part [1 2]
+  INTEGER(INT32), INTENT(IN) :: index !! Single index in 2D matrix representation
+
+  Degrees_of_freedom(1) = MOD(index - 1, discretization % ORBITALS) + 1 ! orbital
+  Degrees_of_freedom(2) = MOD((index - 1) / discretization % ORBITALS, discretization % SUBLATTICES) + 1 ! sublattice
+  Degrees_of_freedom(3) = MOD((index - 1) / discretization % derived % TBA_DIM, SPINS) + 1 ! spin
+  Degrees_of_freedom(4) = (index - 1) / discretization % derived % DIM_POSITIVE_K + 1 ! nambu
+END FUNCTION get_degress_of_freedom_from_index
 
 ! Testing functions
 SUBROUTINE ROTATE_HAMILTONIAN_60_DEG(Hamiltonian, DIM)

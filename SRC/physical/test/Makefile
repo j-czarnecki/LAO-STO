@@ -5,13 +5,14 @@ BUILD_DIR := build
 
 .PHONY: all run clean tidy
 
-all: hamiltonians_test_suite tidy
+all: hamiltonians_test_suite utilities_test_suite tidy
 
 run:
 	./hamiltonians_test_suite
+	./utilities_test_suite
 
 clean:
-	$(RM) -rf $(BUILD_DIR) hamiltonians_test_suite OutputData/*.dat
+	$(RM) -rf $(BUILD_DIR) hamiltonians_test_suite utilities_test_suite OutputData/*.dat
 
 tidy:
 	@echo "Tidying up build artifacts..."
@@ -33,7 +34,13 @@ include $(LATEST_PFUNIT_DIR)/include/PFUNIT.mk
 
 INC_DIRS := -I../src/OBJ -I../src/MOD
 SUT_LIB_DIR := ../src
-LIBS := -llapack -lblas
+LIBS := -qmkl
+FFLAGS += -qmkl
+FFLAGS += -O0 -g
+FFLAGS += -traceback
+FFLAGS += -check all
+#FFLAGS += -warn all -warn errors
+FFLAGS += -fpe0
 
 FFLAGS += $(PFUNIT_EXTRA_FFLAGS)
 FFLAGS += $(LIBS)
@@ -45,9 +52,14 @@ hamiltonians_test_suite_REGISTRY :=
 hamiltonians_test_suite_OTHER_SOURCES :=
 hamiltonians_test_suite_OTHER_LIBRARIES := -L$(SUT_LIB_DIR) -lsut $(LIBS)
 hamiltonians_test_suite_OTHER_INCS := $(INC_DIRS)
-
 $(eval $(call make_pfunit_test,hamiltonians_test_suite))
 
+utilities_test_suite_TESTS := test_utilities.pf
+utilities_test_suite_REGISTRY :=
+utilities_test_suite_OTHER_SOURCES :=
+utilities_test_suite_OTHER_LIBRARIES := -L$(SUT_LIB_DIR) -lsut $(LIBS)
+utilities_test_suite_OTHER_INCS := $(INC_DIRS)
+$(eval $(call make_pfunit_test,utilities_test_suite))
 
 
 

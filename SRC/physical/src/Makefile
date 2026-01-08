@@ -10,15 +10,21 @@ MOD_DIR := MOD
 SRCS := $(SRC_DIR)/physical/src/hamiltonians.f90 \
 				$(SRC_DIR)/physical/src/utilities.f90 \
 				$(SRC_DIR)/physical/src/parameters.f90 \
-				$(SRC_DIR)/input_output/reader.f90 \
-				$(SRC_DIR)/input_output/writers.f90 \
-				$(SRC_DIR)/input_output/logger.f90 \
+				$(SRC_DIR)/input_output/src/reader.f90 \
+				$(SRC_DIR)/input_output/src/writers.f90 \
+				$(SRC_DIR)/input_output/src/logger.f90 \
 				$(SRC_DIR)/types/types.f90
 
 OBJS:= $(patsubst $(SRC_DIR)/%.f90,$(OBJ_DIR)/%.o,$(SRCS))
 
-LIBS = -llapack -lblas
-FFLAGS += -fpp -I$(SRC_DIR)/input_output -module $(MOD_DIR)
+LIBS = -qmkl
+FFLAGS += -qmkl
+FFLAGS += -fpp -I$(SRC_DIR)/input_output/src -module $(MOD_DIR)
+FFLAGS += -O0 -g
+FFLAGS += -traceback
+FFLAGS += -check all
+#FFLAGS += -warn all -warn errors
+FFLAGS += -fpe0
 
 .PHONY: all clean libsut.a
 
