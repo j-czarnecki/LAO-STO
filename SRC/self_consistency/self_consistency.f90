@@ -69,7 +69,8 @@ SUBROUTINE SET_GAMMA_INITIAL(Gamma_SC, J_tensor_crs, gamma_start_nearest, gamma_
     IF (J_tensor_crs % Row_indices(i + 1) .NE. J_tensor_crs % Row_indices(i)) THEN
       Dematricized_indices = get_dematricized_indeces(i, discretization % derived % DIM_POSITIVE_K)
 #ifndef BAND_BASIS
-      Gamma_SC(:, Dematricized_indices(1), Dematricized_indices(2), :) = gamma_start_nearest
+      Gamma_SC(:N_NEAREST_NEIGHBOURS, Dematricized_indices(1), Dematricized_indices(2), :) = gamma_start_nearest
+      Gamma_SC(N_NEAREST_NEIGHBOURS + 1:N_ALL_NEIGHBOURS, Dematricized_indices(1), Dematricized_indices(2), :) = gamma_start_next
 #else
       Gamma_SC(Dematricized_indices(1), Dematricized_indices(2), :) = gamma_start_nearest
 #endif
@@ -188,7 +189,7 @@ SUBROUTINE CHECK_CONVERGENCE(sc_flag, Gamma_old, Gamma_new, Charge_dens, Charge_
   charge_max_error = 0.
   !Here we check whether convergence was reached
   sc_flag = .FALSE.
-  gamma_max_error = MAXVAL(ABS(ABS(Gamma_new) - ABS(Gamma_old)))
+  gamma_max_error = MAXVAL(ABS(Gamma_new - Gamma_old))
   charge_max_error = MAXVAL(ABS(Charge_dens - Charge_dens_new))
   IF (gamma_max_error < self_consistency % gamma_eps_convergence .AND. charge_max_error < self_consistency % charge_eps_convergence) THEN
     sc_flag = .TRUE.

@@ -45,13 +45,18 @@ SUBROUTINE CALCULATE_DOS(dos_params)
   INTEGER(INT32) :: DOS_steps
   INTEGER(INT32) :: hamiltonian_dim
 
-  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian(:, :), Hamiltonian_const(:, :), Hamiltonian_const_band(:, :), U_transformation(:, :)
+  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian(:, :), Hamiltonian_const(:, :), Hamiltonian_const_band(:, :)
   REAL(REAL64), ALLOCATABLE :: Energies(:)
 
-  COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :)
+#ifndef BAND_BASIS
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :, :)
+#else
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :)
+#endif
+
   REAL(REAL64), ALLOCATABLE :: Charge_dens(:, :)
 
-  REAL(REAL64), ALLOCATABLE :: DOS(:), DOS_local(:)
+  REAL(REAL64), ALLOCATABLE :: DOS(:, :), DOS_local(:, :)
   CHARACTER(LEN=20) :: output_format
 
   REAL(REAL64) :: k1, k2, kx, ky, dk1, dk2
@@ -94,12 +99,15 @@ SUBROUTINE CALCULATE_DOS(dos_params)
     ALLOCATE (Hamiltonian(DIM, DIM))
     ALLOCATE (Hamiltonian_const(DIM, DIM))
     ALLOCATE (Hamiltonian_const_band(DIM, DIM))
-    ALLOCATE (U_transformation(hamiltonian_dim, hamiltonian_dim))
     ALLOCATE (Energies(hamiltonian_dim))
-    ALLOCATE (Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, LAYER_COUPLINGS, SUBBANDS))
+#ifndef BAND_BASIS
+    ALLOCATE (Gamma_SC(N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS, DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+#else
+    ALLOCATE (Gamma_SC(DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+#endif
     ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
-    ALLOCATE (DOS(0:DOS_steps))
-    ALLOCATE (DOS_local(0:DOS_steps))
+    ALLOCATE (DOS(DIM_POSITIVE_K, 0:DOS_steps))
+    ALLOCATE (DOS_local(DIM_POSITIVE_K, 0:DOS_steps))
   END ASSOCIATE
   Hamiltonian = CMPLX(0., 0., KIND=REAL64)
   Hamiltonian_const = CMPLX(0., 0., KIND=REAL64)
@@ -126,7 +134,9 @@ SUBROUTINE CALCULATE_DOS(dos_params)
 
     WRITE (log_string, *) "Calculating energies and integrating DOS..."
     LOG_INFO(log_string)
-    !$omp parallel private(E0, k1, k2, kx, ky, Hamiltonian, Energies, U_transformation, DOS_local, points_within_energy_range_local)
+    !$omp parallel private(E0, k1, k2, kx, ky, Hamiltonian, Energies, &
+    !$omp                & DOS_local, points_within_energy_range_local)
+
     DOS_local = 0.0d0 !Initialize DOS_local for each thread!
     points_within_energy_range_local = 0
     !$omp do collapse(2)
@@ -139,17 +149,14 @@ SUBROUTINE CALCULATE_DOS(dos_params)
         ky = -2.*PI / 3.*k1 + 4.*PI / 3.*k2
         Hamiltonian(:, :) = CMPLX(0., 0., KIND=REAL64)
         CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
-        CALL COMPUTE_HUBBARD(Hamiltonian, &
-                            & Charge_dens(:, band), &
-                            & sc_input % physical % subband_params % U_HUB, &
-                            & sc_input % physical % subband_params % V_HUB, &
-                            & sc_input % discretization)
-        CALL COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC(:, :, :, :, :, band), sc_input % discretization)
-        CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM) !This is not needed, since ZHEEV takes only upper triangle
-
-        Hamiltonian = sc_multiplier * (Hamiltonian_const_band + Hamiltonian) !Should by multiplied by 0.5 if in Nambu space
-
-        CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:hamiltonian_dim, :hamiltonian_dim), Energies(:), U_transformation(:, :), hamiltonian_dim)
+        Hamiltonian = Hamiltonian_const_band + Hamiltonian
+#ifndef BAND_BASIS
+        CALL COMPUTE_INTERACTIONS(Hamiltonian, kx, ky, Charge_dens, Gamma_SC, sc_input % discretization, sc_input % physical)
+#else
+        CALL COMPUTE_INTERACTIONS_BAND_BASIS(Hamiltonian, kx, ky, Charge_dens, Gamma_SC, sc_input % discretization, sc_input % physical)
+#endif
+        Hamiltonian = sc_multiplier * Hamiltonian !Should by multiplied by 0.5 if in Nambu space
+        CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:hamiltonian_dim, :hamiltonian_dim), Energies(:), hamiltonian_dim)
 
         ! If lowest energy is beyond the range we are calculating the DOS for, skip
         ! This might be changed if magnetic field is to be introduced
@@ -160,7 +167,7 @@ SUBROUTINE CALCULATE_DOS(dos_params)
         DO n = 0, DOS_steps
           E0 = dos_params % E_min + n * dos_params % dE0
           DO k = 1, hamiltonian_dim
-            DOS_local(n) = DOS_local(n) + dirac_delta(Energies(k), E0, dos_params % zeta_DOS)
+            DOS_local(k, n) = DOS_local(k, n) + dirac_delta(Energies(k), E0, dos_params % zeta_DOS)
           END DO
         END DO
 
@@ -175,23 +182,20 @@ SUBROUTINE CALCULATE_DOS(dos_params)
               ky = -2.*PI / 3.*k1 + 4.*PI / 3.*k2
               Hamiltonian(:, :) = CMPLX(0., 0., KIND=REAL64)
               CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
-              CALL COMPUTE_HUBBARD(Hamiltonian, &
-                                  & Charge_dens(:, band), &
-                                  & sc_input % physical % subband_params % U_HUB, &
-                                  & sc_input % physical % subband_params % V_HUB, &
-                                  & sc_input % discretization)
-              CALL COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC(:, :, :, :, :, band), sc_input % discretization)
-              CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM) !This is not needed, since ZHEEV takes only upper triangle
-
-              Hamiltonian(:, :) = sc_multiplier * (Hamiltonian_const_band + Hamiltonian) !Should by multiplied by 0.5 if in Nambu space
-
-              CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:hamiltonian_dim, :hamiltonian_dim), Energies(:), U_transformation(:, :), hamiltonian_dim)
+              Hamiltonian = Hamiltonian_const_band + Hamiltonian
+#ifndef BAND_BASIS
+              CALL COMPUTE_INTERACTIONS(Hamiltonian, kx, ky, Charge_dens, Gamma_SC, sc_input % discretization, sc_input % physical)
+#else
+              CALL COMPUTE_INTERACTIONS_BAND_BASIS(Hamiltonian, kx, ky, Charge_dens, Gamma_SC, sc_input % discretization, sc_input % physical)
+#endif
+              Hamiltonian = sc_multiplier * Hamiltonian !Should by multiplied by 0.5 if in Nambu space
+              CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:hamiltonian_dim, :hamiltonian_dim), Energies(:), hamiltonian_dim)
 
               !Update DOS for current thread.
               DO n = 0, DOS_steps
                 E0 = dos_params % E_min + n * dos_params % dE0
                 DO k = 1, hamiltonian_dim
-                  DOS_local(n) = DOS_local(n) + dirac_delta(Energies(k), E0, dos_params % zeta_DOS)
+                  DOS_local(k, n) = DOS_local(k, n) + dirac_delta(Energies(k), E0, dos_params % zeta_DOS)
                 END DO
               END DO
 
@@ -208,23 +212,20 @@ SUBROUTINE CALCULATE_DOS(dos_params)
             ky = -2.*PI / 3.*k1 + 4.*PI / 3.*k2
             Hamiltonian(:, :) = CMPLX(0., 0., KIND=REAL64)
             CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
-            CALL COMPUTE_HUBBARD(Hamiltonian, &
-                                & Charge_dens(:, band), &
-                                & sc_input % physical % subband_params % U_HUB, &
-                                & sc_input % physical % subband_params % V_HUB, &
-                                & sc_input % discretization)
-            CALL COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC(:, :, :, :, :, band), sc_input % discretization)
-            CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM) !This is not needed, since ZHEEV takes only upper triangle
-
-            Hamiltonian(:, :) = sc_multiplier * (Hamiltonian_const_band + Hamiltonian) !Should by multiplied by 0.5 if in Nambu space
-
-            CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:hamiltonian_dim, :hamiltonian_dim), Energies(:), U_transformation(:, :), hamiltonian_dim)
+            Hamiltonian = Hamiltonian_const_band + Hamiltonian
+#ifndef BAND_BASIS
+            CALL COMPUTE_INTERACTIONS(Hamiltonian, kx, ky, Charge_dens, Gamma_SC, sc_input % discretization, sc_input % physical)
+#else
+            CALL COMPUTE_INTERACTIONS_BAND_BASIS(Hamiltonian, kx, ky, Charge_dens, Gamma_SC, sc_input % discretization, sc_input % physical)
+#endif
+            Hamiltonian = sc_multiplier * Hamiltonian !Should by multiplied by 0.5 if in Nambu space
+            CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:hamiltonian_dim, :hamiltonian_dim), Energies(:), hamiltonian_dim)
 
             !Update DOS for current thread.
             DO n = 0, DOS_steps
               E0 = dos_params % E_min + n * dos_params % dE0
               DO k = 1, hamiltonian_dim
-                DOS_local(n) = DOS_local(n) + dirac_delta(Energies(k), E0, dos_params % zeta_DOS)
+                DOS_local(k, n) = DOS_local(k, n) + dirac_delta(Energies(k), E0, dos_params % zeta_DOS)
               END DO
             END DO
 
@@ -240,23 +241,20 @@ SUBROUTINE CALCULATE_DOS(dos_params)
             ky = -2.*PI / 3.*k1 + 4.*PI / 3.*k2
             Hamiltonian(:, :) = CMPLX(0., 0., KIND=REAL64)
             CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
-            CALL COMPUTE_HUBBARD(Hamiltonian, &
-                                & Charge_dens(:, band), &
-                                & sc_input % physical % subband_params % U_HUB, &
-                                & sc_input % physical % subband_params % V_HUB, &
-                                & sc_input % discretization)
-            CALL COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC(:, :, :, :, :, band), sc_input % discretization)
-            CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM) !This is not needed, since ZHEEV takes only upper triangle
-
-            Hamiltonian(:, :) = sc_multiplier * (Hamiltonian_const_band + Hamiltonian) !Should by multiplied by 0.5 if in Nambu space
-
-            CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:hamiltonian_dim, :hamiltonian_dim), Energies(:), U_transformation(:, :), hamiltonian_dim)
+            Hamiltonian = Hamiltonian_const_band + Hamiltonian
+#ifndef BAND_BASIS
+            CALL COMPUTE_INTERACTIONS(Hamiltonian, kx, ky, Charge_dens, Gamma_SC, sc_input % discretization, sc_input % physical)
+#else
+            CALL COMPUTE_INTERACTIONS_BAND_BASIS(Hamiltonian, kx, ky, Charge_dens, Gamma_SC, sc_input % discretization, sc_input % physical)
+#endif
+            Hamiltonian = sc_multiplier * Hamiltonian !Should by multiplied by 0.5 if in Nambu space
+            CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:hamiltonian_dim, :hamiltonian_dim), Energies(:), hamiltonian_dim)
 
             !Update DOS for current thread.
             DO n = 0, DOS_steps
               E0 = dos_params % E_min + n * dos_params % dE0
               DO k = 1, hamiltonian_dim
-                DOS_local(n) = DOS_local(n) + dirac_delta(Energies(k), E0, dos_params % zeta_DOS)
+                DOS_local(k, n) = DOS_local(k, n) + dirac_delta(Energies(k), E0, dos_params % zeta_DOS)
               END DO
             END DO
 
@@ -269,7 +267,7 @@ SUBROUTINE CALCULATE_DOS(dos_params)
 
     !$omp critical (accumulate_dos)
     DO n = 0, DOS_steps
-      DOS(n) = DOS(n) + DOS_local(n)
+      DOS(:, n) = DOS(:, n) + DOS_local(:, n)
     END DO
     points_within_energy_range = points_within_energy_range + points_within_energy_range_local
     !$omp end critical (accumulate_dos)
@@ -278,7 +276,7 @@ SUBROUTINE CALCULATE_DOS(dos_params)
   END DO
 
   ! Normalize the DOS
-  IF (MAXVAL(DOS) .NE. 0.0d0) DOS = DOS / MAXVAL(DOS)
+  IF (MAXVAL(SUM(DOS, DIM=1)) .NE. 0.0d0) DOS = DOS / MAXVAL(SUM(DOS, DIM=1))
 
   WRITE (log_string, *) "Included points: ", points_within_energy_range, "out of ", dos_params % Nk_points**2
   LOG_INFO(log_string)
@@ -286,19 +284,18 @@ SUBROUTINE CALCULATE_DOS(dos_params)
   WRITE (log_string, *) "Writing DOS to file"
   LOG_INFO(log_string)
 
-  output_format = '(2E15.5)'
+  output_format = '(2E15.5, *(E15.5))'  !Adjust according to number of bands
   OPEN (unit=9, FILE=TRIM(dos_params % path)//"OutputData/DOS.dat", FORM="FORMATTED", ACTION="WRITE")
-  WRITE (9, '(A)') "#E[meV] DOS[a.u]"
+  WRITE (9, '(A)') "#E[meV]   DOS_total[a.u]    DOS_band1[a.u]   DOS_band2[a.u]   ... DOS_bandN[a.u]"
   DO n = 0, DOS_steps
     E0 = dos_params % E_min + n * dos_params % dE0
-    WRITE (9, output_format) E0 / meV2au, DOS(n)
+    WRITE (9, output_format) E0 / meV2au, SUM(DOS(:, n)), (DOS(k, n), k=1, sc_input % discretization % derived % DIM_POSITIVE_K)
   END DO
   CLOSE (9)
 
   DEALLOCATE (Hamiltonian)
   DEALLOCATE (Hamiltonian_const)
   DEALLOCATE (Hamiltonian_const_band)
-  DEALLOCATE (U_transformation)
   DEALLOCATE (Energies)
   DEALLOCATE (Gamma_SC)
   DEALLOCATE (Charge_dens)
@@ -323,7 +320,11 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
   COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian(:, :), Hamiltonian_const(:, :), Hamiltonian_const_band(:, :)
   REAL(REAL64), ALLOCATABLE :: Energies(:)
 
-  COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :)
+#ifndef BAND_BASIS
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :, :)
+#else
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :)
+#endif
   REAL(REAL64), ALLOCATABLE :: Charge_dens(:, :)
 
   REAL(REAL64) :: kx, ky
@@ -338,13 +339,9 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
   REAL(REAL64), ALLOCATABLE :: Lat_contributions(:)
   REAL(REAL64) :: spin_x_contribution, spin_y_contribution, spin_z_contribution
   REAL(REAL64) :: electron_contribution, hole_contribution
-  REAL(REAL64) :: brillouinZoneVertices(6, 2)
 
   LOGICAL :: fileExists
   INTEGER(INT32) :: hamiltonian_dim
-
-  brillouinZoneVertices(:, 1) = (/4.*PI / (3 * SQRT(3.0d0)), 2.*PI / (3 * SQRT(3.0d0)), -2.*PI / (3 * SQRT(3.0d0)), -4.*PI / (3 * SQRT(3.0d0)), -2.*PI / (3 * SQRT(3.0d0)), 2.*PI / (3 * SQRT(3.0d0))/)
-  brillouinZoneVertices(:, 2) = (/0.0d0, -2.*PI / 3.0d0, -2.*PI / 3.0d0, 0.0d0, 2.*PI / 3.0d0, 2.*PI / 3.0d0/)
 
   CALL GET_INPUT(TRIM(dispersion % path)//"input.nml", sc_input)
 
@@ -369,13 +366,20 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
         & DIM => sc_input % discretization % derived % DIM, &
         & LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS)
 
+#ifndef BAND_BASIS
     WRITE (output_format, '(A, I0, A)') '(I5, ', 11 + SUBLATTICES, 'E15.5)'
-
+#else
+    WRITE (output_format, '(A, I0, A)') '(I5, ', 3, 'E15.5)'
+#endif
     ALLOCATE (Hamiltonian(DIM, DIM))
     ALLOCATE (Hamiltonian_const(DIM, DIM))
     ALLOCATE (Hamiltonian_const_band(DIM, DIM))
     ALLOCATE (Energies(hamiltonian_dim))
-    ALLOCATE (Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, LAYER_COUPLINGS, SUBBANDS))
+#ifndef BAND_BASIS
+    ALLOCATE (Gamma_SC(N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS, DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+#else
+    ALLOCATE (Gamma_SC(DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+#endif
     ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
     ALLOCATE (Lat_contributions(SUBLATTICES))
   END ASSOCIATE
@@ -411,9 +415,9 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
     CALL COMPUTE_SUBBAND_POTENTIAL(Hamiltonian_const_band, band, sc_input % physical % subband_params % Subband_energies, sc_input % discretization)
 
     !$omp parallel do collapse(3) schedule(dynamic, 1) private(phi_k, r_k, r_max, dr, kx, ky, n_triangle, j_phi, i_r, orb, n, &
-    !$omp                                                     & Energies, Hamiltonian, yz_contribution, zx_contribution, xy_contribution, &
-    !$omp                                                     & Lat_contributions, spin_x_contribution, spin_y_contribution, spin_z_contribution, &
-    !$omp                                                     & electron_contribution, hole_contribution, s_up_idx, s_down_idx, l, m, spin, lat)
+    !$omp                                                    & Energies, Hamiltonian, yz_contribution, zx_contribution, xy_contribution, &
+    !$omp                                                    & Lat_contributions, spin_x_contribution, spin_y_contribution, spin_z_contribution, &
+    !$omp                                                    & electron_contribution, hole_contribution, s_up_idx, s_down_idx, l, m, spin, lat)
     DO n_triangle = -N_BZ_SECTIONS / 2, N_BZ_SECTIONS / 2 - 1
       DO j_phi = 0, dispersion % Nphi_points - 1
         DO i_r = 0, dispersion % Nr_points
@@ -428,17 +432,17 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
 
           Hamiltonian(:, :) = CMPLX(0., 0., KIND=REAL64)
           CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
-          CALL COMPUTE_HUBBARD(Hamiltonian, &
-                              & Charge_dens(:, band), &
-                              & sc_input % physical % subband_params % U_HUB, &
-                              & sc_input % physical % subband_params % V_HUB, &
-                              & sc_input % discretization)
-          CALL COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC(:, :, :, :, :, band), sc_input % discretization)
-          CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM) !This is not needed, since ZHEEV takes only upper triangle
-          Hamiltonian = sc_multiplier * (Hamiltonian_const_band + Hamiltonian) !Should by multiplied by 0.5 if in Nambu space
+          Hamiltonian = Hamiltonian_const_band + Hamiltonian
+#ifndef BAND_BASIS
+          CALL COMPUTE_INTERACTIONS(Hamiltonian, kx, ky, Charge_dens, Gamma_SC, sc_input % discretization, sc_input % physical)
+#else
+          CALL COMPUTE_INTERACTIONS_BAND_BASIS(Hamiltonian, kx, ky, Charge_dens, Gamma_SC, sc_input % discretization, sc_input % physical)
+#endif
+          Hamiltonian = sc_multiplier * Hamiltonian !Should by multiplied by 0.5 if in Nambu space
 
           CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:hamiltonian_dim, :hamiltonian_dim), Energies(:), hamiltonian_dim)
 
+#ifndef BAND_BASIS
           !Calculate contributions
           DO l = 1, hamiltonian_dim
             !Distinguishing orbital contributions
@@ -517,6 +521,12 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
             & spin_x_contribution, spin_y_contribution, spin_z_contribution, &
             & electron_contribution, hole_contribution
           END DO
+#else
+          DO l = 1, hamiltonian_dim
+            WRITE (9, output_format) (band - 1) * hamiltonian_dim + l, kx, ky, Energies(l) / meV2au
+          END DO
+          !TODO: Alternatively  I can transform back to spin-orbital-sublattice basis and compute contributions similarly as above.
+#endif
 
         END DO
       END DO
@@ -691,7 +701,11 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(gap)
   COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian(:, :), Hamiltonian_const(:, :), Hamiltonian_const_band(:, :)
   REAL(REAL64), ALLOCATABLE :: Energies(:)
 
-  COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :)
+#ifndef BAND_BASIS
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :, :)
+#else
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :)
+#endif
   REAL(REAL64), ALLOCATABLE :: Charge_dens(:, :)
 
   INTEGER(INT8), ALLOCATABLE :: IsFermiSurface(:, :) !! This indicates whether given (kx,ky) point is at Fermi surface
@@ -733,7 +747,11 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(gap)
     ALLOCATE (Energies(DIM))
     ALLOCATE (IsFermiSurface(-kx_steps:kx_steps, -ky_steps:ky_steps))
     ALLOCATE (OrbitalAtFermiSurface(-kx_steps:kx_steps, -ky_steps:ky_steps))
-    ALLOCATE (Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, LAYER_COUPLINGS, SUBBANDS))
+#ifndef BAND_BASIS
+    ALLOCATE (Gamma_SC(N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS, DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+#else
+    ALLOCATE (Gamma_SC(DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+#endif
     ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
   END ASSOCIATE
   Hamiltonian(:, :) = CMPLX(0., 0., KIND=REAL64)
@@ -776,20 +794,15 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(gap)
           Hamiltonian(:, :) = CMPLX(0., 0., KIND=REAL64)
           Energies(:) = 0.
           CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
-          CALL COMPUTE_HUBBARD(Hamiltonian, &
-                              & Charge_dens(:, band), &
-                              & sc_input % physical % subband_params % U_HUB, &
-                              & sc_input % physical % subband_params % V_HUB, &
-                              & sc_input % discretization)
-          CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM) !This is not needed, since ZHEEV takes only upper triangle
-
-          Hamiltonian = Hamiltonian_const_band + Hamiltonian !Should by multiplied by 0.5 if in Nambu space
-
+          Hamiltonian = Hamiltonian_const_band + Hamiltonian
+#ifndef BAND_BASIS
+          CALL COMPUTE_INTERACTIONS(Hamiltonian, kx, ky, Charge_dens, Gamma_SC, sc_input % discretization, sc_input % physical)
+#else
+          CALL COMPUTE_INTERACTIONS_BAND_BASIS(Hamiltonian, kx, ky, Charge_dens, Gamma_SC, sc_input % discretization, sc_input % physical)
+#endif
           CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:sc_input % discretization % derived % DIM_POSITIVE_K, &
                                     & :sc_input % discretization % derived % DIM_POSITIVE_K), &
                                     & Energies(:sc_input % discretization % derived % DIM_POSITIVE_K), sc_input % discretization % derived % DIM_POSITIVE_K)
-          !CALL DIAGONALIZE_GENERALIZED(Hamiltonian(:DIM_POSITIVE_K, :DIM_POSITIVE_K), Energies(:DIM_POSITIVE_K), U_transformation(:DIM_POSITIVE_K, :DIM_POSITIVE_K), DIM_POSITIVE_K)
-
           !Check whether current wavevector is in the Fermi surface
           IF (MINVAL(ABS(Energies(:sc_input % discretization % derived % DIM_POSITIVE_K))) < gap % dE) THEN
             IsFermiSurface(i, j) = 1
@@ -815,16 +828,14 @@ SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP(gap)
           Hamiltonian(:, :) = CMPLX(0., 0., KIND=REAL64)
           Energies(:) = 0.
           CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
-          CALL COMPUTE_HUBBARD(Hamiltonian, &
-                              & Charge_dens(:, band), &
-                              & sc_input % physical % subband_params % U_HUB, &
-                              & sc_input % physical % subband_params % V_HUB, &
-                              & sc_input % discretization)
-          CALL COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC(:, :, :, :, :, band), sc_input % discretization)
+          Hamiltonian = Hamiltonian_const_band + Hamiltonian
+#ifndef BAND_BASIS
+          CALL COMPUTE_INTERACTIONS(Hamiltonian, kx, ky, Charge_dens, Gamma_SC, sc_input % discretization, sc_input % physical)
+#else
+          CALL COMPUTE_INTERACTIONS_BAND_BASIS(Hamiltonian, kx, ky, Charge_dens, Gamma_SC, sc_input % discretization, sc_input % physical)
+#endif
+          Hamiltonian = 0.5 * Hamiltonian !Should by multiplied by 0.5 if in Nambu space
           CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, sc_input % discretization % derived % DIM) !This is not needed, since ZHEEV takes only upper triangle
-
-          Hamiltonian = 0.5 * (Hamiltonian_const_band + Hamiltonian) !Should by multiplied by 0.5 if in Nambu space
-
           CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:, :), Energies(:), sc_input % discretization % derived % DIM)
           !Write superconducting gap
           WRITE (9, output_format) kx, ky, ABS(Energies(sc_input % discretization % derived % DIM_POSITIVE_K) - &
@@ -845,32 +856,42 @@ END SUBROUTINE CALCULATE_SUPERCONDUCTING_GAP
 SUBROUTINE CALCULATE_GAMMA_K(gamma)
   TYPE(post_gamma_k_t), INTENT(IN) :: gamma
   TYPE(sc_input_params_t) :: sc_input
-  ! CHARACTER(LEN=*), INTENT(IN) :: input_path !! This should be a path to folder where input.nml resides
-  ! INTEGER(INT32), INTENT(IN) :: n_brillouin_points !! Number of steps taken in k-space.
-  !                                               !! Integration is over interval -KX_MAX < ----- n_brillouin_points ----- 0 ----- n_brillouin_points ----- > KX_MAX
-  !                                               !! So effectively 2N + 1 steps are taken in each direction
-
   COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian_const(:, :) !! k-indepndent and band-independent part of the Hamiltonian
   COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian_const_band(:, :) !! k-independent, band-dependent Hamiltonian
   COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian_dummy(:, :) !! This is only used to get matrix elements gamma that show up in the Hamiltonian
-  COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :, :, :, :) !! Supercondicting pairings read from a simulation
-  COMPLEX(REAL64), ALLOCATABLE :: Gamma_K(:, :, :, :, :, :) !! Superconducting pairing, determined at given k point
+#ifndef BAND_BASIS
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :, :) !! Supercondicting pairings read from a simulation
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_K(:, :, :, :) !! Superconducting pairing, determined at given k point
+  COMPLEX(REAL64), ALLOCATABLE :: Delta_local(:, :, :, :) !! Delta (pairing amplitudes) for given k point, integrand
+
+#else
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :)
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_K(:, :, :) !! Superconducting pairing, determined at given k point
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_K_orig_basis(:, :) !! Superconducting pairing, determined at given k point
+  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian(:, :) !! Full Hamiltonian at given k point
+  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian_electron(:, :), Hamiltonian_hole(:, :)
+  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian_hole_reversed(:, :)
+  REAL(REAL64), ALLOCATABLE :: Energies_electron(:), Energies_hole(:)
+  COMPLEX(REAL64), ALLOCATABLE :: Delta_local(:, :, :) !! Delta (pairing amplitudes) for given k point, integrand
+#endif
   REAL(REAL64), ALLOCATABLE :: Charge_dens(:, :) !! Charge density read from a simulation
-  COMPLEX(REAL64), ALLOCATABLE :: Delta_local(:, :, :, :, :, :) !! Delta (pairing amplitudes) for given k point, integrand
   REAL(REAL64), ALLOCATABLE :: Charge_dens_local(:, :) !! Charge density for given k point, integrand
 
-  REAL(REAL64) :: k1, k2, kx, ky, dkx, dky
+  REAL(REAL64) :: k1, k2, kx, ky, kx_minus, ky_minus, dkx, dky
   INTEGER(INT32) :: i, j, n, m, band
   INTEGER(INT32) :: kx_steps, ky_steps
   INTEGER(INT32) :: orb, neigh, spin1, spin2, layer, lat, file_count
   INTEGER(INT32) :: orb_prime, band_prime
   INTEGER(INT32) :: row, col, row_inverse, col_inverse, row_nnn, col_nnn
   INTEGER(INT32) :: gamma_lat_index, gamma_spin_index
+  INTEGER(INT32) :: i_band, j_band
+  INTEGER(INT32) :: idx
+  COMPLEX(REAL64) :: phase
 
   COMPLEX(REAL64) :: gamma_nn_12, gamma_nn_21, gamma_nnn
 
   CHARACTER(LEN=200) :: filename
-  COMPLEX(REAL64), ALLOCATABLE :: File_unit_mapping(:, :, :, :, :)
+  COMPLEX(REAL64), ALLOCATABLE :: File_unit_mapping(:, :, :)
 
   LOGICAL :: file_exists
 
@@ -897,12 +918,25 @@ SUBROUTINE CALCULATE_GAMMA_K(gamma)
     ALLOCATE (Hamiltonian_const(DIM, DIM))
     ALLOCATE (Hamiltonian_const_band(DIM, DIM))
     ALLOCATE (Hamiltonian_dummy(DIM, DIM))
-    ALLOCATE (Gamma_SC(ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, LAYER_COUPLINGS, SUBBANDS))
-    ALLOCATE (Gamma_K(ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, LAYER_COUPLINGS, SUBBANDS))
+#ifndef BAND_BASIS
+    ALLOCATE (Gamma_SC(N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS, DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+    ALLOCATE (Gamma_K(N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS, DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+    ALLOCATE (Delta_local(N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS, DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+#else
+    ALLOCATE (Gamma_SC(DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+    ALLOCATE (Gamma_K(DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+    ALLOCATE (Gamma_K_orig_basis(DIM_POSITIVE_K, DIM_POSITIVE_K))
+    ALLOCATE (Delta_local(DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+    ALLOCATE (Hamiltonian_electron(DIM_POSITIVE_K, DIM_POSITIVE_K))
+    ALLOCATE (Hamiltonian_hole(DIM_POSITIVE_K, DIM_POSITIVE_K))
+    ALLOCATE (Hamiltonian_hole_reversed(DIM_POSITIVE_K, DIM_POSITIVE_K))
+    ALLOCATE (Hamiltonian(DIM, DIM))
+    ALLOCATE (Energies_electron(DIM_POSITIVE_K))
+    ALLOCATE (Energies_hole(DIM_POSITIVE_K))
+#endif
     ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
-    ALLOCATE (Delta_local(ORBITALS, N_ALL_NEIGHBOURS, SPINS, SPINS, LAYER_COUPLINGS, SUBBANDS))
     ALLOCATE (Charge_dens_local(DIM_POSITIVE_K, SUBBANDS))
-    ALLOCATE (File_unit_mapping(ORBITALS, SPINS, SPINS, LAYER_COUPLINGS, SUBBANDS))
+    ALLOCATE (File_unit_mapping(DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
   END ASSOCIATE
 
   Hamiltonian_const = CMPLX(0., 0., KIND=REAL64)
@@ -918,25 +952,27 @@ SUBROUTINE CALCULATE_GAMMA_K(gamma)
 
   !Opening all files I will write gammas to and create a mapping of file units to appropriate names
   file_count = 10
-  DO orb = 1, sc_input % discretization % ORBITALS
-    DO spin1 = 1, SPINS
-      DO spin2 = 1, SPINS
-        DO layer = 1, sc_input % discretization % derived % LAYER_COUPLINGS
-          DO band = 1, sc_input % discretization % SUBBANDS
-            File_unit_mapping(orb, spin1, spin2, layer, band) = file_count
-            WRITE (filename, "(6(A, I0))") "GammaK_orb", orb, "_spin1", spin1, "_spin2", spin2, "_layer", layer, "_band", band
-            OPEN (unit=file_count, FILE=TRIM(gamma % path)//"OutputData/"//TRIM(filename)//".dat", FORM="FORMATTED", ACTION="WRITE")
-            WRITE (file_count, '(A)') "#kx[1/a]   ky[1/a]     Re(Gamma_ham_nn)[meV]     Im(Gamma_ham_nn)[meV]    OPTIONAL(if layer <= SUBLATTICES)[Re(Gamma_ham_nnn)[meV]     Im(Gamma_ham_nnn)[meV]]     Re(Gamma_neigh1)[meV]   Im(Gamma_neigh1)[meV]   Re(Gamma_neigh2)[meV] ..."
-            file_count = file_count + 1
-          END DO
-        END DO
+  DO i_band = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+    DO j_band = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+      DO band = 1, sc_input % discretization % SUBBANDS
+        File_unit_mapping(i_band, j_band, band) = file_count
+        WRITE (filename, "(3(A, I0))") "GammaK_i", i_band, "_j", j_band, "_band", band
+        OPEN (unit=file_count, FILE=TRIM(gamma % path)//"OutputData/"//TRIM(filename)//".dat", FORM="FORMATTED", ACTION="WRITE")
+        WRITE (file_count, '(A)') "#kx[1/a]   ky[1/a]    Re(H_{i,j})[meV]     Im(H_{i,j})[meV]    Re(Delta_neigh1)[meV]   Im(Delta_neigh1)[meV]   Re(Delta_neigh2)[meV] ..."
+        file_count = file_count + 1
       END DO
     END DO
   END DO
 
-  !$omp parallel private(kx, ky, k1, k2, band, Hamiltonian_const_band, Charge_dens_local, Delta_local,&
+  !$omp parallel private(kx, ky, kx_minus, ky_minus, k1, k2, band, Hamiltonian_const_band, Charge_dens_local, Delta_local,&
   !$omp&                 Gamma_K, orb, spin1, spin2, n, neigh, lat, orb_prime, band_prime, layer, file_count, row, col, &
-  !$omp&                 gamma_spin_index, gamma_lat_index, Hamiltonian_dummy, gamma_nn_12, gamma_nn_21, gamma_nnn)
+  !$omp&                 gamma_spin_index, gamma_lat_index, Hamiltonian_dummy, gamma_nn_12, gamma_nn_21, gamma_nnn, idx, phase &
+#ifdef BAND_BASIS
+  !$omp&             ,   Hamiltonian, Hamiltonian_electron, Hamiltonian_hole, Energies_electron, Energies_hole, &
+  !$omp&                 Hamiltonian_hole_reversed, Gamma_K_orig_basis &
+#endif
+  !$omp&             )
+
   !$omp do
   DO i = -kx_steps, kx_steps
     DO j = -ky_steps, ky_steps
@@ -947,84 +983,99 @@ SUBROUTINE CALCULATE_GAMMA_K(gamma)
         Hamiltonian_const_band = Hamiltonian_const
         CALL COMPUTE_SUBBAND_POTENTIAL(Hamiltonian_const_band, band, sc_input % physical % subband_params % Subband_energies, sc_input % discretization)
 
-        k1 = SQRT(3.0d0) / (2.0d0 * PI) * kx
-        k2 = 3.0d0 / (4.0d0 * PI) * (ky + 1.0d0 / SQRT(3.0d0) * kx)
+        k1 = SQRT(kx**2 + ky**2)
+        k2 = ATAN2(ky, kx)
+#ifndef BAND_BASIS
         CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const_band, &
-                                        & Gamma_SC(:, :, :, :, :, band), &
+                                        & Gamma_SC(:, :, :, band), &
                                         & Charge_dens(:, band), &
                                         & k1, &
                                         & k2, &
-                                        & Delta_local(:, :, :, :, :, band), &
+                                        & Delta_local(:, :, :, band), &
                                         & Charge_dens_local(:, band), &
                                         & sc_input % discretization, &
                                         & sc_input % physical)
+#else
+        CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const_band, &
+                                        & Gamma_SC(:, :, band), &
+                                        & Charge_dens(:, band), &
+                                        & k1, &
+                                        & k2, &
+                                        & Delta_local(:, :, band), &
+                                        & Charge_dens_local(:, band), &
+                                        & sc_input % discretization, &
+                                        & sc_input % physical)
+#endif
       END DO
-
-      CALL GET_GAMMAS_FROM_DELTAS(Gamma_K, Delta_local, sc_input % discretization, sc_input % physical % subband_params % nearest_interorb_multiplier, sc_input % physical % subband_params % next_interorb_multiplier)
 
       !Write result for given k point to file
       DO band = 1, sc_input % discretization % SUBBANDS
         Hamiltonian_dummy = CMPLX(0.0d0, 0.0d0, KIND=REAL64)
-        CALL COMPUTE_SC(Hamiltonian_dummy, kx, ky, Gamma_SC(:, :, :, :, :, band), sc_input % discretization)
-
-        DO orb = 1, sc_input % discretization % ORBITALS
-          DO spin1 = 1, SPINS
-            DO spin2 = 1, SPINS
-              DO lat = 0, sc_input % discretization % SUBLATTICES - 2
-                !Include inter and intralayer couplings
-
-                !Interlayer coupling
-                !Coupling Ti1 - Ti2
-                gamma_lat_index = 2 * lat + 2
-                row = (spin1 - 1) * sc_input % discretization % derived % TBA_DIM + &
-                    & orb + lat * sc_input % discretization % ORBITALS
-                col = (spin2 - 1) * sc_input % discretization % derived % TBA_DIM + &
-                    & orb + (lat + 1) * sc_input % discretization % ORBITALS + sc_input % discretization % derived % DIM_POSITIVE_K
-                gamma_nn_12 = Hamiltonian_dummy(row, col)
-
-                IF (gamma_lat_index .le. sc_input % discretization % SUBLATTICES) THEN
-                  row = orb + (gamma_lat_index - 1) * sc_input % discretization % ORBITALS + &
-                      & (spin1 - 1) * sc_input % discretization % derived % TBA_DIM
-                  col = orb + (gamma_lat_index - 1) * sc_input % discretization % ORBITALS + &
-                      & (spin2 - 1) * sc_input % discretization % derived % TBA_DIM + sc_input % discretization % derived % DIM_POSITIVE_K
-                  gamma_nnn = Hamiltonian_dummy(row, col)
-                ELSE
-                  gamma_nnn = CMPLX(0.0d0, 0.0d0, KIND=REAL64)
-                END IF
-
-                file_count = File_unit_mapping(orb, spin1, spin2, gamma_lat_index, band)
-                WRITE (file_count, '(6F15.8, *(2F15.8))') kx, ky, &
-                & REAL(gamma_nn_12) / meV2au, AIMAG(gamma_nn_12) / meV2au, & !Interlayer couplings
-                & REAL(gamma_nnn) / meV2au, AIMAG(gamma_nnn) / meV2au, & !Intralayer couplings
-                & (REAL(Gamma_K(orb, neigh, spin1, spin2, gamma_lat_index, band)) / meV2au, AIMAG(Gamma_K(orb, neigh, spin1, spin2, gamma_lat_index, band)) / meV2au, neigh=1, N_ALL_NEIGHBOURS)
-
-                !Coupling Ti2 - Ti1
-                gamma_lat_index = 2 * lat + 1
-                row = (spin1 - 1) * sc_input % discretization % derived % TBA_DIM + &
-                    & orb + (lat + 1) * sc_input % discretization % ORBITALS
-                col = (spin2 - 1) * sc_input % discretization % derived % TBA_DIM + &
-                    & orb + lat * sc_input % discretization % ORBITALS + sc_input % discretization % derived % DIM_POSITIVE_K
-                gamma_nn_21 = Hamiltonian_dummy(row, col)
-
-                IF (gamma_lat_index .le. sc_input % discretization % SUBLATTICES) THEN
-                  row = orb + (gamma_lat_index - 1) * sc_input % discretization % ORBITALS + &
-                      & (spin1 - 1) * sc_input % discretization % derived % TBA_DIM
-                  col = orb + (gamma_lat_index - 1) * sc_input % discretization % ORBITALS + &
-                      & (spin2 - 1) * sc_input % discretization % derived % TBA_DIM + sc_input % discretization % derived % DIM_POSITIVE_K
-                  gamma_nnn = Hamiltonian_dummy(row, col)
-                ELSE
-                  gamma_nnn = CMPLX(0.0d0, 0.0d0, KIND=REAL64)
-                END IF
-
-                file_count = File_unit_mapping(orb, spin1, spin2, gamma_lat_index, band)
-                WRITE (file_count, '(6F15.8, *(2F15.8))') kx, ky, &
-                & REAL(gamma_nn_21) / meV2au, AIMAG(gamma_nn_21) / meV2au, & !Interlayer couplings
-                & REAL(gamma_nnn) / meV2au, AIMAG(gamma_nnn) / meV2au, & !Intralayer couplings
-                & (REAL(Gamma_K(orb, neigh, spin1, spin2, gamma_lat_index, band)) / meV2au, AIMAG(Gamma_K(orb, neigh, spin1, spin2, gamma_lat_index, band)) / meV2au, neigh=1, N_ALL_NEIGHBOURS)
-              END DO
-            END DO
+#ifndef BAND_BASIS
+        CALL COMPUTE_SC(Hamiltonian_dummy, kx, ky, Gamma_SC(:, :, :, band), sc_input % discretization)
+        DO i_band = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+          DO j_band = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+            file_count = File_unit_mapping(i_band, j_band, band)
+            WRITE (file_count, '(2F15.8, *(2F15.8))') kx, ky, &
+              & REAL(Hamiltonian_dummy(i_band, sc_input % discretization % derived % DIM_POSITIVE_K + j_band)) / meV2au, &
+              & AIMAG(Hamiltonian_dummy(i_band, sc_input % discretization % derived % DIM_POSITIVE_K + j_band)) / meV2au, &
+              & (REAL(Delta_local(neigh, i_band, j_band, band)) / meV2au, &
+              & AIMAG(Delta_local(neigh, i_band, j_band, band)) / meV2au, &
+              & neigh=1, &
+              & N_NEXT_NEIGHBOURS + N_NEAREST_NEIGHBOURS)
           END DO
         END DO
+#else
+        Hamiltonian = Hamiltonian_const_band
+        CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
+        Hamiltonian = 0.5 * Hamiltonian
+
+        Hamiltonian_electron = Hamiltonian(:sc_input % discretization % derived % DIM_POSITIVE_K, &
+                                         & :sc_input % discretization % derived % DIM_POSITIVE_K)
+        CALL DIAGONALIZE_HERMITIAN(Hamiltonian_electron, Energies_electron, sc_input % discretization % derived % DIM_POSITIVE_K)
+        !! Fix the gauge
+        DO n = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+          idx = MAXLOC(ABS(Hamiltonian_electron(:, n)), 1)
+          phase = Hamiltonian_electron(idx, n) / ABS(Hamiltonian_electron(idx, n))
+          Hamiltonian_electron(:, n) = Hamiltonian_electron(:, n) / phase
+        END DO
+
+        !! Electron hamiltonian at -k
+        kx_minus = -kx
+        ky_minus = -ky
+        Hamiltonian = Hamiltonian_const_band
+        CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx_minus, ky_minus, sc_input % discretization, sc_input % physical)
+        Hamiltonian = 0.5 * Hamiltonian
+
+        Hamiltonian_hole = Hamiltonian(:sc_input % discretization % derived % DIM_POSITIVE_K, &
+                                     & :sc_input % discretization % derived % DIM_POSITIVE_K)
+        CALL DIAGONALIZE_HERMITIAN(Hamiltonian_hole, Energies_hole, sc_input % discretization % derived % DIM_POSITIVE_K)
+        !! Fix the gauge
+        DO n = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+          idx = MAXLOC(ABS(Hamiltonian_hole(:, n)), 1)
+          phase = Hamiltonian_hole(idx, n) / ABS(Hamiltonian_hole(idx, n))
+          Hamiltonian_hole(:, n) = Hamiltonian_hole(:, n) / phase
+        END DO
+
+        CALL COMPUTE_SC_BAND(Hamiltonian_dummy, kx, ky, Gamma_SC(:, :, band), sc_input % discretization)
+        ! Transform back to spin-orbital-sublattice basis to get Hamiltonian elements
+        Gamma_K(:, :, band) = Hamiltonian_dummy(:sc_input % discretization % derived % DIM_POSITIVE_K, &
+                                        & sc_input % discretization % derived % DIM_POSITIVE_K + 1:)
+        Gamma_K_orig_basis(:, :) = MATMUL(Hamiltonian_electron, MATMUL((Gamma_K(:, :, band)), TRANSPOSE(Hamiltonian_hole)))
+
+        DO i_band = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+          DO j_band = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+            file_count = File_unit_mapping(i_band, j_band, band)
+            WRITE (file_count, '(2F15.8, *(2F15.8))') kx, ky, &
+              & REAL(Gamma_K_orig_basis(i_band, j_band)) / meV2au, &
+              & AIMAG(Gamma_K_orig_basis(i_band, j_band)) / meV2au, &
+              & REAL(Delta_local(i_band, j_band, band)) / meV2au, &
+              & AIMAG(Delta_local(i_band, j_band, band)) / meV2au
+          END DO
+        END DO
+
+#endif
+
       END DO
     END DO
   END DO
@@ -1032,15 +1083,11 @@ SUBROUTINE CALCULATE_GAMMA_K(gamma)
   !$omp end parallel
 
   !Close all files
-  DO orb = 1, sc_input % discretization % ORBITALS
-    DO spin1 = 1, SPINS
-      DO spin2 = 1, SPINS
-        DO layer = 1, sc_input % discretization % derived % LAYER_COUPLINGS
-          DO band = 1, sc_input % discretization % SUBBANDS
-            file_count = File_unit_mapping(orb, spin1, spin2, layer, band)
-            CLOSE (file_count)
-          END DO
-        END DO
+  DO i_band = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+    DO j_band = 1, sc_input % discretization % derived % DIM_POSITIVE_K
+      DO band = 1, sc_input % discretization % SUBBANDS
+        file_count = File_unit_mapping(i_band, j_band, band)
+        CLOSE (file_count)
       END DO
     END DO
   END DO
@@ -1059,6 +1106,7 @@ SUBROUTINE CALCULATE_GAMMA_K(gamma)
   DEALLOCATE (File_unit_mapping)
 END SUBROUTINE CALCULATE_GAMMA_K
 
+!! DEPRECATED
 SUBROUTINE CALCULATE_PROJECTIONS(projections)
   TYPE(post_projections_t), INTENT(IN) :: projections
   TYPE(sc_input_params_t) :: sc_input
@@ -1782,26 +1830,6 @@ SUBROUTINE SORT_ENERGIES_AND_WAVEFUNCTIONS(Energies, Psi, HamDim)
   ! END DO
 
 END SUBROUTINE SORT_ENERGIES_AND_WAVEFUNCTIONS
-
-RECURSIVE FUNCTION det(matrix, n) RESULT(determinant)
-  IMPLICIT NONE
-  COMPLEX(REAL64) :: determinant
-  INTEGER(INT32), INTENT(IN) :: n
-  COMPLEX(REAL64), INTENT(IN) :: matrix(n, n)
-  INTEGER(INT32) :: IPIV(n)
-  INTEGER(INT32) :: info, i
-
-  IPIV(:) = 0.0d0
-
-  CALL ZGETRF(n, n, matrix, n, IPIV, info)
-  CALL ZLAPMT(.TRUE., n, n, matrix, n, IPIV)
-  determinant = 1.0d0
-  DO i = 1, n
-    determinant = determinant * matrix(i, i)
-  END DO
-  RETURN
-
-END FUNCTION det
 
 LOGICAL FUNCTION is_inside_polygon(verticesArray, nVertices, pointX, pointY)
     !! This function returns true if the point (pointX, pointY) is inside the polygon

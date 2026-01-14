@@ -27,11 +27,66 @@ USE parameters
 USE local_integrand
 USE logger
 USE types
+USE omp_lib
 IMPLICIT NONE
 
 #include "macros_def.f90"
 
 CONTAINS
+
+SUBROUTINE ROMBERG_INTEGRATE_OVER_CHUNKS(Hamiltonian_const_band, Gamma_SC, Charge_dens, &
+                                         & Delta_new, Charge_dens_new, sc_input)
+  !! Parallel integration over Brillouin zone chunks using Romberg algorithm
+  IMPLICIT NONE
+  TYPE(sc_input_params_t), INTENT(IN) :: sc_input
+  COMPLEX(REAL64), INTENT(IN) :: Hamiltonian_const_band(sc_input % discretization % derived % DIM, &
+                                                       & sc_input % discretization % derived % DIM)
+  REAL(REAL64), INTENT(IN) :: Charge_dens(sc_input % discretization % derived % DIM_POSITIVE_K)
+#ifndef BAND_BASIS
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_SC(N_ALL_NEIGHBOURS + N_NEIGHBOURS, &
+                                        & sc_input % discretization % derived % DIM_POSITIVE_K, &
+                                        & sc_input % discretization % derived % DIM_POSITIVE_K)
+  COMPLEX(REAL64), INTENT(INOUT) :: Delta_new(N_ALL_NEIGHBOURS + N_NEIGHBOURS, &
+                                             & sc_input % discretization % derived % DIM_POSITIVE_K, &
+                                             & sc_input % discretization % derived % DIM_POSITIVE_K)
+  COMPLEX(REAL64) :: Delta_local(N_ALL_NEIGHBOURS + N_NEIGHBOURS, &
+                               & sc_input % discretization % derived % DIM_POSITIVE_K, &
+                               & sc_input % discretization % derived % DIM_POSITIVE_K)
+#else
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_SC(sc_input % discretization % derived % DIM_POSITIVE_K, &
+                                        & sc_input % discretization % derived % DIM_POSITIVE_K)
+  COMPLEX(REAL64), INTENT(INOUT) :: Delta_new(sc_input % discretization % derived % DIM_POSITIVE_K, &
+                                             & sc_input % discretization % derived % DIM_POSITIVE_K)
+  COMPLEX(REAL64) :: Delta_local(sc_input % discretization % derived % DIM_POSITIVE_K, &
+                               & sc_input % discretization % derived % DIM_POSITIVE_K)
+#endif
+  REAL(REAL64), INTENT(INOUT) :: Charge_dens_new(sc_input % discretization % derived % DIM_POSITIVE_K)
+  REAL(REAL64) :: Charge_dens_local(sc_input % discretization % derived % DIM_POSITIVE_K)
+
+  INTEGER(INT32) :: n_triangle, i_r, j_phi
+  REAL(REAL64) :: phi_k_min
+
+  !$omp parallel do collapse(3) schedule(dynamic, 1) private(Delta_local, Charge_dens_local, phi_k_min)
+  DO n_triangle = -N_BZ_SECTIONS / 2, N_BZ_SECTIONS / 2 - 1
+    DO i_r = 0, sc_input % discretization % k1_steps - 1
+      DO j_phi = 0, sc_input % discretization % k2_steps - 1
+        phi_k_min = n_triangle * (PI / 3.0d0) + j_phi * sc_input % discretization % derived % dphi_k
+
+        CALL ROMBERG_Y(Hamiltonian_const_band, Gamma_SC, Charge_dens, &
+        & i_r, sc_input % discretization % k1_steps, phi_k_min, phi_k_min + sc_input % discretization % derived % dphi_k, &
+        & Delta_local, Charge_dens_local, sc_input)
+
+        !Atomic update of global arrays
+        !$omp critical (update_delta_and_charge)
+        Delta_new = Delta_new + Delta_local
+        Charge_dens_new = Charge_dens_new + Charge_dens_local
+        !$omp end critical (update_delta_and_charge)
+      END DO
+    END DO
+  END DO
+  !$omp end parallel do
+
+END SUBROUTINE ROMBERG_INTEGRATE_OVER_CHUNKS
 
 !Adapted from "Numerical Recipes in Fortran Second Edition"
 !William H. Press, Saul A. Teukolsky, W. T. Vetterling, B. P. Flannery
@@ -233,7 +288,8 @@ RECURSIVE SUBROUTINE ROMBERG_Y(Hamiltonian_const, Gamma_SC, Charge_dens, i_r, k1
 
 END SUBROUTINE ROMBERG_Y
 
-RECURSIVE SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chunk_min, k1_chunk_max, k2_actual, Delta_local, Charge_dens_local, sc_input)
+RECURSIVE SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chunk_min, k1_chunk_max, &
+  & k2_actual, Delta_local, Charge_dens_local, sc_input)
   IMPLICIT NONE
   TYPE(sc_input_params_t), INTENT(IN) :: sc_input
   COMPLEX(REAL64), INTENT(IN) :: Hamiltonian_const(sc_input % discretization % derived % DIM, sc_input % discretization % derived % DIM)
@@ -288,7 +344,8 @@ RECURSIVE SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chun
     IF (j == 1) THEN
       !Calculation for lower bound of chunk
       CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, &
-          & Charge_dens, k1_chunk_min, k2_actual, Delta_local, Charge_dens_local, sc_input % discretization, sc_input % physical)
+          & Charge_dens, k1_chunk_min, k2_actual, Delta_local, Charge_dens_local, &
+          & sc_input % discretization, sc_input % physical)
 #ifndef BAND_BASIS
       Delta_iterations(j, :, :, :) = Delta_local
 #else
@@ -298,7 +355,8 @@ RECURSIVE SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chun
 
       !Calculation for upper bound of chunk
       CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, &
-      & Charge_dens, k1_chunk_max, k2_actual, Delta_local, Charge_dens_local, sc_input % discretization, sc_input % physical)
+      & Charge_dens, k1_chunk_max, k2_actual, Delta_local, Charge_dens_local, &
+      & sc_input % discretization, sc_input % physical)
 #ifndef BAND_BASIS
       Delta_iterations(j, :, :, :) = Delta_iterations(j, :, :, :) + Delta_local
       Delta_iterations(j, :, :, :) = 0.5 * (k1_chunk_max - k1_chunk_min) * Delta_iterations(j, :, :, :)
@@ -320,7 +378,8 @@ RECURSIVE SUBROUTINE ROMBERG_X(Hamiltonian_const, Gamma_SC, Charge_dens, k1_chun
       DO n = 1, i
         !Here we pass k1_trap as actual k1 point
         CALL GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, &
-        & Charge_dens, k1_trap, k2_actual, Delta_local, Charge_dens_local, sc_input % discretization, sc_input % physical)
+        & Charge_dens, k1_trap, k2_actual, Delta_local, Charge_dens_local, &
+        & sc_input % discretization, sc_input % physical)
         Delta_sum = Delta_sum + Delta_local
         Charge_dens_sum = Charge_dens_sum + Charge_dens_local
         k1_trap = k1_trap + dk1_trap

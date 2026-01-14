@@ -105,6 +105,24 @@ class OutputMocker:
               print(" ", file=f)
               print(" ", file=f)
 
+  def createGammaInitial(self, subbands: int, spinPairing: np.ndarray, orbitalPairing: np.ndarray, sublatsPairing: np.ndarray) -> None:
+    fullPairing = np.kron(spinPairing, np.kron(orbitalPairing, sublatsPairing))
+    fortFormat = ff.FortranRecordWriter("(10I5, 2E15.5)")
+
+
+  def createGammaInitialBandBasis(self, subbands: int, pairingBandBasis: np.ndarray) -> None:
+    fortFormat = ff.FortranRecordWriter("(3I5, 2E15.5)")
+    with open(os.path.join(self.outputPath, "OutputData", "Gamma_SC_input.dat"), "w") as f:
+      print("#band i_band j_band Re(Gamma) Im(Gamma)", file=f)
+      for band in range(subbands):
+        for iBand in range(subbands):
+          for jBand in range(subbands):
+              line = fortFormat.write([band + 1, iBand + 1, jBand + 1, pairingBandBasis[iBand, jBand].real, pairingBandBasis[iBand, jBand].imag])
+              print(line, file=f)
+          print(" ", file=f)
+          print(" ", file=f)
+
+
   def __createFlatSymmetryGamma(self, symmetriesWeightsDict: dict[str, float], neighborsType: str = "nearest") -> np.ndarray:
     """
     Creates a flat array of gamma, taking into account weights of symmetries specified in symmetriesWeightsDict

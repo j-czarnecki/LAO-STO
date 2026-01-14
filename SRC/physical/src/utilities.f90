@@ -511,6 +511,7 @@ RECURSIVE SUBROUTINE QSORT(X, N, low_bound, high_bound)
 END SUBROUTINE QSORT
 
 FUNCTION kronecker_product(A, B) result(K)
+  !! Given two matrices A and B it computes their Kronecker product K = A ⊗ B
   IMPLICIT NONE
   COMPLEX(REAL64), intent(in) :: A(:, :), B(:, :)
   COMPLEX(REAL64) :: K(size(A, 1) * size(B, 1), size(A, 2) * size(B, 2))
@@ -522,6 +523,27 @@ FUNCTION kronecker_product(A, B) result(K)
     end do
   end do
 END FUNCTION kronecker_product
+
+RECURSIVE FUNCTION det(matrix, n) RESULT(determinant)
+  !! Given a square matrix it computes its determinant
+  IMPLICIT NONE
+  COMPLEX(REAL64) :: determinant
+  INTEGER(INT32), INTENT(IN) :: n
+  COMPLEX(REAL64), INTENT(IN) :: matrix(n, n)
+  INTEGER(INT32) :: IPIV(n)
+  INTEGER(INT32) :: info, i
+
+  IPIV(:) = 0.0d0
+
+  CALL ZGETRF(n, n, matrix, n, IPIV, info)
+  CALL ZLAPMT(.TRUE., n, n, matrix, n, IPIV)
+  determinant = 1.0d0
+  DO i = 1, n
+    determinant = determinant * matrix(i, i)
+  END DO
+  RETURN
+
+END FUNCTION det
 
 !---------------------- SPARSE MATRIX STORAGE ---------------------------------------------
 

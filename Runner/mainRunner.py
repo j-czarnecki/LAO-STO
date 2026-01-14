@@ -145,34 +145,42 @@ def configureAndRunSc():
     param_name = "E_Fermi"
     Ef_min = 0.00e3
     Ef_max = 0.15e3
-    Ef_steps = 50
+    Ef_steps = 5
     dE = abs(Ef_max - Ef_min) / Ef_steps
     Fermi_table = [(nml_name, param_name, Ef_min + i * dE) for i in range(Ef_steps + 1)]
     #Fermi_table = [(nml_name, param_name, -0.06e3)]
 
     # J_SC
-    nml_name = "physical_params"
-    param_name = "J_SC_tensor"
-    J_SC_val = [0.0, 0.0, 0.0, 0.0, 0.0, 170, 0.0, 0.0, 0.0, 0.0, 170.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    J_SC = (nml_name, param_name, J_SC_val)
+    J_SC = []
+    J_i_idx = []
+    J_j_idx = []
+    J_k_idx = []
+    J_l_idx = []
+    for pairing in (-30, -50, -70, -100):
+        i_idx, j_idx, k_idx, l_idx, J_values = runner.createPairingInteractionCrs(pairing, 12)
+        nml_name = "physical_params"
+        param_name = "J_tensor_values"
+        J_SC.append((nml_name, param_name, J_values))
+        J_i_idx.append((nml_name, "J_tensor_i_idx", i_idx))
+        J_j_idx.append((nml_name, "J_tensor_j_idx", j_idx))
+        J_k_idx.append((nml_name, "J_tensor_k_idx", k_idx))
+        J_l_idx.append((nml_name, "J_tensor_l_idx", l_idx))
 
     #for phi in phi_table:
     for Ef in Fermi_table:
-        runner.runSlurmParamValue(
-            paramValuePairs=[
-                Ef,
-                J_SC,
-                #U_nml,
-                #V_nml
-                #J_NNN
-                #V_layer_param,
-                #Sublat_param,
-                #Subband_param,
-                #Subband_energies_param,
-            ],
-            runsDir="STO-SC/STO-E_Fermi_J_SC",
-            material="STO",
-            machine="helios",
+        for i, J_pairing in enumerate(J_SC):
+            runner.runSlurmParamValue(
+                paramValuePairs=[
+                    Ef,
+                    J_SC[i],
+                    J_i_idx[i],
+                    J_j_idx[i],
+                    J_k_idx[i],
+                    J_l_idx[i],
+                ],
+                runsDir="STO-SC/STO-E_Fermi_J_SC",
+                material="STO",
+                machine="helios",
         )
 
 

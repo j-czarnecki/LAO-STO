@@ -29,6 +29,74 @@ USE types
 IMPLICIT NONE
 CONTAINS
 
+PURE RECURSIVE SUBROUTINE COMPUTE_INTERACTIONS(Hamiltonian, kx, ky, Charge_dens, Gamma_SC, discretization, physical_params)
+  !! Computes interactions treated in the mean-field approximation and adds them to the Hamiltonian.
+  !! This subroutine assumes real space pairing only (spin-orbital-sublattice basis).
+  IMPLICIT NONE
+  TYPE(discretization_t), INTENT(IN) :: discretization
+  TYPE(physical_params_t), INTENT(IN) :: physical_params
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, &
+                                              & discretization % derived % DIM) !! Hamiltonian of the system that is to be filled
+  REAL(REAL64), INTENT(IN) :: kx, ky !! Wavevector in X and Y direction
+  REAL(REAL64), INTENT(IN) :: Charge_dens(discretization % derived % DIM_POSITIVE_K) !! Charge density per spin-orbital-sublattice
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_SC(N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS, &
+                                        & discretization % derived % DIM_POSITIVE_K, &
+                                        & discretization % derived % DIM_POSITIVE_K) !! Superconducting interaction matrix in real space
+  CALL COMPUTE_HUBBARD(Hamiltonian, &
+                      & Charge_dens, &
+                      & physical_params % subband_params % U_HUB, &
+                      & physical_params % subband_params % V_HUB, &
+                      & discretization)
+  CALL COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC, discretization)
+END SUBROUTINE COMPUTE_INTERACTIONS
+
+RECURSIVE SUBROUTINE COMPUTE_INTERACTIONS_BAND_BASIS(Hamiltonian, kx, ky, Charge_dens, Gamma_SC, discretization, physical_params)
+  !! Computes interactions treated in the mean-field approximation and adds them to the Hamiltonian.
+  !! This subroutine assumes k-space pairing only (band basis).
+  IMPLICIT NONE
+  TYPE(discretization_t), INTENT(IN) :: discretization
+  TYPE(physical_params_t), INTENT(IN) :: physical_params
+  COMPLEX(REAL64), INTENT(INOUT) :: Hamiltonian(discretization % derived % DIM, &
+                                              & discretization % derived % DIM) !! Hamiltonian of the system that is to be filled
+  REAL(REAL64), INTENT(IN) :: kx, ky !! Wavevector in X and Y direction
+  REAL(REAL64), INTENT(IN) :: Charge_dens(discretization % derived % DIM_POSITIVE_K) !! Charge density per band
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_SC(discretization % derived % DIM_POSITIVE_K, &
+                                        & discretization % derived % DIM_POSITIVE_K) !! Superconducting interaction matrix in k-space
+
+  COMPLEX(REAL64) :: Hamiltonian_electron(discretization % derived % DIM_POSITIVE_K, &
+                                        & discretization % derived % DIM_POSITIVE_K)
+  COMPLEX(REAL64) :: Hamiltonian_hole(discretization % derived % DIM_POSITIVE_K, &
+                                      & discretization % derived % DIM_POSITIVE_K)
+  REAL(REAL64) :: Energies_electron(discretization % derived % DIM_POSITIVE_K)
+  REAL(REAL64) :: Energies_hole(discretization % derived % DIM_POSITIVE_K)
+  INTEGER(INT32) :: i
+
+  !! Transofrming the non-interacting Hamiltonin to diagonal (band) basis
+  Hamiltonian_electron = Hamiltonian(:discretization % derived % DIM_POSITIVE_K, &
+                                   & :discretization % derived % DIM_POSITIVE_K)
+  Hamiltonian_hole = Hamiltonian(discretization % derived % DIM_POSITIVE_K + 1:, &
+                               & discretization % derived % DIM_POSITIVE_K + 1:)
+  CALL DIAGONALIZE_HERMITIAN(Hamiltonian_electron, Energies_electron, discretization % derived % DIM_POSITIVE_K)
+  CALL DIAGONALIZE_HERMITIAN(Hamiltonian_hole, Energies_hole, discretization % derived % DIM_POSITIVE_K)
+
+  !! Computing the interaction terms in band basis
+  Hamiltonian = CMPLX(0., 0., KIND=REAL64)
+  CALL COMPUTE_HUBBARD(Hamiltonian, &
+                      & Charge_dens, &
+                      & physical_params % subband_params % U_HUB, &
+                      & physical_params % subband_params % V_HUB, &
+                      & discretization)
+  CALL COMPUTE_SC_BAND(Hamiltonian, kx, ky, Gamma_SC, discretization)
+  !! Adding band energies obtained from diagonalization of non-interacting Hamiltonian
+  DO i = 1, discretization % derived % DIM_POSITIVE_K
+    Hamiltonian(i, i) = Hamiltonian(i, i) + Energies_electron(i)
+    Hamiltonian(i + discretization % derived % DIM_POSITIVE_K, i + discretization % derived % DIM_POSITIVE_K) = &
+      & Hamiltonian(i + discretization % derived % DIM_POSITIVE_K, i + discretization % derived % DIM_POSITIVE_K) + &
+      & Energies_hole(discretization % derived % DIM_POSITIVE_K + 1 - i)
+  END DO
+
+END SUBROUTINE COMPUTE_INTERACTIONS_BAND_BASIS
+
 PURE RECURSIVE SUBROUTINE COMPUTE_K_INDEPENDENT_TERMS(Hamiltonian, discretization, physical_params)
   !! Computes all terms that do not depend on k, including complex conjugate elements
   IMPLICIT NONE

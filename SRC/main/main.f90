@@ -43,23 +43,21 @@ IMPLICIT NONE
 COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian(:, :), Hamiltonian_const(:, :), Hamiltonian_const_band(:, :), U_transformation(:, :)
 REAL(REAL64), ALLOCATABLE :: Energies(:)
 #ifndef BAND_BASIS
-COMPLEX(REAL64), ALLOCATABLE :: Delta_local(:, :, :, :), Delta_new(:, :, :, :)
+COMPLEX(REAL64), ALLOCATABLE :: Delta_new(:, :, :, :)
 COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :, :), Gamma_SC_new(:, :, :, :)
 #else
-COMPLEX(REAL64), ALLOCATABLE :: Delta_local(:, :, :), Delta_new(:, :, :)
+COMPLEX(REAL64), ALLOCATABLE :: Delta_new(:, :, :)
 COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :), Gamma_SC_new(:, :, :)
 #endif
 REAL(REAL64), ALLOCATABLE :: Delta_broyden(:), Delta_new_broyden(:)
-REAL(REAL64), ALLOCATABLE :: Charge_dens(:, :), Charge_dens_new(:, :), Charge_dens_local(:, :)
+REAL(REAL64), ALLOCATABLE :: Charge_dens(:, :), Charge_dens_new(:, :)
 
 TYPE(sc_input_params_t) :: sc_input
 
 REAL(REAL64) :: gamma_max_error, charge_max_error
 REAL(REAL64) :: gamma_max_error_prev, charge_max_error_prev
-REAL(REAL64) :: phi_k_min
 
 INTEGER(INT32) :: band
-INTEGER(INT32) :: n_triangle, i_r, j_phi
 INTEGER(INT32) :: sc_iter
 LOGICAL :: sc_flag
 
@@ -94,28 +92,25 @@ ASSOCIATE (SUBLATTICES => sc_input % discretization % SUBLATTICES, &
   ALLOCATE (U_transformation(DIM, DIM))
   ALLOCATE (Energies(DIM))
 #ifndef BAND_BASIS
-  ALLOCATE (Delta_local(N_ALL_NEIGHBOURS + N_NEIGHBOURS, DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
   ALLOCATE (Delta_new(N_ALL_NEIGHBOURS + N_NEIGHBOURS, DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
   ALLOCATE (Gamma_SC(N_ALL_NEIGHBOURS + N_NEIGHBOURS, DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
   ALLOCATE (Gamma_SC_new(N_ALL_NEIGHBOURS + N_NEIGHBOURS, DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
 #else
-  ALLOCATE (Delta_local(DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
   ALLOCATE (Delta_new(DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
   ALLOCATE (Gamma_SC(DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
   ALLOCATE (Gamma_SC_new(DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
 #endif
+  ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
+  ALLOCATE (Charge_dens_new(DIM_POSITIVE_K, SUBBANDS))
   !Fourth dimension for coupling between sublattices/layers
   !Coupling with nearest neighbours is inter-layer, thus we include both
   !Ti1 - Ti2 coupling and Ti2 - Ti1 coupling separately.
   !For next-to-nearest neighbours we only include Ti1-Ti1 etc. coupling
   !Due to its intra-layer character
-  delta_real_elems = 2 * size(Gamma_SC) + DIM_POSITIVE_K
+  delta_real_elems = 2 * size(Gamma_SC) + size(Charge_dens)
 
   ALLOCATE (Delta_broyden(delta_real_elems))   !Flattened Gamma array
   ALLOCATE (Delta_new_broyden(delta_real_elems))
-  ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
-  ALLOCATE (Charge_dens_local(DIM_POSITIVE_K, SUBBANDS))
-  ALLOCATE (Charge_dens_new(DIM_POSITIVE_K, SUBBANDS))
 END ASSOCIATE
 
 !Initializations
@@ -125,7 +120,6 @@ Hamiltonian_const_band = CMPLX(0., 0., KIND=REAL64)
 U_transformation = CMPLX(0., 0., KIND=REAL64)
 Energies = 0.
 
-Delta_local = CMPLX(0., 0., KIND=REAL64)
 Delta_new = CMPLX(0., 0., KIND=REAL64)
 
 ASSOCIATE (sc => sc_input % self_consistency, &
@@ -154,7 +148,6 @@ ASSOCIATE (sc => sc_input % self_consistency, &
   END IF
 END ASSOCIATE
 Charge_dens_new = 0.
-Charge_dens_local = 0.
 
 Delta_broyden = 0.
 Delta_new_broyden = 0.
@@ -178,35 +171,13 @@ DO sc_iter = 1, sc_input % self_consistency % max_sc_iter
     CALL COMPUTE_SUBBAND_POTENTIAL(Hamiltonian_const_band, band, sc_input % physical % subband_params % Subband_energies, sc_input % discretization)
 
     !Integration over chunks is computed via Romberg algorithm.
-    !$omp parallel do collapse(3) schedule(dynamic, 1) private(Delta_local, Charge_dens_local, phi_k_min)
-    DO n_triangle = -N_BZ_SECTIONS / 2, N_BZ_SECTIONS / 2 - 1
-      DO i_r = 0, sc_input % discretization % k1_steps - 1
-        DO j_phi = 0, sc_input % discretization % k2_steps - 1
-          ! WRITE(log_string, *) 'Integrating over chunk: ', i, j
-          ! LOG_INFO(log_string)
-          phi_k_min = n_triangle * (PI / 3.0d0) + j_phi * sc_input % discretization % derived % dphi_k
 #ifndef BAND_BASIS
-          CALL ROMBERG_Y(Hamiltonian_const_band, Gamma_SC(:, :, :, band), Charge_dens(:, band), &
-          & i_r, sc_input % discretization % k1_steps, phi_k_min, phi_k_min + sc_input % discretization % derived % dphi_k, &
-          & Delta_local(:, :, :, band), Charge_dens_local(:, band), sc_input)
+    CALL ROMBERG_INTEGRATE_OVER_CHUNKS(Hamiltonian_const_band, Gamma_SC(:, :, :, band), Charge_dens(:, band), &
+                                      & Delta_new(:, :, :, band), Charge_dens_new(:, band), sc_input)
 #else
-          CALL ROMBERG_Y(Hamiltonian_const_band, Gamma_SC(:, :, band), Charge_dens(:, band), &
-          & i_r, sc_input % discretization % k1_steps, phi_k_min, phi_k_min + sc_input % discretization % derived % dphi_k, &
-          & Delta_local(:, :, band), Charge_dens_local(:, band), sc_input)
+    CALL ROMBERG_INTEGRATE_OVER_CHUNKS(Hamiltonian_const_band, Gamma_SC(:, :, band), Charge_dens(:, band), &
+                                      & Delta_new(:, :, band), Charge_dens_new(:, band), sc_input)
 #endif
-          !This has to be atomic operations, since Delta_new and Charge_dens would be global variables for all threads
-          !$omp critical (update_delta_and_charge)
-#ifndef BAND_BASIS
-          Delta_new(:, :, :, band) = Delta_new(:, :, :, band) + Delta_local(:, :, :, band)
-#else
-          Delta_new(:, :, band) = Delta_new(:, :, band) + Delta_local(:, :, band)
-#endif
-          Charge_dens_new(:, band) = Charge_dens_new(:, band) + Charge_dens_local(:, band)
-          !$omp end critical (update_delta_and_charge)
-        END DO
-      END DO
-    END DO
-    !$omp end parallel do
   END DO
   !Multiplying the result by Brillouin zone area
   Delta_new = Delta_new / JACOBIAN
@@ -263,7 +234,6 @@ DO sc_iter = 1, sc_input % self_consistency % max_sc_iter
 END DO !End of SC loop
 CLOSE (99)
 
-!Printing results after the simulation is done
 CALL PRINT_GAMMA(Gamma_SC, "Gamma_SC_final", sc_input % discretization)
 CALL PRINT_CHARGE(Charge_dens, "Charge_dens_final", sc_input % discretization)
 
@@ -276,7 +246,6 @@ DEALLOCATE (Hamiltonian)
 DEALLOCATE (Hamiltonian_const)
 DEALLOCATE (Hamiltonian_const_band)
 DEALLOCATE (Energies)
-DEALLOCATE (Delta_local)
 DEALLOCATE (Delta_new)
 DEALLOCATE (Gamma_SC)
 DEALLOCATE (Gamma_SC_new)
@@ -284,7 +253,6 @@ DEALLOCATE (U_transformation)
 DEALLOCATE (Delta_broyden)
 DEALLOCATE (Delta_new_broyden)
 DEALLOCATE (Charge_dens)
-DEALLOCATE (Charge_dens_local)
 DEALLOCATE (Charge_dens_new)
 
 ASSOCIATE (params => sc_input % physical % subband_params)

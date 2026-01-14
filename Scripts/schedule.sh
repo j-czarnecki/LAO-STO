@@ -11,4 +11,4 @@
 #SBATCH --error="error.err"
 
 #bash /home/czarnecki/LAO-STO/Scripts/runDoses.sh
-srun /home/czarnecki/LAO-STO/bin/LAO_STO.x
+srun /home/czarnecki/LAO-STO/bin/POST_LAO_STO.x

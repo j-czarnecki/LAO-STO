@@ -79,47 +79,15 @@ SUBROUTINE GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge_dens, 
   Hamiltonian(:, :) = CMPLX(0., 0., KIND=REAL64)
   U_transformation(:, :) = CMPLX(0., 0., KIND=REAL64)
   CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, discretization, physical_params)
-
+  Hamiltonian = Hamiltonian_const + Hamiltonian
 #ifndef BAND_BASIS
-  CALL COMPUTE_HUBBARD(Hamiltonian, &
-                      & Charge_dens, &
-                      & physical_params % subband_params % U_HUB, &
-                      & physical_params % subband_params % V_HUB, &
-                      & discretization)
-  CALL COMPUTE_SC(Hamiltonian, kx, ky, Gamma_SC, discretization)
-  CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, discretization % derived % DIM) !This is not needed, since ZHEEV takes only upper triangle
-
-  Hamiltonian(:, :) = 0.5 * (Hamiltonian_const + Hamiltonian)
-
+  CALL COMPUTE_INTERACTIONS(Hamiltonian, kx, ky, Charge_dens, Gamma_SC, discretization, physical_params)
 #else
-  CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, discretization % derived % DIM) !This is not needed, since ZHEEV takes only upper triangle
-  Hamiltonian = 0.5 * (Hamiltonian_const + Hamiltonian)
-  Hamiltonian_electron = Hamiltonian(:discretization % derived % DIM_POSITIVE_K, &
-                                   & :discretization % derived % DIM_POSITIVE_K)
-  Hamiltonian_hole = Hamiltonian(discretization % derived % DIM_POSITIVE_K + 1:, &
-                               & discretization % derived % DIM_POSITIVE_K + 1:)
-  CALL DIAGONALIZE_HERMITIAN(Hamiltonian_electron, Energies_electron, discretization % derived % DIM_POSITIVE_K)
-  CALL DIAGONALIZE_HERMITIAN(Hamiltonian_hole, Energies_hole, discretization % derived % DIM_POSITIVE_K)
-
-  Hamiltonian = CMPLX(0., 0., KIND=REAL64)
-  CALL COMPUTE_HUBBARD(Hamiltonian, &
-                      & Charge_dens, &
-                      & physical_params % subband_params % U_HUB, &
-                      & physical_params % subband_params % V_HUB, &
-                      & discretization)
-  CALL COMPUTE_SC_BAND(Hamiltonian, kx, ky, Gamma_SC, discretization)
-  CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, discretization % derived % DIM) !This is not needed, since ZHEEV takes only upper triangle
-  Hamiltonian = 0.5 * Hamiltonian
-  DO i = 1, discretization % derived % DIM_POSITIVE_K
-    Hamiltonian(i, i) = Hamiltonian(i, i) + Energies_electron(i)
-    ! Since ZHEEV sorts energies in ascending order, we have to fill hole energies in reverse order.
-    ! This guarantees that the SC pairing block is diagonal (not antidiagonal).
-    Hamiltonian(discretization % derived % DIM_POSITIVE_K + i, discretization % derived % DIM_POSITIVE_K + i) = &
-      & Hamiltonian(discretization % derived % DIM_POSITIVE_K + i, discretization % derived % DIM_POSITIVE_K + i) + &
-      & Energies_hole(discretization % derived % DIM_POSITIVE_K + 1 - i)
-  END DO
+  CALL COMPUTE_INTERACTIONS_BAND_BASIS(Hamiltonian, kx, ky, Charge_dens, Gamma_SC, discretization, physical_params)
 #endif
-  CALL DIAGONALIZE_GENERALIZED(Hamiltonian, Energies, U_transformation, discretization % derived % DIM)
+  Hamiltonian = 0.5 * Hamiltonian
+  CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, discretization % derived % DIM) !This is not needed, since ZHEEV takes only upper triangle
+  CALL DIAGONALIZE_HERMITIAN(Hamiltonian, Energies, discretization % derived % DIM)
   !After DIAGONALIZE HERMITIAN, U contains eigenvectors, so it corresponds to transformation matrix U
 
   !Here it has to be set to zero, to avoid artifacts from previous iteration / chunk
@@ -129,19 +97,19 @@ SUBROUTINE GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge_dens, 
   CALL ACCUMULATE_DELTA_REAL_SPACE(Delta_local, physical_params % subband_params % J_tensor % Values, &
     & physical_params % subband_params % J_tensor % Column_indices, &
     & physical_params % subband_params % J_tensor % Row_indices, &
-    & U_transformation, Energies, kx, ky, discretization, &
+    & Hamiltonian, Energies, kx, ky, discretization, &
     & physical_params % subband_params % J_tensor % n_nonzero, physical_params % external % T)
 #else
   CALL ACCUMULATE_DELTA_K_SPACE(Delta_local, physical_params % subband_params % J_tensor % Values, &
     & physical_params % subband_params % J_tensor % Column_indices, &
     & physical_params % subband_params % J_tensor % Row_indices, &
-    & U_transformation, Energies, kx, ky, discretization, &
+    & Hamiltonian, Energies, kx, ky, discretization, &
     & physical_params % subband_params % J_tensor % n_nonzero, physical_params % external % T)
 #endif
   !Here it has to be set to zero, to avoid artifacts from previous iteration / chunk
   Charge_dens_local = 0.
   !Charge density calculation
-  CALL ACCUMULATE_CHARGE_DENSITY(Charge_dens_local, U_transformation, Energies, discretization, physical_params % external % T)
+  CALL ACCUMULATE_CHARGE_DENSITY(Charge_dens_local, Hamiltonian, Energies, discretization, physical_params % external % T)
   !Multiplication by the Jacobian
   Delta_local = Delta_local * k1
   Charge_dens_local = Charge_dens_local * k1
