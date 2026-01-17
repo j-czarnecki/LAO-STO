@@ -105,9 +105,9 @@ SUBROUTINE PRINT_GAMMA(Gamma_SC, filename, discretization)
 
   !Printing SC gammas in [meV]
   OPEN (unit=9, FILE="./OutputData/"//filename//".dat", FORM="FORMATTED", ACTION="WRITE")
+  output_format = '(4I5, 2E15.5)'
+  WRITE (9, '(100A)') "#band i_band j_band neighbour Re(Gamma) Im(Gamma)"
 #ifndef BAND_BASIS
-  output_format = '(10I5, 2E15.5)'
-  WRITE (9, '(100A)') "#band i_band j_band orb1 orb2 lat1 lat2 spin1 spin2 neighbour Re(Gamma) Im(Gamma)"
   DO band = 1, discretization % SUBBANDS
     Do i_band = 1, discretization % derived % DIM_POSITIVE_K
       Do j_band = 1, discretization % derived % DIM_POSITIVE_K
@@ -115,11 +115,7 @@ SUBROUTINE PRINT_GAMMA(Gamma_SC, filename, discretization)
         Degrees_of_freedom_col = get_degress_of_freedom_from_index(j_band, discretization)
         DO neigh = 1, N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS
           WRITE (9, output_format) band, &
-          & i_band, j_band, &
-          & Degrees_of_freedom_row(1), Degrees_of_freedom_col(1), &
-          & Degrees_of_freedom_row(2), Degrees_of_freedom_col(2), &
-          & Degrees_of_freedom_row(3), Degrees_of_freedom_col(3), &
-          & neigh, &
+          & i_band, j_band, neigh, &
           & REAL(Gamma_SC(neigh, i_band, j_band, band)) / meV2au, &
           & AIMAG(Gamma_SC(neigh, i_band, j_band, band)) / meV2au
         END DO
@@ -129,13 +125,11 @@ SUBROUTINE PRINT_GAMMA(Gamma_SC, filename, discretization)
     END DO
   END DO
 #else
-  output_format = '(3I5, 2E15.5)'
-  WRITE (9, '(100A)') "#band i_band j_band Re(Gamma) Im(Gamma)"
   DO band = 1, discretization % SUBBANDS
     Do i_band = 1, discretization % derived % DIM_POSITIVE_K
       Do j_band = 1, discretization % derived % DIM_POSITIVE_K
         WRITE (9, output_format) band, &
-        & i_band, j_band, &
+        & i_band, j_band, 0, & ! Setting neighbour to 0 so that we unify format in both bases
         & REAL(Gamma_SC(i_band, j_band, band)) / meV2au, &
         & AIMAG(Gamma_SC(i_band, j_band, band)) / meV2au
       END DO
@@ -156,27 +150,14 @@ SUBROUTINE PRINT_CHARGE(Charge_dens, filename, discretization)
   INTEGER(INT32) :: spin, lat, orb, n, band, i_band
   INTEGER(INT32) :: Degrees_of_freedom(4)
 
-#ifndef BAND_BASIS
-  output_format = '(5I5, 1E15.5)'
-#else
   output_format = '(2I5, 1E15.5)'
-#endif
 
   OPEN (unit=9, FILE="./OutputData/"//filename//".dat", FORM="FORMATTED", ACTION="WRITE")
-#ifndef BAND_BASIS
-  WRITE (9, '(100A)') "#band i_band orb lat spin Charge"
-#else
   WRITE (9, '(100A)') "#band i_band Charge"
-#endif
 
   DO band = 1, discretization % SUBBANDS
     DO i_band = 1, discretization % derived % DIM_POSITIVE_K
-#ifndef BAND_BASIS
-      Degrees_of_freedom = get_degress_of_freedom_from_index(i_band, discretization)
-      WRITE (9, output_format) band, i_band, Degrees_of_freedom(1), Degrees_of_freedom(2), Degrees_of_freedom(3), Charge_dens(i_band, band)
-#else
       WRITE (9, output_format) band, i_band, Charge_dens(i_band, band)
-#endif
     END DO
   END DO
   CLOSE (9)

@@ -523,7 +523,12 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
           END DO
 #else
           DO l = 1, hamiltonian_dim
-            WRITE (9, output_format) (band - 1) * hamiltonian_dim + l, kx, ky, Energies(l) / meV2au
+            !! Zeros as placeholder to unify outputs
+            WRITE (9, output_format) (band - 1) * hamiltonian_dim + l, kx, ky, Energies(l) / meV2au, &
+              & 0, 0, 0, &
+              & (0, lat=1, sc_input % discretization % SUBLATTICES), &
+              & 0, 0, 0, &
+              & 0, 0
           END DO
           !TODO: Alternatively  I can transform back to spin-orbital-sublattice basis and compute contributions similarly as above.
 #endif
@@ -1016,7 +1021,7 @@ SUBROUTINE CALCULATE_GAMMA_K(gamma)
         DO i_band = 1, sc_input % discretization % derived % DIM_POSITIVE_K
           DO j_band = 1, sc_input % discretization % derived % DIM_POSITIVE_K
             file_count = File_unit_mapping(i_band, j_band, band)
-            WRITE (file_count, '(2F15.8, *(2F15.8))') kx, ky, &
+            WRITE (file_count, '(2E15.5, *(2E15.5))') kx, ky, &
               & REAL(Hamiltonian_dummy(i_band, sc_input % discretization % derived % DIM_POSITIVE_K + j_band)) / meV2au, &
               & AIMAG(Hamiltonian_dummy(i_band, sc_input % discretization % derived % DIM_POSITIVE_K + j_band)) / meV2au, &
               & (REAL(Delta_local(neigh, i_band, j_band, band)) / meV2au, &
@@ -1066,11 +1071,13 @@ SUBROUTINE CALCULATE_GAMMA_K(gamma)
         DO i_band = 1, sc_input % discretization % derived % DIM_POSITIVE_K
           DO j_band = 1, sc_input % discretization % derived % DIM_POSITIVE_K
             file_count = File_unit_mapping(i_band, j_band, band)
-            WRITE (file_count, '(2F15.8, *(2F15.8))') kx, ky, &
+            WRITE (file_count, '(2E15.5, *(2E15.5))') kx, ky, &
               & REAL(Gamma_K_orig_basis(i_band, j_band)) / meV2au, &
               & AIMAG(Gamma_K_orig_basis(i_band, j_band)) / meV2au, &
-              & REAL(Delta_local(i_band, j_band, band)) / meV2au, &
-              & AIMAG(Delta_local(i_band, j_band, band)) / meV2au
+              & (REAL(Delta_local(i_band, j_band, band)) / meV2au, &
+              & AIMAG(Delta_local(i_band, j_band, band)) / meV2au, &
+              & neigh=1, &
+              & N_NEXT_NEIGHBOURS + N_NEAREST_NEIGHBOURS) !! Repeating values to unify format between bases.
           END DO
         END DO
 

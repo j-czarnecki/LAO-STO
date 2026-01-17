@@ -639,11 +639,7 @@ SUBROUTINE GET_GAMMA_SC(Gamma_SC, path, discretization)
   REAL(REAL64) :: Gamma_re, Gamma_im
   CHARACTER(LEN=20) :: output_format
 
-#ifndef BAND_BASIS
-  output_format = '(10I5, 2E15.5)'
-#else
-  output_format = '(3I5, 2E15.5)'
-#endif
+  output_format = '(4I5, 2E15.5)'
 
   OPEN (unit=9, FILE=path, FORM="FORMATTED", ACTION="READ", STATUS="OLD")
   READ (9, *) !! Skip header
@@ -651,9 +647,7 @@ SUBROUTINE GET_GAMMA_SC(Gamma_SC, path, discretization)
   DO i_band = 1, discretization % derived % DIM_POSITIVE_K
     DO j_band = 1, discretization % derived % DIM_POSITIVE_K
       DO neigh = 1, N_ALL_NEIGHBOURS + N_NEIGHBOURS
-        READ (9, output_format) band_read, i_band_read, j_band_read, &
-                              & orb1_read, orb2_read, lat1_read, lat2_read, spin1_read, spin2_read, &
-                              & neigh_read, Gamma_re, Gamma_im
+        READ (9, output_format) band_read, i_band_read, j_band_read, neigh_read, Gamma_re, Gamma_im
         IF (neigh_read .NE. neigh) THEN
           WRITE (log_string, *) "Error reading Gamma_SC file: neighbour index mismatch"
           LOG_ERROR(log_string)
@@ -678,7 +672,8 @@ SUBROUTINE GET_GAMMA_SC(Gamma_SC, path, discretization)
 #else
   DO i_band = 1, discretization % derived % DIM_POSITIVE_K
     DO j_band = 1, discretization % derived % DIM_POSITIVE_K
-      READ (9, output_format) band_read, i_band_read, j_band_read, Gamma_re, Gamma_im
+      !! Reading dummy value of neighbour.
+      READ (9, output_format) band_read, i_band_read, j_band_read, neigh_read, Gamma_re, Gamma_im
       IF (i_band_read .NE. i_band) THEN
         WRITE (log_string, *) "Error reading Gamma_SC file: i_band index mismatch"
         LOG_ERROR(log_string)
@@ -730,29 +725,12 @@ SUBROUTINE GET_CHARGE_DENS(Charge_dens, path, discretization)
   INTEGER(INT32) :: i_band, i_band_read
   CHARACTER(LEN=20) :: output_format
 
-#ifndef BAND_BASIS
-  output_format = '(5I5, 1E15.5)'
-#else
   output_format = '(2I5, 1E15.5)'
-#endif
 
   OPEN (unit=9, FILE=path, FORM="FORMATTED", ACTION="READ", STATUS="OLD")
   READ (9, *)
   DO band = 1, discretization % SUBBANDS
     DO i_band = 1, discretization % derived % DIM_POSITIVE_K
-#ifndef BAND_BASIS
-      READ (9, output_format) band_read, i_band_read, orb_read, lat_read, spin_read, Charge_dens(i_band_read, band_read)
-      IF (band_read .NE. band) THEN
-        WRITE (log_string, *) "Error reading Charge_dens file: band index mismatch"
-        LOG_ERROR(log_string)
-        STOP "Error reading Charge_dens file: band index mismatch"
-      END IF
-      IF (i_band_read .NE. i_band) THEN
-        WRITE (log_string, *) "Error reading Charge_dens file: i_band index mismatch"
-        LOG_ERROR(log_string)
-        STOP "Error reading Charge_dens file: i_band index mismatch"
-      END IF
-#else
       READ (9, output_format) band_read, i_band_read, Charge_dens(i_band_read, band_read)
       IF (band_read .NE. band) THEN
         WRITE (log_string, *) "Error reading Charge_dens file: band index mismatch"
@@ -764,7 +742,6 @@ SUBROUTINE GET_CHARGE_DENS(Charge_dens, path, discretization)
         LOG_ERROR(log_string)
         STOP "Error reading Charge_dens file: i_band index mismatch"
       END IF
-#endif
     END DO
   END DO
   CLOSE (9)
