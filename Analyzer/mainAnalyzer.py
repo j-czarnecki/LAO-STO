@@ -191,8 +191,7 @@ def main():
     #plotGammas()
     #plotDispersions()
     #addMissingBandNumber()
-    analyzeLogs()
-
+    #analyzeLogs()
 
 if __name__ == "__main__":
     main()
