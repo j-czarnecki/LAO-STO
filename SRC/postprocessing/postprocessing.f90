@@ -106,8 +106,8 @@ SUBROUTINE CALCULATE_DOS(dos_params)
     ALLOCATE (Gamma_SC(DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
 #endif
     ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
-    ALLOCATE (DOS(DIM_POSITIVE_K, 0:DOS_steps))
-    ALLOCATE (DOS_local(DIM_POSITIVE_K, 0:DOS_steps))
+    ALLOCATE (DOS(hamiltonian_dim, 0:DOS_steps))
+    ALLOCATE (DOS_local(hamiltonian_dim, 0:DOS_steps))
   END ASSOCIATE
   Hamiltonian = CMPLX(0., 0., KIND=REAL64)
   Hamiltonian_const = CMPLX(0., 0., KIND=REAL64)
@@ -289,7 +289,7 @@ SUBROUTINE CALCULATE_DOS(dos_params)
   WRITE (9, '(A)') "#E[meV]   DOS_total[a.u]    DOS_band1[a.u]   DOS_band2[a.u]   ... DOS_bandN[a.u]"
   DO n = 0, DOS_steps
     E0 = dos_params % E_min + n * dos_params % dE0
-    WRITE (9, output_format) E0 / meV2au, SUM(DOS(:, n)), (DOS(k, n), k=1, sc_input % discretization % derived % DIM_POSITIVE_K)
+    WRITE (9, output_format) E0 / meV2au, SUM(DOS(:, n)), (DOS(k, n), k=1, hamiltonian_dim)
   END DO
   CLOSE (9)
 
