@@ -80,11 +80,14 @@ LIBS_MKL = -I${MKLROOT}/include \
 SRC_FILES_ALL := $(shell find $(SRC_DIR) -name '*.f90')
 
 # --- Exclude the two main programs from the common source set ---
-SRC_COMMON := $(filter-out $(SRC_DIR)/main/main.f90 $(SRC_DIR)/main_post/main_postprocessing.f90 $(SRC_DIR)/postprocessing/postprocessing.f90 $(SRC_DIR)/%/test/test_profiling.f90, $(SRC_FILES_ALL))
+SRC_COMMON := $(filter-out $(SRC_DIR)/main/main.f90 $(SRC_DIR)/main_post/main_postprocessing.f90 $(SRC_DIR)/postprocessing/%.f90 $(SRC_DIR)/%/test/test_profiling.f90, $(SRC_FILES_ALL))
 
 # --- Define two build sets ---
 SRC_FILES_MAIN := $(SRC_COMMON) $(SRC_DIR)/main/main.f90
-SRC_FILES_POST := $(SRC_COMMON) $(SRC_DIR)/postprocessing/postprocessing.f90 $(SRC_DIR)/main_post/main_postprocessing.f90
+
+SRC_FILES_POST := $(SRC_COMMON)
+SRC_FILES_POST += $(shell find $(SRC_DIR)/postprocessing -name '*.f90')
+SRC_FILES_POST += $(SRC_DIR)/main_post/main_postprocessing.f90
 
 # --- Define corresponding object files ---
 OBJS_MAIN := $(patsubst $(SRC_DIR)/%.f90,$(OBJ_DIR)/%.o,$(SRC_FILES_MAIN))

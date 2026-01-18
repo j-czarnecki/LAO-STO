@@ -30,7 +30,9 @@ USE utilities
 USE writers
 USE reader
 USE local_integrand
-USE postprocessing
+USE energy
+USE symmetry
+USE topology
 USE logger
 USE types
 IMPLICIT NONE
