@@ -368,12 +368,18 @@ class DispersionPlotter():
             ax.plot(
                 dosDf['E'], dosDf['DOS'], color=color, linewidth=1.5
             )
+            dos_band_columns = [col for col in dosDf.columns if col.startswith('DOS_')]
+            for band_col in dos_band_columns:
+                ax.plot(
+                    dosDf['E'], dosDf[band_col], linewidth=1, alpha=0.8, linestyle='--'
+                )
 
         if isSingle:
             ax.yaxis.set_major_locator(ticker.MultipleLocator(0.25))
-            ax.xaxis.set_major_locator(ticker.MultipleLocator(0.25))
+            ax.xaxis.set_major_locator(ticker.LinearLocator(5))
+            plt.xlim(left=0, right=eMax)
 
-            plt.xlim(left=-eMax, right=eMax)
+            #plt.xlim(left=-eMax, right=eMax)
             plt.xlabel(r"E (meV)")
             plt.ylabel(r"DOS")
             filename = os.path.join(self.plotOutputPath, "DOS.png")
