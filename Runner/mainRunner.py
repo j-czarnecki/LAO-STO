@@ -150,33 +150,21 @@ def configureAndRunSc():
     Fermi_table = [(nml_name, param_name, Ef_min + i * dE) for i in range(Ef_steps + 1)]
     #Fermi_table = [(nml_name, param_name, -0.06e3)]
 
-    # J_SC
-    J_SC = []
-    J_i_idx = []
-    J_j_idx = []
-    J_k_idx = []
-    J_l_idx = []
-    for pairing in (-30, -50, -70, -100):
-        i_idx, j_idx, k_idx, l_idx, J_values = runner.createPairingInteractionCrs(pairing, 12)
-        nml_name = "physical_params"
-        param_name = "J_tensor_values"
-        J_SC.append((nml_name, param_name, J_values))
-        J_i_idx.append((nml_name, "J_tensor_i_idx", i_idx))
-        J_j_idx.append((nml_name, "J_tensor_j_idx", j_idx))
-        J_k_idx.append((nml_name, "J_tensor_k_idx", k_idx))
-        J_l_idx.append((nml_name, "J_tensor_l_idx", l_idx))
+    #J_sc
+    nml_name = "physical_params"
+    param_name = "Interaction_energies"
+    J_sc_min = -40
+    J_sc_max = -10
+    J_sc_steps = 3
+    dJ_sc = abs(J_sc_max - J_sc_min) / J_sc_steps
+    J_sc_table = [(nml_name, param_name, J_sc_min + i * dJ_sc) for i in range(J_sc_steps + 1)]
 
-    #for phi in phi_table:
     for Ef in Fermi_table:
-        for i, J_pairing in enumerate(J_SC):
+        for J_SC in J_sc_table:
             runner.runSlurmParamValue(
                 paramValuePairs=[
                     Ef,
-                    J_SC[i],
-                    J_i_idx[i],
-                    J_j_idx[i],
-                    J_k_idx[i],
-                    J_l_idx[i],
+                    J_SC
                 ],
                 runsDir="STO-SC/STO-E_Fermi_J_SC",
                 material="STO",

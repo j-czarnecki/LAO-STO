@@ -1,7 +1,8 @@
 &discretization
     k1_steps = 100
     k2_steps = 100
-    n_tensor_elems = 12
+    n_interactions = 1
+    n_cooper_pair_hoppings = 1
     sublattices = 2
     subbands = 1
 /
@@ -18,14 +19,13 @@
     v = 200.0
     v_pdp = 28.0
     v_pds = -65.0
-    J_tensor_values = -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50
-    i_tensor_idx = 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
-    j_tensor_idx = 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
-    k_tensor_idx = 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
-    l_tensor_idx = 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
+    Interaction_names = "intraband"
+    Interaction_energies = -40
+    Cooper_pair_hopping_names = "intraband"
+    Cooper_pair_hopping_multipliers = 0.01
     u_hub = 0.0
     v_hub = 0.0
-    e_fermi = 30.0
+    e_fermi = 15.0
     v_layer = 1053.0, 1053.0
     subband_energies = 0.,
     g_factor = 10.0,

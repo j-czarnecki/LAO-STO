@@ -26,6 +26,18 @@ use, intrinsic :: iso_fortran_env, only: real64, int8, int16, int32, int64
 USE parameters
 IMPLICIT NONE
 
+TYPE interaction_t
+  !! Interaction type.
+  INTEGER(INT32) :: interaction_id !! Identifier for the interaction. Defined in parameters.f90
+  REAL(REAL64) :: energy !! Interaction energy [meV].
+END TYPE interaction_t
+
+TYPE cooper_pair_hopping_t
+  !! Cooper pair hopping type.
+  INTEGER(INT32) :: hopping_id !! Identifier for the Cooper pair hopping. Defined in parameters.f90
+  REAL(REAL64) :: multiplier !! Fraction of original energy that should be added via the Cooper pair hopping.
+END TYPE cooper_pair_hopping_t
+
 TYPE crs_matrix_t
   !! Compressed Row Storage matrix type.
   INTEGER(INT32) :: n_nonzero !! Number of nonzero elements in the matrix.
@@ -49,6 +61,7 @@ TYPE discretization_t
   !! Later on used to set derived_dimensions_t parameters.
   INTEGER(INT32) :: k1_steps = 0
   INTEGER(INT32) :: k2_steps = 0
+  INTEGER(INT32) :: n_cooper_pair_hoppings = 0
   INTEGER(INT32) :: SUBLATTICES = 2
   INTEGER(INT32) :: SUBBANDS = 1
   INTEGER(INT32) :: ORBITALS = 3
@@ -69,6 +82,7 @@ TYPE subband_params_t
   REAL(REAL64) :: V_pdp = 0.0d0 !! Slater-Koster integral for p-d orbitals hybrdization via pi overlap [meV].
   REAL(REAL64) :: V_pds = 0.0d0 !! Slater-Koster integral for p-d orbitals hybrdization via sigma overlap [meV].
   TYPE(crs_matrix_t) :: J_tensor !! Electron-hole coupling tensor in CRS format.
+  TYPE(cooper_pair_hopping_t), ALLOCATABLE :: Cooper_pair_hoppings(:) !! Cooper pair hoppings.
   REAL(REAL64) :: U_HUB = 0.0d0 !! Hubbard on-site intraorbital repulsion energy [meV].
   REAL(REAL64) :: V_HUB = 0.0d0 !! Hubbard on-site interorbital repulsion energy [meV].
   REAL(REAL64) :: E_Fermi = 0.0d0 !! Fermi energy [meV].

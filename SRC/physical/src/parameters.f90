@@ -55,11 +55,11 @@ REAL(REAL64), PARAMETER :: A_TILDE = SQRT(2./3.) * 0.3905 * nm2au !length
 REAL(REAL64), PARAMETER :: K1_MAX = 1. !Full Brillouin zone to integrate over
 REAL(REAL64), PARAMETER :: K2_MAX = 1.
 REAL(REAL64), PARAMETER :: KX_MAX = 4.0d0 * PI / (3.0d0 * SQRT(3.0d0)) ! This defines maximum kx of hexagon
-                                                                       ! corresponding to the first Brillouin Zone
+! corresponding to the first Brillouin Zone
 REAL(REAL64), PARAMETER :: KY_MAX = 2.0d0 * PI / 3.0d0 ! This defines maximum ky of hexagon
-                                                       ! corresponding to the first Brillouin Zone
+! corresponding to the first Brillouin Zone
 REAL(REAL64), PARAMETER :: R_K_MAX = 4.0d0 * PI / (3.0d0 * SQRT(3.0d0)) ! This defines the radius of circle
-                                                                        ! that the first Brillouin Zone hexagon is inscribed in.
+! that the first Brillouin Zone hexagon is inscribed in.
 REAL(REAL64), PARAMETER :: JACOBIAN = 8 * PI**2 / (3.*SQRT(3.0d0))
 INTEGER(INT32), PARAMETER :: N_BZ_SECTIONS = 6
 
@@ -87,5 +87,12 @@ COMPLEX(REAL64), PARAMETER :: Sigma_y(2, 2) = TRANSPOSE(RESHAPE([c_zero, -imag, 
 COMPLEX(REAL64), PARAMETER :: Sigma_z(2, 2) = TRANSPOSE(RESHAPE([c_one, c_zero, &
                                                                  c_zero, -c_one], &
                                                                 [2, 2]))
+
+!Interaction types "enumeration"
+INTEGER(INT32), PARAMETER :: INT_INTRABAND_ID = 1
+INTEGER(INT32), PARAMETER :: INT_INTERBAND_ID = 2
+
+!Cooper pair hoppings "enumeration"
+INTEGER(INT32), PARAMETER :: COOPER_PAIR_HOP_INTRABAND_ID = 1
 
 END MODULE parameters

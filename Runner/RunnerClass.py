@@ -233,6 +233,10 @@ class Runner(RunnerConfig):
         for pair in paramValuePairs:
             if pair[0] != "self_consistency" and not isinstance(pair[2], list):
                 pathToAppend = pathToAppend + f"_{pair[1]}_{pair[2]}"
+            if isinstance(pair[2], list):
+                pathToAppend = pathToAppend + f"_{pair[1]}"
+                for i in range(len(pair[2])):
+                    pathToAppend = pathToAppend + f"_{pair[2][i]}"
 
         path = pathToAppend
 

@@ -35,6 +35,7 @@ USE broydenV2
 USE local_integrand
 USE integrate
 USE self_consistency
+USE interaction_factory
 USE types
 USE omp_lib
 
@@ -188,6 +189,12 @@ DO sc_iter = 1, sc_input % self_consistency % max_sc_iter
   !TODO: Check, because probably this is not needed anymor
   !CALL GET_GAMMAS_FROM_DELTAS(Gamma_SC_new, Delta_new, sc_input % discretization, sc_input % physical % subband_params % nearest_interorb_multiplier, sc_input % physical % subband_params % next_interorb_multiplier)
   Gamma_SC_new = Delta_new
+
+  CALL COMPUTE_COOPER_PAIR_HOPPINGS(sc_input % physical % subband_params % cooper_pair_hoppings, &
+    & sc_input % discretization % n_cooper_pair_hoppings, &
+    & Gamma_SC_new, &
+    & sc_input % discretization % derived % DIM_POSITIVE_K)
+
   CALL PRINT_GAMMA(Gamma_SC_new, "Gamma_SC_new", sc_input % discretization)
 
   CALL CHECK_CONVERGENCE(sc_flag, Gamma_SC, Gamma_SC_new, Charge_dens, Charge_dens_new, &

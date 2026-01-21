@@ -29,6 +29,7 @@ USE types
 USE parameters
 USE logger
 USE utilities
+USE interaction_factory
 IMPLICIT NONE
 SAVE
 PRIVATE
@@ -41,7 +42,8 @@ PUBLIC :: GET_SAFE_GAMMA_SC, GET_GAMMA_SC, GET_SAFE_CHARGE_DENS, GET_CHARGE_DENS
 !Discretization
 INTEGER(INT32) :: k1_steps = 0
 INTEGER(INT32) :: k2_steps = 0
-INTEGER(INT32) :: n_tensor_elems = 0
+INTEGER(INT32) :: n_interactions = 0
+INTEGER(INT32) :: n_cooper_pair_hoppings = 0
 INTEGER(INT32) :: SUBLATTICES = 2
 INTEGER(INT32) :: SUBBANDS = 1
 
@@ -65,11 +67,10 @@ INTEGER(INT32) :: orb_affected_tetragonal = 1
 REAL(REAL64) :: v = 0.
 REAL(REAL64) :: V_pdp = 0.
 REAL(REAL64) :: V_pds = 0.
-REAL(REAL64), ALLOCATABLE :: J_tensor_values(:)
-INTEGER(INT32), ALLOCATABLE :: i_tensor_idx(:)
-INTEGER(INT32), ALLOCATABLE :: j_tensor_idx(:)
-INTEGER(INT32), ALLOCATABLE :: k_tensor_idx(:)
-INTEGER(INT32), ALLOCATABLE :: l_tensor_idx(:)
+CHARACTER(100), ALLOCATABLE :: Interaction_names(:)
+REAL(REAL64), ALLOCATABLE :: Interaction_energies(:)
+CHARACTER(100), ALLOCATABLE :: Cooper_pair_hopping_names(:)
+REAL(REAL64), ALLOCATABLE :: Cooper_pair_hopping_multipliers(:)
 REAL(REAL64) :: U_HUB = 0.
 REAL(REAL64) :: V_HUB = 0.
 REAL(REAL64) :: E_Fermi = 0.
@@ -154,37 +155,37 @@ CHARACTER(1000) :: path_to_run_dir_projections = ""
 INTEGER(INT32) :: Nr_points_projections
 INTEGER(INT32) :: Nphi_points_projections
 
-NAMELIST /physical_params/     &
-& T,                           &
-& t_D,                         &
-& t_I,                         &
-& t_Rashba,                    &
-& lambda_SOC,                  &
-& delta_trigonal,              &
-& zeta_tetragonal,             &
-& orb_affected_tetragonal,     &
-& v,                           &
-& V_pdp,                       &
-& V_pds,                       &
-& J_tensor_values,             &
-& i_tensor_idx,                &
-& j_tensor_idx,                &
-& k_tensor_idx,                &
-& l_tensor_idx,                &
-& U_HUB,                       &
-& V_HUB,                       &
-& E_Fermi,                     &
-& V_layer,                     &
-& Subband_energies,            &
-& g_factor,                    &
-& B_magnitude,                 &
-& B_theta,                     &
+NAMELIST /physical_params/         &
+& T,                               &
+& t_D,                             &
+& t_I,                             &
+& t_Rashba,                        &
+& lambda_SOC,                      &
+& delta_trigonal,                  &
+& zeta_tetragonal,                 &
+& orb_affected_tetragonal,         &
+& v,                               &
+& V_pdp,                           &
+& V_pds,                           &
+& Interaction_names,               &
+& Interaction_energies,            &
+& Cooper_pair_hopping_names,       &
+& Cooper_pair_hopping_multipliers, &
+& U_HUB,                           &
+& V_HUB,                           &
+& E_Fermi,                         &
+& V_layer,                         &
+& Subband_energies,                &
+& g_factor,                        &
+& B_magnitude,                     &
+& B_theta,                         &
 & B_phi
 
 NAMELIST /discretization/ &
 & k1_steps,               &
 & k2_steps,               &
-& n_tensor_elems,         &
+& n_interactions,         &
+& n_cooper_pair_hoppings, &
 & SUBLATTICES,            &
 & SUBBANDS
 
@@ -267,6 +268,9 @@ SUBROUTINE GET_INPUT(nmlfile, sc_input)
   CHARACTER(500) :: io_msg
   REAL(REAL64), ALLOCATABLE :: J_tensor(:, :, :, :)
   REAL(REAL64), ALLOCATABLE :: Matricized_j_tensor(:, :)
+  TYPE(interaction_t), ALLOCATABLE :: Interactions(:)
+  TYPE(cooper_pair_hopping_t), ALLOCATABLE :: Cooper_pair_hoppings(:)
+  INTEGER(INT32) :: n_tensor_nonzero = 0
 
   OPEN (unit=9, FILE=nmlfile, FORM="FORMATTED", ACTION="READ", STATUS="OLD")
 
@@ -283,35 +287,34 @@ SUBROUTINE GET_INPUT(nmlfile, sc_input)
   IF ((k1_steps .LE. 0) .OR. (k2_steps .LE. 0)) STOP "k_steps must be > 0"
   IF (SUBLATTICES .LE. 0) STOP "SUBLATTICES must be > 0"
   CALL SET_HAMILTONIAN_PARAMS(SUBLATTICES, SUBBANDS, sc_input % discretization)
-  WRITE (log_string, '(8(A, I0))') " SUBLATTICES: ", sc_input % discretization % SUBLATTICES,&
+  WRITE (log_string, '(9(A, I0))') " SUBLATTICES: ", sc_input % discretization % SUBLATTICES,&
                                 & " SUBBANDS: ", sc_input % discretization % SUBBANDS,&
                                 & " ORBITALS: ", sc_input % discretization % ORBITALS, &
                                 & " TBA_DIM: ", sc_input % discretization % derived % TBA_DIM, &
                                 & " DIM_POSITIVE_K: ", sc_input % discretization % derived % DIM_POSITIVE_K, &
                                 & " DIM: ", sc_input % discretization % derived % DIM, &
                                 & " LAYER_COUPLINGS: ", sc_input % discretization % derived % LAYER_COUPLINGS, &
-                                & " n_tensor_elems: ", n_tensor_elems
+                                & " n_interactions: ", n_interactions, &
+                                & " n_cooper_pair_hoppings: ", n_cooper_pair_hoppings
   LOG_INFO(log_string)
 
   !Write it to sc_input
   sc_input % discretization % k1_steps = k1_steps
   sc_input % discretization % k2_steps = k2_steps
-  sc_input % physical % subband_params % J_tensor % n_nonzero = n_tensor_elems
+  sc_input % discretization % n_cooper_pair_hoppings = n_cooper_pair_hoppings
   sc_input % discretization % derived % dr_k = R_K_MAX / k1_steps
   sc_input % discretization % derived % dphi_k = (PI / 3.0d0) / k2_steps !Slicing every hexagon's triangle into the same number of phi steps
 
   !This is crucial
   !J tensor
-  ALLOCATE (J_tensor_values(n_tensor_elems))
-  ALLOCATE (i_tensor_idx(n_tensor_elems))
-  ALLOCATE (j_tensor_idx(n_tensor_elems))
-  ALLOCATE (k_tensor_idx(n_tensor_elems))
-  ALLOCATE (l_tensor_idx(n_tensor_elems))
-  J_tensor_values = 0.0d0
-  i_tensor_idx = 0
-  j_tensor_idx = 0
-  k_tensor_idx = 0
-  l_tensor_idx = 0
+  ALLOCATE (Interaction_names(n_interactions))
+  ALLOCATE (Interaction_energies(n_interactions))
+  ALLOCATE (Cooper_pair_hopping_names(n_cooper_pair_hoppings))
+  ALLOCATE (Cooper_pair_hopping_multipliers(n_cooper_pair_hoppings))
+  ALLOCATE (Interactions(n_interactions))
+  ALLOCATE (sc_input % physical % subband_params % Cooper_pair_hoppings(n_cooper_pair_hoppings))
+  Interaction_energies = 0.0d0
+  Cooper_pair_hopping_multipliers = 0.0d0
 
   ALLOCATE (J_tensor(sc_input % discretization % derived % DIM_POSITIVE_K, &
     & sc_input % discretization % derived % DIM_POSITIVE_K, &
@@ -319,9 +322,6 @@ SUBROUTINE GET_INPUT(nmlfile, sc_input)
     & sc_input % discretization % derived % DIM_POSITIVE_K))
   ALLOCATE (Matricized_j_tensor(sc_input % discretization % derived % DIM_POSITIVE_K**2, &
     & sc_input % discretization % derived % DIM_POSITIVE_K**2))
-  ALLOCATE (sc_input % physical % subband_params % J_tensor % Values(n_tensor_elems))
-  ALLOCATE (sc_input % physical % subband_params % J_tensor % Column_indices(n_tensor_elems))
-  ALLOCATE (sc_input % physical % subband_params % J_tensor % Row_indices(sc_input % discretization % derived % DIM_POSITIVE_K**2 + 1))
   J_tensor = 0.0d0
   Matricized_j_tensor = 0.0d0
   sc_input % physical % subband_params % J_tensor % Values = 0.0d0
@@ -370,6 +370,14 @@ SUBROUTINE GET_INPUT(nmlfile, sc_input)
   sc_input % physical % external % B_field(2) = SIN(deg2rad(B_phi)) * SIN(deg2rad(B_theta)) * B_magnitude * T2au
   sc_input % physical % external % B_field(3) = COS(deg2rad(B_theta)) * B_magnitude * T2au
 
+  WRITE (log_string, '(A, *(1X,A))') "Interactions: ", (TRIM(Interaction_names(i)), i=1, n_interactions)
+  LOG_INFO(log_string)
+  WRITE (log_string, '(A, *(E15.5))') "Interaction energies: ", (Interaction_energies(i), i=1, n_interactions)
+  LOG_INFO(log_string)
+  WRITE (log_string, '(A, *(1X,A))') "Cooper pair hoppings: ", (TRIM(Cooper_pair_hopping_names(i)), i=1, n_cooper_pair_hoppings)
+  LOG_INFO(log_string)
+  WRITE (log_string, '(A, *(E15.5))') "Cooper pair hopping multipliers: ", (Cooper_pair_hopping_multipliers(i), i=1, n_cooper_pair_hoppings)
+  LOG_INFO(log_string)
   WRITE (log_string, *) "V_layer: ", (V_layer(i), i=1, SUBLATTICES)
   LOG_INFO(log_string)
   WRITE (log_string, *) "Subband_energies: ", (Subband_energies(i), i=1, SUBBANDS)
@@ -377,23 +385,22 @@ SUBROUTINE GET_INPUT(nmlfile, sc_input)
   WRITE (log_string, '(A, 3E15.5)') "B_field: ", (sc_input % physical % external % B_field(i) / T2au, i=1, 3)
   LOG_INFO(log_string)
 
-  !TODO: Add printout of J_tensor
-  DO i = 1, n_tensor_elems
-    J_tensor(i_tensor_idx(i), j_tensor_idx(i), k_tensor_idx(i), l_tensor_idx(i)) = J_tensor_values(i)
-  END DO
+  CALL ASSIGN_COOPER_PAIR_HOPPING_IDS(Cooper_pair_hopping_names, &
+    & Cooper_pair_hopping_multipliers, &
+    & sc_input % physical % subband_params % Cooper_pair_hoppings, &
+    & n_cooper_pair_hoppings)
 
+  CALL ASSIGN_INTERACTION_IDS(Interaction_names, Interaction_energies, Interactions, n_interactions)
+  CALL CONSTRUCT_INTERACTION_TENSOR(Interactions, n_interactions, J_tensor, sc_input % discretization % derived % DIM_POSITIVE_K)
+
+  WRITE (log_string, *) "Constructing J_tensor in matricized form"
   CALL MATRICIZE_INTERACTION_TENSOR(J_tensor, sc_input % discretization % derived % DIM_POSITIVE_K, Matricized_j_tensor)
+  n_tensor_nonzero = calculate_number_of_nonzero_elements(Matricized_j_tensor)
+  WRITE (log_string, *) "Number of nonzero elements in J_tensor: ", n_tensor_nonzero
+  LOG_INFO(log_string)
   CALL SAVE_SPARSE_MATRIX_IN_CRS(Matricized_j_tensor, sc_input % physical % subband_params % J_tensor % Values, &
     & sc_input % physical % subband_params % J_tensor % Column_indices, sc_input % physical % subband_params % J_tensor % Row_indices,&
-    & n_tensor_elems, sc_input % discretization % derived % DIM_POSITIVE_K**2)
-
-  WRITE (log_string, *) "J_tensor_crs: ", (sc_input % physical % subband_params % J_tensor % Values(i), i=1, n_tensor_elems)
-  LOG_INFO(log_string)
-  WRITE (log_string, *) "J_tensor_crs_column_indices: ", (sc_input % physical % subband_params % J_tensor % Column_indices(i), i=1, n_tensor_elems)
-  LOG_INFO(log_string)
-  WRITE (log_string, *) "J_tensor_crs_row_indices: ", (sc_input % physical % subband_params % J_tensor % Row_indices(i), &
-    & i=1, sc_input % discretization % derived % DIM_POSITIVE_K**2 + 1)
-  LOG_INFO(log_string)
+    & n_tensor_nonzero, sc_input % discretization % derived % DIM_POSITIVE_K**2)
 
   !Check input data
   IF (T < 0) STOP "Temperature in kelvins must be >= 0!"
@@ -498,11 +505,10 @@ SUBROUTINE GET_INPUT(nmlfile, sc_input)
   CLOSE (9)
   DEALLOCATE (V_layer)
   DEALLOCATE (Subband_energies)
-  DEALLOCATE (J_tensor_values)
-  DEALLOCATE (i_tensor_idx)
-  DEALLOCATE (j_tensor_idx)
-  DEALLOCATE (k_tensor_idx)
-  DEALLOCATE (l_tensor_idx)
+  DEALLOCATE (Interaction_names)
+  DEALLOCATE (Interaction_energies)
+  DEALLOCATE (Cooper_pair_hopping_names)
+  DEALLOCATE (Cooper_pair_hopping_multipliers)
   DEALLOCATE (J_tensor)
   DEALLOCATE (Matricized_j_tensor)
 

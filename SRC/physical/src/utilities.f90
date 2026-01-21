@@ -574,11 +574,15 @@ SUBROUTINE SAVE_SPARSE_MATRIX_IN_CRS(Matrix, Values, Column_indeces, Row_pointer
   INTEGER(INT32), INTENT(IN) :: n_nonzero
   INTEGER(INT32), INTENT(IN) :: matrix_size
   REAL(REAL64), INTENT(IN) :: Matrix(matrix_size, matrix_size)
-  REAL(REAL64), INTENT(OUT) :: Values(n_nonzero)
-  INTEGER(INT32), INTENT(OUT) :: Column_indeces(n_nonzero)
-  INTEGER(INT32), INTENT(OUT) :: Row_pointers(matrix_size + 1)
+  REAL(REAL64), ALLOCATABLE, INTENT(OUT) :: Values(:)
+  INTEGER(INT32), ALLOCATABLE, INTENT(OUT) :: Column_indeces(:)
+  INTEGER(INT32), ALLOCATABLE, INTENT(OUT) :: Row_pointers(:)
 
   INTEGER(INT32) :: i, j, n_current_nonzero_value
+
+  ALLOCATE (Values(n_nonzero))
+  ALLOCATE (Column_indeces(n_nonzero))
+  ALLOCATE (Row_pointers(matrix_size + 1))
 
   Row_pointers(1) = 1
   n_current_nonzero_value = 1
