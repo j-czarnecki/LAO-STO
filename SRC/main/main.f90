@@ -218,8 +218,9 @@ DO sc_iter = 1, sc_input % self_consistency % max_sc_iter
   !In the last phase of convergence use linear mixing to avoid spare oscillations
   ! ELSE
   !     PRINT*, "Linear mixing"
-  !     !Linear mixing
-  !     Gamma_SC(:,:,:,:) = (1. - sc_alpha)*Gamma_SC(:,:,:,:) + sc_alpha*Gamma_SC_new(:,:,:,:)
+  !Linear mixing
+  ! Gamma_SC = (1.-sc_input % self_consistency % sc_alpha) * Gamma_SC + sc_input % self_consistency % sc_alpha * Gamma_SC_new
+  ! Charge_dens = (1.-sc_input % self_consistency % sc_alpha) * Charge_dens + sc_input % self_consistency % sc_alpha * Charge_dens_new
   ! END IF
 
   !Gamma_SC(:,:,:,2) = CONJG(Gamma_SC(:,:,:,1)) !This is valid in asbence of magnetic field

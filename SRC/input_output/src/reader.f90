@@ -143,6 +143,11 @@ LOGICAL :: enable_gamma_k_calc = .FALSE.
 CHARACTER(1000) :: path_to_run_dir_gamma_k = ""
 INTEGER(INT32) :: Nk_points_gamma_k = 0
 
+LOGICAL :: enable_transformation_calc = .FALSE.
+CHARACTER(1000) :: path_to_run_dir_transformation = ""
+INTEGER(INT32) :: Nr_points_transformation
+INTEGER(INT32) :: Nphi_points_transformation
+
 !Projections calculation
 LOGICAL :: enable_projections_calc = .FALSE.
 CHARACTER(1000) :: path_to_run_dir_projections = ""
@@ -239,6 +244,12 @@ NAMELIST /gamma_k_calculation/ &
 & enable_gamma_k_calc,         &
 & path_to_run_dir_gamma_k,     &
 & Nk_points_gamma_k
+
+NAMELIST /transformation_calculation/ &
+& enable_transformation_calc,         &
+& path_to_run_dir_transformation,     &
+& Nr_points_transformation,           &
+& Nphi_points_transformation
 
 NAMELIST /projections_calculation/ &
 & enable_projections_calc,         &
@@ -568,6 +579,18 @@ SUBROUTINE GET_POSTPROCESSING_INPUT(nmlfile, post_input)
     post_input % gamma_k % enable = enable_gamma_k_calc
     post_input % gamma_k % path = path_to_run_dir_gamma_k
     post_input % gamma_k % Nk_points = Nk_points_gamma_k
+  END IF
+
+  READ (9, NML=transformation_calculation)
+  IF (enable_transformation_calc) THEN
+    IF (Nr_points_transformation .LE. 0) STOP "Nr_points_transformation must be > 0"
+    IF (Nphi_points_transformation .LE. 0) STOP "Nphi_points_transformation must be > 0"
+    IF (path_to_run_dir_transformation == "") STOP "path_to_run_dir_transformation must not be empty"
+
+    post_input % transformation % enable = enable_transformation_calc
+    post_input % transformation % path = path_to_run_dir_transformation
+    post_input % transformation % Nr_points = Nr_points_transformation
+    post_input % transformation % Nphi_points = Nphi_points_transformation
   END IF
 
   READ (9, NML=projections_calculation)

@@ -141,6 +141,42 @@ SUBROUTINE PRINT_GAMMA(Gamma_SC, filename, discretization)
   CLOSE (9)
 END SUBROUTINE PRINT_GAMMA
 
+SUBROUTINE PRINT_GAMMA_REAL_SPACE(Gamma_SC, filename, discretization)
+  TYPE(discretization_t), INTENT(IN) :: discretization
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_SC(0:N_ALL_NEIGHBOURS + N_NEIGHBOURS, &
+                                        & discretization % derived % DIM_POSITIVE_K, &
+                                        & discretization % derived % DIM_POSITIVE_K, &
+                                        & discretization % SUBBANDS)
+  CHARACTER(LEN=*), INTENT(IN) :: filename
+  CHARACTER(LEN=20) :: output_format
+
+  INTEGER(INT32) :: orb, j, spin1, spin2, lat, band
+  INTEGER(INT32) :: i_band, j_band, neigh
+  INTEGER(INT32) :: Degrees_of_freedom_row(4), Degrees_of_freedom_col(4)
+
+  !Printing SC gammas in [meV]
+  OPEN (unit=9, FILE="./OutputData/"//filename//".dat", FORM="FORMATTED", ACTION="WRITE")
+  output_format = '(4I5, 2E15.5)'
+  WRITE (9, '(100A)') "#band i_band j_band neighbour Re(Gamma) Im(Gamma)"
+  DO band = 1, discretization % SUBBANDS
+    Do i_band = 1, discretization % derived % DIM_POSITIVE_K
+      Do j_band = 1, discretization % derived % DIM_POSITIVE_K
+        Degrees_of_freedom_row = get_degress_of_freedom_from_index(i_band, discretization)
+        Degrees_of_freedom_col = get_degress_of_freedom_from_index(j_band, discretization)
+        DO neigh = 0, N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS
+          WRITE (9, output_format) band, &
+          & i_band, j_band, neigh, &
+          & REAL(Gamma_SC(neigh, i_band, j_band, band)) / meV2au, &
+          & AIMAG(Gamma_SC(neigh, i_band, j_band, band)) / meV2au
+        END DO
+        WRITE (9, *)
+        WRITE (9, *)
+      END DO
+    END DO
+  END DO
+  CLOSE (9)
+END SUBROUTINE PRINT_GAMMA_REAL_SPACE
+
 SUBROUTINE PRINT_CHARGE(Charge_dens, filename, discretization)
   TYPE(discretization_t), INTENT(IN) :: discretization
   REAL(REAL64), INTENT(IN) :: Charge_dens(discretization % derived % DIM_POSITIVE_K, &

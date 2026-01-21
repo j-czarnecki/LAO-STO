@@ -48,12 +48,7 @@ SUBROUTINE CALCULATE_GAMMA_K(gamma)
   COMPLEX(REAL64), ALLOCATABLE :: Delta_local(:, :, :, :) !! Delta (pairing amplitudes) for given k point, integrand
 #else
   COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :)
-  COMPLEX(REAL64), ALLOCATABLE :: Gamma_K(:, :, :) !! Superconducting pairing, determined at given k point
   COMPLEX(REAL64), ALLOCATABLE :: Gamma_K_orig_basis(:, :) !! Superconducting pairing, determined at given k point
-  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian(:, :) !! Full Hamiltonian at given k point
-  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian_electron(:, :), Hamiltonian_hole(:, :)
-  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian_hole_reversed(:, :)
-  REAL(REAL64), ALLOCATABLE :: Energies_electron(:), Energies_hole(:)
   COMPLEX(REAL64), ALLOCATABLE :: Delta_local(:, :, :) !! Delta (pairing amplitudes) for given k point, integrand
 #endif
   REAL(REAL64), ALLOCATABLE :: Charge_dens(:, :) !! Charge density read from a simulation
@@ -106,15 +101,8 @@ SUBROUTINE CALCULATE_GAMMA_K(gamma)
     ALLOCATE (Delta_local(N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS, DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
 #else
     ALLOCATE (Gamma_SC(DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
-    ALLOCATE (Gamma_K(DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
     ALLOCATE (Gamma_K_orig_basis(DIM_POSITIVE_K, DIM_POSITIVE_K))
     ALLOCATE (Delta_local(DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
-    ALLOCATE (Hamiltonian_electron(DIM_POSITIVE_K, DIM_POSITIVE_K))
-    ALLOCATE (Hamiltonian_hole(DIM_POSITIVE_K, DIM_POSITIVE_K))
-    ALLOCATE (Hamiltonian_hole_reversed(DIM_POSITIVE_K, DIM_POSITIVE_K))
-    ALLOCATE (Hamiltonian(DIM, DIM))
-    ALLOCATE (Energies_electron(DIM_POSITIVE_K))
-    ALLOCATE (Energies_hole(DIM_POSITIVE_K))
 #endif
     ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
     ALLOCATE (Charge_dens_local(DIM_POSITIVE_K, SUBBANDS))
@@ -146,12 +134,11 @@ SUBROUTINE CALCULATE_GAMMA_K(gamma)
     END DO
   END DO
 
-  !$omp parallel private(kx, ky, kx_minus, ky_minus, k1, k2, band, Hamiltonian_const_band, Charge_dens_local, Delta_local,&
-  !$omp&                 Gamma_K, orb, spin1, spin2, n, neigh, lat, orb_prime, band_prime, layer, file_count, row, col, &
-  !$omp&                 gamma_spin_index, gamma_lat_index, Hamiltonian_dummy, gamma_nn_12, gamma_nn_21, gamma_nnn, idx, phase &
+  !$omp parallel private(kx, ky, k1, k2, band, Hamiltonian_const_band, Charge_dens_local, Delta_local,&
+  !$omp&                 orb, spin1, spin2, n, neigh, lat, orb_prime, band_prime, layer, file_count, row, col, &
+  !$omp&                 gamma_spin_index, gamma_lat_index, Hamiltonian_dummy, gamma_nn_12, gamma_nn_21, gamma_nnn &
 #ifdef BAND_BASIS
-  !$omp&             ,   Hamiltonian, Hamiltonian_electron, Hamiltonian_hole, Energies_electron, Energies_hole, &
-  !$omp&                 Hamiltonian_hole_reversed, Gamma_K_orig_basis &
+  !$omp&             ,   Gamma_K_orig_basis &
 #endif
   !$omp&             )
 
@@ -188,7 +175,7 @@ SUBROUTINE CALCULATE_GAMMA_K(gamma)
                                         & sc_input % discretization, &
                                         & sc_input % physical)
 #endif
-      END DO
+      END DO !band loop
 
       !Write result for given k point to file
       DO band = 1, sc_input % discretization % SUBBANDS
@@ -208,42 +195,8 @@ SUBROUTINE CALCULATE_GAMMA_K(gamma)
           END DO
         END DO
 #else
-        Hamiltonian = Hamiltonian_const_band
-        CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, sc_input % discretization, sc_input % physical)
-        Hamiltonian = 0.5 * Hamiltonian
-
-        Hamiltonian_electron = Hamiltonian(:sc_input % discretization % derived % DIM_POSITIVE_K, &
-                                         & :sc_input % discretization % derived % DIM_POSITIVE_K)
-        CALL DIAGONALIZE_HERMITIAN(Hamiltonian_electron, Energies_electron, sc_input % discretization % derived % DIM_POSITIVE_K)
-        !! Fix the gauge
-        DO n = 1, sc_input % discretization % derived % DIM_POSITIVE_K
-          idx = MAXLOC(ABS(Hamiltonian_electron(:, n)), 1)
-          phase = Hamiltonian_electron(idx, n) / ABS(Hamiltonian_electron(idx, n))
-          Hamiltonian_electron(:, n) = Hamiltonian_electron(:, n) / phase
-        END DO
-
-        !! Electron hamiltonian at -k
-        kx_minus = -kx
-        ky_minus = -ky
-        Hamiltonian = Hamiltonian_const_band
-        CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx_minus, ky_minus, sc_input % discretization, sc_input % physical)
-        Hamiltonian = 0.5 * Hamiltonian
-
-        Hamiltonian_hole = Hamiltonian(:sc_input % discretization % derived % DIM_POSITIVE_K, &
-                                     & :sc_input % discretization % derived % DIM_POSITIVE_K)
-        CALL DIAGONALIZE_HERMITIAN(Hamiltonian_hole, Energies_hole, sc_input % discretization % derived % DIM_POSITIVE_K)
-        !! Fix the gauge
-        DO n = 1, sc_input % discretization % derived % DIM_POSITIVE_K
-          idx = MAXLOC(ABS(Hamiltonian_hole(:, n)), 1)
-          phase = Hamiltonian_hole(idx, n) / ABS(Hamiltonian_hole(idx, n))
-          Hamiltonian_hole(:, n) = Hamiltonian_hole(:, n) / phase
-        END DO
-
-        CALL COMPUTE_SC_BAND(Hamiltonian_dummy, kx, ky, Gamma_SC(:, :, band), sc_input % discretization)
-        ! Transform back to spin-orbital-sublattice basis to get Hamiltonian elements
-        Gamma_K(:, :, band) = Hamiltonian_dummy(:sc_input % discretization % derived % DIM_POSITIVE_K, &
-                                        & sc_input % discretization % derived % DIM_POSITIVE_K + 1:)
-        Gamma_K_orig_basis(:, :) = MATMUL(Hamiltonian_electron, MATMUL((Gamma_K(:, :, band)), TRANSPOSE(Hamiltonian_hole)))
+        CALL GET_GAMMA_K_ORIG_BASIS(Gamma_K_orig_basis, Hamiltonian_const_band, kx, ky, Gamma_SC(:, :, band), &
+                                  & sc_input % physical, sc_input % discretization)
 
         DO i_band = 1, sc_input % discretization % derived % DIM_POSITIVE_K
           DO j_band = 1, sc_input % discretization % derived % DIM_POSITIVE_K
@@ -260,9 +213,9 @@ SUBROUTINE CALCULATE_GAMMA_K(gamma)
 
 #endif
 
-      END DO
-    END DO
-  END DO
+      END DO ! band loop
+    END DO ! ky loop
+  END DO ! kx loop
   !$omp end do
   !$omp end parallel
 
@@ -283,12 +236,118 @@ SUBROUTINE CALCULATE_GAMMA_K(gamma)
   DEALLOCATE (Hamiltonian_const_band)
   DEALLOCATE (Hamiltonian_dummy)
   DEALLOCATE (Gamma_SC)
-  DEALLOCATE (Gamma_K)
   DEALLOCATE (Charge_dens)
   DEALLOCATE (Delta_local)
   DEALLOCATE (Charge_dens_local)
   DEALLOCATE (File_unit_mapping)
 END SUBROUTINE CALCULATE_GAMMA_K
+
+SUBROUTINE TRANSFORM_GAMMA_TO_REAL_SPACE(transformation)
+  !! This subroutine reads Gamma in the band basis,
+  !! calculates the shape of Gamma(k) in the spin-orbital-sublattice basis,
+  !! and performs a Fourier transform to get Gamma(\delta_i).
+  !! \delta_i is the vector to i-th neighbour.
+  TYPE(post_transformation_t), INTENT(IN) :: transformation
+  TYPE(sc_input_params_t) :: sc_input
+
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :) !! Supercondicting pairings read from a simulation (band basis)
+  REAL(REAL64), ALLOCATABLE :: Charge_dens(:, :) !! Charge density read from a simulation (band basis)
+
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_K_orig_basis(:, :) !! Superconducting pairing,
+                                                           !! determined at given k point (spin-orbital basis)
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_real_space(:, :, :, :) !! Gamma in the real space (spin-orbital basis)
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_real_space_local(:, :, :, :) !! Tread-private accumulator for
+                                                                     !! Gamma in the real space (spin-orbital basis).
+  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian_const(:, :) !! k-indepndent and band-independent part of the Hamiltonian
+  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian_const_band(:, :) !! k-independent, band-dependent Hamiltonian
+  COMPLEX(REAL64) :: Phases(N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS) !! Phase factors for given neighbour
+
+  INTEGER(INT32) :: n_triangle, j_phi, i_r
+  REAL(REAL64) :: phi_k, r_k, r_max, dr
+  REAL(REAL64) :: kx, ky
+  INTEGER(INT32) :: band, neigh
+
+  CALL GET_INPUT(TRIM(transformation % path)//"input.nml", sc_input)
+
+  !Redefining step in radial and angular directions according to postprocessing parameters
+  sc_input % discretization % derived % dr_k = R_K_MAX / transformation % Nr_points
+  sc_input % discretization % derived % dphi_k = (PI / 3.0d0) / transformation % Nphi_points  !Slicing every hexagon's triangle into the same number of phi steps
+
+  ASSOCIATE (DIM_POSITIVE_K => sc_input % discretization % derived % DIM_POSITIVE_K, &
+           & DIM => sc_input % discretization % derived % DIM, &
+           & SUBBANDS => sc_input % discretization % SUBBANDS)
+    ALLOCATE (Gamma_SC(DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+    ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
+    ALLOCATE (Gamma_K_orig_basis(DIM_POSITIVE_K, DIM_POSITIVE_K))
+    ALLOCATE (Gamma_real_space(0:N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS, DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+    ALLOCATE (Gamma_real_space_local(0:N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS, DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
+    ALLOCATE (Hamiltonian_const(DIM, DIM))
+    ALLOCATE (Hamiltonian_const_band(DIM, DIM))
+
+  END ASSOCIATE
+
+  Gamma_SC = CMPLX(0.0d0, 0.0d0, KIND=REAL64)
+  Charge_dens = 0.0d0
+  Gamma_K_orig_basis = CMPLX(0.0d0, 0.0d0, KIND=REAL64)
+  Gamma_real_space = CMPLX(0.0d0, 0.0d0, KIND=REAL64)
+  Gamma_real_space_local = CMPLX(0.0d0, 0.0d0, KIND=REAL64)
+  Hamiltonian_const = CMPLX(0.0d0, 0.0d0, KIND=REAL64)
+  Hamiltonian_const_band = CMPLX(0.0d0, 0.0d0, KIND=REAL64)
+
+  CALL GET_SAFE_GAMMA_SC(Gamma_SC, transformation % path, sc_input % discretization)
+  CALL GET_SAFE_CHARGE_DENS(Charge_dens, transformation % path, sc_input % discretization)
+
+  DO band = 1, sc_input % discretization % SUBBANDS
+    Hamiltonian_const_band = Hamiltonian_const
+    CALL COMPUTE_SUBBAND_POTENTIAL(Hamiltonian_const_band, band, sc_input % physical % subband_params % Subband_energies, sc_input % discretization)
+    !$omp parallel private(n_triangle, j_phi, i_r, neigh, phi_k, r_max, dr, r_k, kx, ky, Gamma_K_orig_basis,&
+    !$omp&                 Gamma_real_space_local, Phases)
+    !$omp do collapse(3) schedule(dynamic, 1)
+    DO n_triangle = -N_BZ_SECTIONS / 2, N_BZ_SECTIONS / 2 - 1
+      DO j_phi = 0, transformation % Nphi_points - 1
+        DO i_r = 0, transformation % Nr_points
+          phi_k = n_triangle * (PI / 3.0d0) + j_phi * sc_input % discretization % derived % dphi_k
+          r_max = r_max_phi(MOD(ABS(phi_k), PI / 3))
+          dr = r_max / transformation % Nr_points
+          r_k = i_r * dr
+
+          !Transform from graphene reciprocal lattice to kx and ky
+          kx = r_k * COS(phi_k)
+          ky = r_k * SIN(phi_k)
+          CALL COMPUTE_NEAREST_PAIRINGS(Phases(:N_NEAREST_NEIGHBOURS), kx, ky, 6)
+          CALL COMPUTE_NEXT_PAIRINGS(Phases(N_NEAREST_NEIGHBOURS + 1:), kx, ky, 6)
+          Phases = CONJG(Phases) !! Due to inverse Fourier transform
+          CALL GET_GAMMA_K_ORIG_BASIS(Gamma_K_orig_basis, Hamiltonian_const_band, kx, ky, Gamma_SC(:, :, band), &
+                                  & sc_input % physical, sc_input % discretization)
+          Gamma_real_space_local(0, :, :, band) = Gamma_real_space_local(0, :, :, band) + &
+              & Gamma_K_orig_basis(:, :) * r_k * dr * sc_input % discretization % derived % dphi_k / JACOBIAN
+          DO neigh = 1, N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS
+            Gamma_real_space_local(neigh, :, :, band) = Gamma_real_space_local(neigh, :, :, band) + &
+              & (Gamma_K_orig_basis(:, :) * Phases(neigh)) * r_k * dr * sc_input % discretization % derived % dphi_k / JACOBIAN
+          END DO
+
+          !$omp critical (gamma_update)
+          Gamma_real_space = Gamma_real_space + Gamma_real_space_local
+          !$omp end critical (gamma_update)
+
+        END DO
+      END DO
+    END DO
+    !$omp end do
+    !$omp end parallel
+  END DO
+
+  CALL PRINT_GAMMA_REAL_SPACE(Gamma_real_space, "Gamma_real_space_transformed", sc_input % discretization)
+
+  DEALLOCATE (Gamma_SC)
+  DEALLOCATE (Charge_dens)
+  DEALLOCATE (Gamma_K_orig_basis)
+  DEALLOCATE (Gamma_real_space)
+  DEALLOCATE (Gamma_real_space_local)
+  DEALLOCATE (Hamiltonian_const)
+  DEALLOCATE (Hamiltonian_const_band)
+
+END SUBROUTINE TRANSFORM_GAMMA_TO_REAL_SPACE
 
 !! DEPRECATED
 SUBROUTINE CALCULATE_PROJECTIONS(projections)
@@ -842,4 +901,81 @@ CONTAINS
   END FUNCTION e2_6_proj
 
 END SUBROUTINE CALCULATE_PROJECTIONS
+
+SUBROUTINE GET_GAMMA_K_ORIG_BASIS(Gamma_K_orig_basis, Hamiltonian_const_band, kx, ky, Gamma_SC, physical, discretization)
+  !! Compute Gamma_K in the original spin-orbital-sublattice basis
+  !! by transforming from the band basis using eigenvectors at k and -k
+  IMPLICIT NONE
+  TYPE(physical_params_t), INTENT(IN) :: physical
+  TYPE(discretization_t), INTENT(IN) :: discretization
+  COMPLEX(REAL64), INTENT(OUT) :: Gamma_K_orig_basis(discretization % derived % DIM_POSITIVE_K, discretization % derived % DIM_POSITIVE_K)
+  COMPLEX(REAL64), INTENT(IN) :: Hamiltonian_const_band(discretization % derived % DIM, discretization % derived % DIM)
+  REAL(REAL64), INTENT(INOUT) :: kx, ky
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_SC(discretization % derived % DIM_POSITIVE_K, discretization % derived % DIM_POSITIVE_K)
+
+  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian(:, :)
+  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian_electron(:, :), Hamiltonian_hole(:, :)
+  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian_dummy(:, :)
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_K(:, :)
+  REAL(REAL64), ALLOCATABLE :: Energies_electron(:), Energies_hole(:)
+  REAL(REAL64) :: kx_minus, ky_minus
+  INTEGER(INT32) :: n, idx
+  COMPLEX(REAL64) :: phase
+
+  ALLOCATE (Hamiltonian(discretization % derived % DIM, discretization % derived % DIM))
+  ALLOCATE (Hamiltonian_electron(discretization % derived % DIM_POSITIVE_K, discretization % derived % DIM_POSITIVE_K))
+  ALLOCATE (Hamiltonian_hole(discretization % derived % DIM_POSITIVE_K, discretization % derived % DIM_POSITIVE_K))
+  ALLOCATE (Hamiltonian_dummy(discretization % derived % DIM, discretization % derived % DIM))
+  ALLOCATE (Gamma_K(discretization % derived % DIM_POSITIVE_K, discretization % derived % DIM_POSITIVE_K))
+  ALLOCATE (Energies_electron(discretization % derived % DIM_POSITIVE_K))
+  ALLOCATE (Energies_hole(discretization % derived % DIM_POSITIVE_K))
+
+  Hamiltonian = Hamiltonian_const_band
+  CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, discretization, physical)
+  Hamiltonian = 0.5 * Hamiltonian
+
+  Hamiltonian_electron = Hamiltonian(:discretization % derived % DIM_POSITIVE_K, &
+                                   & :discretization % derived % DIM_POSITIVE_K)
+  CALL DIAGONALIZE_HERMITIAN(Hamiltonian_electron, Energies_electron, discretization % derived % DIM_POSITIVE_K)
+  !! Fix the gauge
+  DO n = 1, discretization % derived % DIM_POSITIVE_K
+    idx = MAXLOC(ABS(Hamiltonian_electron(:, n)), 1)
+    phase = Hamiltonian_electron(idx, n) / ABS(Hamiltonian_electron(idx, n))
+    Hamiltonian_electron(:, n) = Hamiltonian_electron(:, n) / phase
+  END DO
+
+  !! Electron hamiltonian at -k
+  kx_minus = -kx
+  ky_minus = -ky
+  Hamiltonian = Hamiltonian_const_band
+  CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx_minus, ky_minus, discretization, physical)
+  Hamiltonian = 0.5 * Hamiltonian
+
+  Hamiltonian_hole = Hamiltonian(:discretization % derived % DIM_POSITIVE_K, &
+                               & :discretization % derived % DIM_POSITIVE_K)
+  CALL DIAGONALIZE_HERMITIAN(Hamiltonian_hole, Energies_hole, discretization % derived % DIM_POSITIVE_K)
+  !! Fix the gauge
+  DO n = 1, discretization % derived % DIM_POSITIVE_K
+    idx = MAXLOC(ABS(Hamiltonian_hole(:, n)), 1)
+    phase = Hamiltonian_hole(idx, n) / ABS(Hamiltonian_hole(idx, n))
+    Hamiltonian_hole(:, n) = Hamiltonian_hole(:, n) / phase
+  END DO
+
+  Hamiltonian_dummy = CMPLX(0.0d0, 0.0d0, KIND=REAL64)
+  CALL COMPUTE_SC_BAND(Hamiltonian_dummy, kx, ky, Gamma_SC, discretization)
+  ! Transform back to spin-orbital-sublattice basis to get Hamiltonian elements
+  Gamma_K(:, :) = Hamiltonian_dummy(:discretization % derived % DIM_POSITIVE_K, &
+                                  & discretization % derived % DIM_POSITIVE_K + 1:)
+  Gamma_K_orig_basis(:, :) = MATMUL(Hamiltonian_electron, MATMUL(Gamma_K(:, :), TRANSPOSE(Hamiltonian_hole)))
+
+  DEALLOCATE (Hamiltonian)
+  DEALLOCATE (Hamiltonian_electron)
+  DEALLOCATE (Hamiltonian_hole)
+  DEALLOCATE (Hamiltonian_dummy)
+  DEALLOCATE (Gamma_K)
+  DEALLOCATE (Energies_electron)
+  DEALLOCATE (Energies_hole)
+
+END SUBROUTINE GET_GAMMA_K_ORIG_BASIS
+
 END MODULE symmetry

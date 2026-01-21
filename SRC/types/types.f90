@@ -186,6 +186,15 @@ TYPE post_gamma_k_t
   INTEGER(INT32) :: Nk_points = 0 !! Number of k-points along each direction in the Brillouin zone for gamma(k) calculation.
 END TYPE post_gamma_k_t
 
+TYPE post_transformation_t
+  !! Transformation of Gamma from band basis in k-space
+  !! to spin-orbital basis in real space.
+  LOGICAL :: enable = .FALSE. !! Whether to perform transformation of Gamma.
+  CHARACTER(1000) :: path = "" !! Path from which to read Gamma and Charge
+  INTEGER(INT32) :: Nr_points = 0 !! Number of radial k-points along each direction in the Brillouin zone.
+  INTEGER(INT32) :: Nphi_points = 0 !! Number of angular k-points in the Brillouin zone.
+END TYPE post_transformation_t
+
 TYPE post_projections_t
   !! Projections calculation using integration over Brillouin zone.
   LOGICAL :: enable = .FALSE. !! Whether to perform projections calculation.
@@ -201,6 +210,7 @@ TYPE post_input_params_t
   TYPE(post_dispersion_relation_t) :: dispersion
   TYPE(post_dos_t) :: dos
   TYPE(post_gamma_k_t) :: gamma_k
+  TYPE(post_transformation_t) :: transformation
   TYPE(post_projections_t) :: projections
 END TYPE post_input_params_t
 

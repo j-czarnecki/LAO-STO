@@ -47,37 +47,43 @@ LOG_INFO(log_string)
 CALL GET_POSTPROCESSING_INPUT('./postprocessing_input.nml', post_input_params)
 
 IF (post_input_params % dispersion % enable) THEN
-  WRITE (log_string, *) "Calculating dispersion relation"
+  WRITE (log_string, *) "==== Calculating dispersion relation"
   LOG_INFO(log_string)
   CALL CALCULATE_DISPERSION(post_input_params % dispersion)
 END IF
 
 IF (post_input_params % dos % enable) THEN
-  WRITE (log_string, *) "Calculating DOS"
+  WRITE (log_string, *) "==== Calculating DOS"
   LOG_INFO(log_string)
   CALL CALCULATE_DOS(post_input_params % dos)
 END IF
 
 IF (post_input_params % chern % enable) THEN
-  WRITE (log_string, *) "Calculating Chern number"
+  WRITE (log_string, *) "==== Calculating Chern number"
   LOG_INFO(log_string)
   CALL CALCULATE_CHERN_PARAMS(post_input_params % chern)
 END IF
 
 IF (post_input_params % sc_gap % enable) THEN
-  WRITE (log_string, *) "Calculating superconducting gap"
+  WRITE (log_string, *) "==== Calculating superconducting gap"
   LOG_INFO(log_string)
   CALL CALCULATE_SUPERCONDUCTING_GAP(post_input_params % sc_gap)
 END IF
 
 IF (post_input_params % gamma_k % enable) THEN
-  WRITE (log_string, *) "Calculating Gamma_K"
+  WRITE (log_string, *) "==== Calculating Gamma_K"
   LOG_INFO(log_string)
   CALL CALCULATE_GAMMA_K(post_input_params % gamma_k)
 END IF
 
+IF (post_input_params % transformation % enable) THEN
+  WRITE (log_string, *) "==== Transforming Gamma to real space"
+  LOG_INFO(log_string)
+  CALL TRANSFORM_GAMMA_TO_REAL_SPACE(post_input_params % transformation)
+END IF
+
 IF (post_input_params % projections % enable) THEN
-  WRITE (log_string, *) "Calculating projections"
+  WRITE (log_string, *) "==== Calculating projections"
   LOG_INFO(log_string)
   CALL CALCULATE_PROJECTIONS(post_input_params % projections)
 END IF
