@@ -318,6 +318,7 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
   CHARACTER(LEN=20) :: output_format
 
   COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian(:, :), Hamiltonian_const(:, :), Hamiltonian_const_band(:, :)
+  COMPLEX(REAL64), ALLOCATABLE :: U_k(:, :), U_minus_k(:, :), U_combined(:, :), Hamiltonian_dummy(:, :)
   REAL(REAL64), ALLOCATABLE :: Energies(:)
 
 #ifndef BAND_BASIS
@@ -335,7 +336,6 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
   INTEGER(INT32) :: s_up_idx, s_down_idx
   INTEGER(INT32) :: kx_steps, ky_steps
   REAL(REAL64) :: yz_contribution, zx_contribution, xy_contribution
-  REAL(REAL64) :: lat1_contribution, lat2_contribution
   REAL(REAL64), ALLOCATABLE :: Lat_contributions(:)
   REAL(REAL64) :: spin_x_contribution, spin_y_contribution, spin_z_contribution
   REAL(REAL64) :: electron_contribution, hole_contribution
@@ -366,20 +366,21 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
         & DIM => sc_input % discretization % derived % DIM, &
         & LAYER_COUPLINGS => sc_input % discretization % derived % LAYER_COUPLINGS)
 
-#ifndef BAND_BASIS
     WRITE (output_format, '(A, I0, A)') '(I5, ', 11 + SUBLATTICES, 'E15.5)'
-#else
-    WRITE (output_format, '(A, I0, A)') '(I5, ', 3, 'E15.5)'
-#endif
+
     ALLOCATE (Hamiltonian(DIM, DIM))
     ALLOCATE (Hamiltonian_const(DIM, DIM))
     ALLOCATE (Hamiltonian_const_band(DIM, DIM))
+    ALLOCATE (Hamiltonian_dummy(DIM, DIM))
     ALLOCATE (Energies(hamiltonian_dim))
 #ifndef BAND_BASIS
     ALLOCATE (Gamma_SC(N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS, DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
 #else
     ALLOCATE (Gamma_SC(DIM_POSITIVE_K, DIM_POSITIVE_K, SUBBANDS))
 #endif
+    ALLOCATE (U_k(DIM_POSITIVE_K, DIM_POSITIVE_K))
+    ALLOCATE (U_minus_k(DIM_POSITIVE_K, DIM_POSITIVE_K))
+    ALLOCATE (U_combined(DIM, DIM))
     ALLOCATE (Charge_dens(DIM_POSITIVE_K, SUBBANDS))
     ALLOCATE (Lat_contributions(SUBLATTICES))
   END ASSOCIATE
@@ -417,7 +418,8 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
     !$omp parallel do collapse(3) schedule(dynamic, 1) private(phi_k, r_k, r_max, dr, kx, ky, n_triangle, j_phi, i_r, orb, n, &
     !$omp                                                    & Energies, Hamiltonian, yz_contribution, zx_contribution, xy_contribution, &
     !$omp                                                    & Lat_contributions, spin_x_contribution, spin_y_contribution, spin_z_contribution, &
-    !$omp                                                    & electron_contribution, hole_contribution, s_up_idx, s_down_idx, l, m, spin, lat)
+    !$omp                                                    & electron_contribution, hole_contribution, s_up_idx, s_down_idx, l, m, spin, lat, &
+    !$omp                                                    & U_k, U_minus_k, U_combined, Hamiltonian_dummy)
     DO n_triangle = -N_BZ_SECTIONS / 2, N_BZ_SECTIONS / 2 - 1
       DO j_phi = 0, dispersion % Nphi_points - 1
         DO i_r = 0, dispersion % Nr_points
@@ -436,13 +438,35 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
 #ifndef BAND_BASIS
           CALL COMPUTE_INTERACTIONS(Hamiltonian, kx, ky, Charge_dens, Gamma_SC, sc_input % discretization, sc_input % physical)
 #else
+          U_k = Hamiltonian(:sc_input % discretization % derived % DIM_POSITIVE_K, &
+                          & :sc_input % discretization % derived % DIM_POSITIVE_K)
+          U_minus_k = Hamiltonian(sc_input % discretization % derived % DIM_POSITIVE_K + 1:, &
+                                & sc_input % discretization % derived % DIM_POSITIVE_K + 1:)
+
+          CALL DIAGONALIZE_HERMITIAN(U_k, &
+                                   & Energies(:sc_input % discretization % derived % DIM_POSITIVE_K), &
+                                   & sc_input % discretization % derived % DIM_POSITIVE_K)
+          CALL DIAGONALIZE_HERMITIAN(U_minus_k, &
+                                   & Energies(:sc_input % discretization % derived % DIM_POSITIVE_K), &
+                                   & sc_input % discretization % derived % DIM_POSITIVE_K)
+          U_combined = CMPLX(0., 0., KIND=REAL64)
+          U_combined(:sc_input % discretization % derived % DIM_POSITIVE_K, &
+                   & :sc_input % discretization % derived % DIM_POSITIVE_K) = U_k
+          U_combined(sc_input % discretization % derived % DIM_POSITIVE_K + 1:, &
+                   & sc_input % discretization % derived % DIM_POSITIVE_K + 1:) = CONJG(U_minus_k)
+
           CALL COMPUTE_INTERACTIONS_BAND_BASIS(Hamiltonian, kx, ky, Charge_dens, Gamma_SC, sc_input % discretization, sc_input % physical)
 #endif
           Hamiltonian = sc_multiplier * Hamiltonian !Should by multiplied by 0.5 if in Nambu space
 
           CALL DIAGONALIZE_HERMITIAN(Hamiltonian(:hamiltonian_dim, :hamiltonian_dim), Energies(:), hamiltonian_dim)
 
-#ifndef BAND_BASIS
+#ifdef BAND_BASIS
+          Hamiltonian_dummy = Hamiltonian
+          Hamiltonian(:hamiltonian_dim, :hamiltonian_dim) = MATMUL(U_combined(:hamiltonian_dim, :hamiltonian_dim), &
+            & Hamiltonian_dummy(:hamiltonian_dim, :hamiltonian_dim))
+#endif
+
           !Calculate contributions
           DO l = 1, hamiltonian_dim
             !Distinguishing orbital contributions
@@ -456,8 +480,6 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
             END DO
 
             !Distinguishing lattice contributions
-            lat1_contribution = 0.
-            lat2_contribution = 0.
             Lat_contributions(:) = 0.
             DO m = 0, sc_input % discretization % SUBLATTICES - 1
               DO spin = 0, 1
@@ -521,18 +543,6 @@ SUBROUTINE CALCULATE_DISPERSION(dispersion)
             & spin_x_contribution, spin_y_contribution, spin_z_contribution, &
             & electron_contribution, hole_contribution
           END DO
-#else
-          DO l = 1, hamiltonian_dim
-            !! Zeros as placeholder to unify outputs
-            WRITE (9, output_format) (band - 1) * hamiltonian_dim + l, kx, ky, Energies(l) / meV2au, &
-              & 0, 0, 0, &
-              & (0, lat=1, sc_input % discretization % SUBLATTICES), &
-              & 0, 0, 0, &
-              & 0, 0
-          END DO
-          !TODO: Alternatively  I can transform back to spin-orbital-sublattice basis and compute contributions similarly as above.
-#endif
-
         END DO
       END DO
     END DO
