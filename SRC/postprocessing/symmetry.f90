@@ -319,11 +319,12 @@ SUBROUTINE TRANSFORM_GAMMA_TO_REAL_SPACE(transformation)
           Phases = CONJG(Phases) !! Due to inverse Fourier transform
           CALL GET_GAMMA_K_ORIG_BASIS(Gamma_K_orig_basis, Hamiltonian_const_band, kx, ky, Gamma_SC(:, :, band), &
                                   & sc_input % physical, sc_input % discretization)
-          Gamma_real_space_local(0, :, :, band) = Gamma_real_space_local(0, :, :, band) + &
-              & Gamma_K_orig_basis(:, :) * r_k * dr * sc_input % discretization % derived % dphi_k / JACOBIAN
+          Gamma_real_space_local = CMPLX(0.0d0, 0.0d0, KIND=REAL64)
+          Gamma_real_space_local(0, :, :, band) = Gamma_K_orig_basis(:, :) * &
+            & (r_k * dr * sc_input % discretization % derived % dphi_k) / JACOBIAN
           DO neigh = 1, N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS
-            Gamma_real_space_local(neigh, :, :, band) = Gamma_real_space_local(neigh, :, :, band) + &
-              & (Gamma_K_orig_basis(:, :) * Phases(neigh)) * r_k * dr * sc_input % discretization % derived % dphi_k / JACOBIAN
+            Gamma_real_space_local(neigh, :, :, band) = Gamma_K_orig_basis(:, :) * Phases(neigh) * &
+              & (r_k * dr * sc_input % discretization % derived % dphi_k) / JACOBIAN
           END DO
 
           !$omp critical (gamma_update)
@@ -913,22 +914,16 @@ SUBROUTINE GET_GAMMA_K_ORIG_BASIS(Gamma_K_orig_basis, Hamiltonian_const_band, kx
   REAL(REAL64), INTENT(INOUT) :: kx, ky
   COMPLEX(REAL64), INTENT(IN) :: Gamma_SC(discretization % derived % DIM_POSITIVE_K, discretization % derived % DIM_POSITIVE_K)
 
-  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian(:, :)
-  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian_electron(:, :), Hamiltonian_hole(:, :)
-  COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian_dummy(:, :)
-  COMPLEX(REAL64), ALLOCATABLE :: Gamma_K(:, :)
-  REAL(REAL64), ALLOCATABLE :: Energies_electron(:), Energies_hole(:)
+  COMPLEX(REAL64) :: Hamiltonian(discretization % derived % DIM, discretization % derived % DIM)
+  COMPLEX(REAL64) :: Hamiltonian_electron(discretization % derived % DIM_POSITIVE_K, discretization % derived % DIM_POSITIVE_K)
+  COMPLEX(REAL64) :: Hamiltonian_hole(discretization % derived % DIM_POSITIVE_K, discretization % derived % DIM_POSITIVE_K)
+  COMPLEX(REAL64) :: Hamiltonian_dummy(discretization % derived % DIM, discretization % derived % DIM)
+  COMPLEX(REAL64) :: Gamma_K(discretization % derived % DIM_POSITIVE_K, discretization % derived % DIM_POSITIVE_K)
+  REAL(REAL64) :: Energies_electron(discretization % derived % DIM_POSITIVE_K)
+  REAL(REAL64) :: Energies_hole(discretization % derived % DIM_POSITIVE_K)
   REAL(REAL64) :: kx_minus, ky_minus
-  INTEGER(INT32) :: n, idx
+  INTEGER(INT32) :: n, idx, idx_1d(2)
   COMPLEX(REAL64) :: phase
-
-  ALLOCATE (Hamiltonian(discretization % derived % DIM, discretization % derived % DIM))
-  ALLOCATE (Hamiltonian_electron(discretization % derived % DIM_POSITIVE_K, discretization % derived % DIM_POSITIVE_K))
-  ALLOCATE (Hamiltonian_hole(discretization % derived % DIM_POSITIVE_K, discretization % derived % DIM_POSITIVE_K))
-  ALLOCATE (Hamiltonian_dummy(discretization % derived % DIM, discretization % derived % DIM))
-  ALLOCATE (Gamma_K(discretization % derived % DIM_POSITIVE_K, discretization % derived % DIM_POSITIVE_K))
-  ALLOCATE (Energies_electron(discretization % derived % DIM_POSITIVE_K))
-  ALLOCATE (Energies_hole(discretization % derived % DIM_POSITIVE_K))
 
   Hamiltonian = Hamiltonian_const_band
   CALL COMPUTE_K_DEPENDENT_TERMS(Hamiltonian, kx, ky, discretization, physical)
@@ -967,14 +962,6 @@ SUBROUTINE GET_GAMMA_K_ORIG_BASIS(Gamma_K_orig_basis, Hamiltonian_const_band, kx
   Gamma_K(:, :) = Hamiltonian_dummy(:discretization % derived % DIM_POSITIVE_K, &
                                   & discretization % derived % DIM_POSITIVE_K + 1:)
   Gamma_K_orig_basis(:, :) = MATMUL(Hamiltonian_electron, MATMUL(Gamma_K(:, :), TRANSPOSE(Hamiltonian_hole)))
-
-  DEALLOCATE (Hamiltonian)
-  DEALLOCATE (Hamiltonian_electron)
-  DEALLOCATE (Hamiltonian_hole)
-  DEALLOCATE (Hamiltonian_dummy)
-  DEALLOCATE (Gamma_K)
-  DEALLOCATE (Energies_electron)
-  DEALLOCATE (Energies_hole)
 
 END SUBROUTINE GET_GAMMA_K_ORIG_BASIS
 

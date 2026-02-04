@@ -72,7 +72,7 @@ SUBROUTINE SET_GAMMA_INITIAL(Gamma_SC, J_tensor_crs, gamma_start_nearest, gamma_
       Gamma_SC(:N_NEAREST_NEIGHBOURS, Dematricized_indices(1), Dematricized_indices(2), :) = gamma_start_nearest
       Gamma_SC(N_NEAREST_NEIGHBOURS + 1:N_ALL_NEIGHBOURS, Dematricized_indices(1), Dematricized_indices(2), :) = gamma_start_next
 #else
-      Gamma_SC(Dematricized_indices(1), Dematricized_indices(2), :) = gamma_start_nearest
+      Gamma_SC(Dematricized_indices(1), Dematricized_indices(2), :) = gamma_start_nearest * (-1.0)**(Dematricized_indices(1))
 #endif
     END IF
   END DO
