@@ -113,6 +113,14 @@ class SymbolicSymmetryProjectorClass:
       print("\n")
     print(totalOutputStr)
 
+  def filterOutProjections(self, diagonalizedProjections: dict[str, list[tuple[int, int, list[sp.Matrix]]]]) -> dict[str, list[tuple[int, int, list[sp.Matrix]]]]:
+    for irrep in self.irrepsTuple:
+      for projection in diagonalizedProjections[irrep]:
+        if np.abs(projection[0]) != 1:
+          diagonalizedProjections[irrep].remove(projection)
+
+    return diagonalizedProjections
+
   def __instantProjectionCheck(self, projection: sp.Matrix, irrep: str):
     """ Checks corectness of single projection operator """
     if ((projection**2 - projection) == np.zeros(projection.shape[0])):
