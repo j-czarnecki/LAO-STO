@@ -377,7 +377,7 @@ class DispersionPlotter():
         if isSingle:
             ax.yaxis.set_major_locator(ticker.MultipleLocator(0.25))
             ax.xaxis.set_major_locator(ticker.LinearLocator(5))
-            plt.xlim(left=0, right=eMax)
+            plt.xlim(left=-100, right=eMax)
 
             #plt.xlim(left=-eMax, right=eMax)
             plt.xlabel(r"E (meV)")
@@ -478,7 +478,7 @@ class DispersionPlotter():
         ax.set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
         ax.set_aspect("equal")
 
-        # plt.grid()
+        ax.grid(True, linestyle=':')
         filename = os.path.join(self.plotOutputPath, f"SuperconductingGap_{postfix}.png")
         plt.savefig(filename)
         plt.close()
@@ -540,8 +540,8 @@ class DispersionPlotter():
 
 
 
-        axAngular.yaxis.set_major_locator(ticker.MultipleLocator(10))
-        axAngular.xaxis.set_major_locator(ticker.MultipleLocator(0.5))
+        #axAngular.yaxis.set_major_locator(ticker.MultipleLocator(10))
+        #axAngular.xaxis.set_major_locator(ticker.MultipleLocator(0.5))
         axAngular.set_title(title)
         #axAngular.legend(title="n", loc="upper right")
         axAngular.set_xlabel(r"$\varphi$~($\pi$)")

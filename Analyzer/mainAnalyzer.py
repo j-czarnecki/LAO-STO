@@ -38,63 +38,54 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
 def plotGammas():
-    #eMin = -1053
-    #eMin = -1480
-    eMin = 0
-    gammaAndFillingPlotter = GammaAndFillingPlotter(
-        runsPath=os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-B_phi_B_J_SC_chunking_500_eps4"),
-        # runsPath=os.path.join(
-        #     "/home", "jczarnecki", "LAO-STO-results", "LAO-STO-E_Fermi_J_SC_J_SC_NNN"
-        # ),
-        matchPattern="RUN_.*B_magnitude_\\d.0.*",
-        nNeighbors=3,
-        nNextNeighbors=6,
-        eMinimal=eMin,
-        sublattices=3,
-        subbands=1,
-        material="KTO",
-    )
+    reader = DataReader(runsPath=os.path.join(SCRATCH_PATH, 'KTO-SC', 'KTO-BAND-B_magnitude_B_phi_adaptive_broyden_mix'),
+                        matchPattern="RUN_.*",
+                        sublattices=3,
+                        subbands=1,
+                        nBands=18,
+                        nAllNeighbours=12,)
+    plotter = GammaAndFillingPlotter(material='KTO')
+    xKeywords = ('B_magnitude', 'B_phi')
+    gammasDf = reader.LoadGamma(xKeywords)
+    chargesDf = reader.LoadFilling(xKeywords)
 
-    gammaAndFillingPlotter.LoadFilling(loadUnfinished=True)
-    gammaAndFillingPlotter.LoadGamma(xKeywords=("b_phi", "b_magnitude"), loadUnfinished=True)
-    gammaAndFillingPlotter.sortData()
-    gammaAndFillingPlotter.CalculateSymmetryGamma()
-    gammaAndFillingPlotter.getMaxvalSymmetrizedGamma()
-    gammaAndFillingPlotter.plotGammasTwoParam2d(firstXLabel=r"$\varphi$ (deg)",
-                                                neighborsToPlot=("nearest", ),
-                                                plotSecondX=False,
-                                                secondXLabel=r"$n$ (10\textsuperscript{14} cm\textsuperscript{-2})",
-                                                legendTitles=(r"$|B|$ (T)",),
-                                                continuousColor=True,
-                                                yUnit=r"($\mu$eV)")
-    #gammaAndFillingPlotter.plotFillingFermi()
-    # gammaAndFillingPlotter.plotGammasThreeParamCmap(neighborsToPlot=("nearest",),
-    #                                                 secondXLabel=r"$n$ (10\textsuperscript{14} cm\textsuperscript{-2})",
-    #                                                 colorUnit=r"($\mu$eV)",)
+    #gammasDf = gammasDf[gammasDf['B_phi'].isin([0., 30., 60., 90.])]
 
+    plotter.plotGammasTwoParam2d(gammasDf,
+                                 chargesDf,
+                                 xKeywords,
+                                 firstXLabel=r"$|\vec{B}|$ (T)",
+                                 plotSecondX=False,
+                                 secondXLabel=r"$n$",
+                                 legendTitle=r"$\mu$ (meV)",
+                                 yUnit=r"($\mu$eV)",
+                                 plotRaw=True,
+                                 continuousColor=True)
 
 def plotDispersions():
     reader = DataReader(runsPath="/home/czarnecki/LAO-STO/",
                         matchPattern="RUN_.*",
-                        sublattices=2,
+                        sublattices=3,
                         subbands=1,
-                        nBands=12,
+                        nBands=18,
                         nAllNeighbours=12,)
     dispersionPlotter = DispersionPlotter(plotOutputPath="../Plots")
 
-    # Dispersion plots
+    #Dispersion plots
     dispersionDf = reader.LoadDispersion("../OutputData/Energies.dat")
     dispersionPlotter.GetStatistics(dispersionDf)
     dispersionPlotter.plotCrossection(dispersionDf, 500, "ky", 0.0, 2, False)
     dispersionPlotter.plotCrossection(dispersionDf, 500, "kx", 0.0, 2, False)
     dispersionPlotter.plotFermiCrossection(dispersionDf, 30, 1.5, False)
 
-    #DOS plots
-    dosDf = reader.LoadDos("../OutputData/DOS.dat")
-    dispersionPlotter.plotDos(dosDf, 500.0, False, 0.1)
+    # #DOS plots
+    # dosDf = reader.LoadDos("../OutputData/DOS.dat")
+    # dispersionPlotter.plotDos(dosDf, 400.0, False, 0.1)
 
+    scGapDf = reader.LoadSuperconductingGap("../OutputData/SuperconductingGap.dat")
+    dispersionPlotter.plotSuperconductingGap(scGapDf, "", "")
+    dispersionPlotter.plotSuperconductingGapAngular(scGapDf, "", "")
 
 def addMissingBandNumber():
     runsPath=os.path.join(SCRATCH_PATH, "STO-SC", "LAO-STO-E_Fermi_J_SC_NNN")
@@ -148,8 +139,8 @@ def analyzeLogs():
 
 def main():
     logger.info("Starting Analyzer")
-    #plotGammas()
-    plotDispersions()
+    plotGammas()
+    #plotDispersions()
     #addMissingBandNumber()
     #analyzeLogs()
 

@@ -37,30 +37,17 @@ logger = logging.getLogger(__name__)
 
 # TODO: this class should be improved to be more general and possibly plot more symmetries of gamma
 # self.eMinimal should not be used, as all energies must be calculated with respect to E_Fermi
-class GammaAndFillingPlotter(SymmetryResolver):
+class GammaAndFillingPlotter():
 
     def __init__(
         self,
-        runsPath: str,
-        matchPattern: str,
-        nNeighbors: int,
-        nNextNeighbors: int,
-        eMinimal: float,
-        sublattices: int,
-        subbands: int,
         material: str,
+        plotOutputPath: str = "../Plots",
+        eMinimal: float = 0,
     ):
-        SymmetryResolver.__init__(
-            self,
-            nNeighbors,
-            nNextNeighbors,
-            runsPath,
-            matchPattern,
-            sublattices,
-            subbands,
-        )
         self.eMinimal = eMinimal
         self.material = material
+        self.plotOutputPath = plotOutputPath
         self.a_tilde = self.__getMaterialsLatticeConstant(self.material)
         self.symmetryKeys: dict[str, list[tuple[int, int, int, int, str]]]= {"nearest": [], "next": []}
         self.orbitalNameMapping = list[str]
@@ -80,35 +67,38 @@ class GammaAndFillingPlotter(SymmetryResolver):
     """ ---------------------------- Interface methods ----------------------------------- """
     """ ---------------------------------------------------------------------------------- """
 
-    def getMaxvalSymmetrizedGamma(self):
-        self.maxval = 0.0
-        for key in self.symmetryKeys["nearest"]:
-            for i in range(len(self.symmetryGammaDict[key][:])):
-                if np.abs(self.symmetryGammaDict[key][i]) > self.maxval:
-                    self.maxval = np.abs(self.symmetryGammaDict[key][i])
-                    self.efMaxval = self.params[i][0]
+    # def getMaxvalSymmetrizedGamma(self):
+    #     self.maxval = 0.0
+    #     for key in self.symmetryKeys["nearest"]:
+    #         for i in range(len(self.symmetryGammaDict[key][:])):
+    #             if np.abs(self.symmetryGammaDict[key][i]) > self.maxval:
+    #                 self.maxval = np.abs(self.symmetryGammaDict[key][i])
+    #                 self.efMaxval = self.params[i][0]
 
-        if not self.nNextNeighbors == 0:
-            for key in self.symmetryKeys["next"]:
-                for i in range(len(self.nnnSymmetryGammaDict[key][:])):
-                    if np.abs(self.nnnSymmetryGammaDict[key][i]) > self.maxval:
-                        self.maxval = np.abs(self.nnnSymmetryGammaDict[key][i])
-                        self.efMaxval = self.params[i][0]
+    #     if not self.nNextNeighbors == 0:
+    #         for key in self.symmetryKeys["next"]:
+    #             for i in range(len(self.nnnSymmetryGammaDict[key][:])):
+    #                 if np.abs(self.nnnSymmetryGammaDict[key][i]) > self.maxval:
+    #                     self.maxval = np.abs(self.nnnSymmetryGammaDict[key][i])
+    #                     self.efMaxval = self.params[i][0]
 
 
-        logger.info(f"Maxval is {self.maxval} at Ef = {self.efMaxval}")
+    #     logger.info(f"Maxval is {self.maxval} at Ef = {self.efMaxval}")
 
     def plotGammasTwoParam2d(self,
+                             gammasDf: pd.DataFrame,
+                             chargeDf: pd.DataFrame,
+                             xKeywords: tuple[str, ...],
                              firstXLabel: str = r"$\mu$ (meV)",
                              plotSecondX: bool = True,
                              secondXLabel: str = r"$n$",
-                             neighborsToPlot: tuple[str, ...] = ("nearest",),
-                             legendTitles: tuple[str, ...] = (r"$J$ (meV)", ),
+                             legendTitle: str = r"$J$ (meV)",
                              firstXMax: float = np.inf,
                              firstXShift: float = 0,
                              yMax: float = np.inf,
                              yUnit: str = "(meV)",
-                             continuousColor: bool = False):
+                             continuousColor: bool = False,
+                             plotRaw: bool = False):
         """
         Plots a 2D curve of symmetrized Gammas as a function of argument X,
         where X is the first parameter specified in self.LoadGammas(xKeywords=(X, Y)).
@@ -143,30 +133,22 @@ class GammaAndFillingPlotter(SymmetryResolver):
         continuousColor: bool
             If True, consecutive curves with different Y values will have a gradually changing color.
             Colorbar will be also plotted.
+        plotRaw: bool
+            If True, raw gammas (neighbors) are plotted instead of symmetrized ones.
         """
-        secondParamValues = [element[1] for element in self.params]
-        secondParamValues = sorted(list(set(secondParamValues)))
-        self.__setPalette(nColors=len(set(secondParamValues)))
+        firstParamKey, secondParamKey = xKeywords
+        secondParamValues = gammasDf[secondParamKey].unique()
+        self.__setPalette(nColors=len(secondParamValues))
 
-        gammaYPlot = []
-        firstXPlot = []
-        secondXPlot = []
+        gammasDf['gammaAbs'] = np.sqrt(gammasDf['gammaRe'] ** 2 + gammasDf['gammaIm'] ** 2)
+        gammaAbsMaxval = gammasDf['gammaAbs'].max()
 
         secondXCallback = None
         neighborGammasList = []
-        neighborKeys = []
         gammaLabelsCallbacks = []
         gammaNeighorhoodLabels = []
 
-        #Assign neighbor gammas
-        if "nearest" in neighborsToPlot:
-            neighborGammasList.append(self.symmetryGammaDict)
-            gammaLabelsCallbacks.append(self.__getNearestNeighborGammaLabel)
-            gammaNeighorhoodLabels.append("nearest")
-        if "next" in neighborsToPlot:
-            neighborGammasList.append(self.nnnSymmetryGammaDict)
-            gammaLabelsCallbacks.append(self.__getNextNearestNeighborGammaLabel)
-            gammaNeighorhoodLabels.append("next")
+        singlePlotSignatureKey = "i_band" if plotRaw else "symmetry"
 
         # Pick second axis label
         if plotSecondX:
@@ -191,83 +173,77 @@ class GammaAndFillingPlotter(SymmetryResolver):
             raise ValueError(f"Unknown yUnit: {yUnit}")
 
         if continuousColor:
-            cmap = plt.cm.cividis
+            cmap = plt.cm.hsv
             norm = Normalize(vmin=min(secondParamValues), vmax=max(secondParamValues))
 
         # Main plotting loop
-        for nNeighborhood, gammaDict in enumerate(neighborGammasList):
-            for key in self.symmetryKeys[gammaNeighorhoodLabels[nNeighborhood]]:
-                fig = plt.figure(figsize=(7, 5), dpi=100)
-                # Set up GridSpec (1 row, 1 column, with some spacing)
+        for plotSignature in gammasDf[singlePlotSignatureKey].unique():
+            fig = plt.figure(figsize=(7, 5), dpi=100)
+            # Set up GridSpec (1 row, 1 column, with some spacing)
+            if continuousColor:
+                gs = gridspec.GridSpec(1, 1, figure=fig, left=0.25, right=0.95, top=0.75, bottom=0.2)
+            else:
+                gs = gridspec.GridSpec(1, 1, figure=fig, left=0.25, right=0.95, top=0.75, bottom=0.2)
+            ax1 = fig.add_subplot(gs[0,0])
+
+            sortedGammasDf = pd.DataFrame()
+            for secondParam in secondParamValues:
+                filteredGammasDf = gammasDf[gammasDf[secondParamKey] == secondParam]
+                filteredGammasDf = filteredGammasDf[filteredGammasDf[singlePlotSignatureKey] == plotSignature]
+                if singlePlotSignatureKey == "i_band":
+                    filteredGammasDf = filteredGammasDf[filteredGammasDf["i_band"] == filteredGammasDf["j_band"]]
+                sortedGammasDf = filteredGammasDf.sort_values(firstParamKey)
+                #print(sortedGammasDf)
                 if continuousColor:
-                    gs = gridspec.GridSpec(1, 1, figure=fig, left=0.25, right=0.95, top=0.75, bottom=0.2)
+                    color = cmap(norm(secondParam))
+                    ax1.plot(sortedGammasDf[firstParamKey], sortedGammasDf['gammaAbs'] * yMultiplier, label=secondParam, color=color, linewidth=2)
                 else:
-                    gs = gridspec.GridSpec(1, 1, figure=fig, left=0.25, right=0.95, top=0.75, bottom=0.2)
-                ax1 = fig.add_subplot(gs[0,0])
+                    ax1.plot(sortedGammasDf[firstParamKey], sortedGammasDf['gammaAbs'] * yMultiplier, label=secondParam)
 
-                for secondParam in secondParamValues:
-                    gammaYPlot = []
-                    secondXPlot = []
-                    firstXPlot = []
+            ax1.set_ylim(bottom=0, top=1.02 * gammaAbsMaxval * yMultiplier if yMax == np.inf else yMax) # Guarantee a single scale for all plots
+            ax1.set_xlim(right=firstXMax if firstXMax != np.inf else sortedGammasDf[firstParamKey].max())
+            ax1.set_xlabel(firstXLabel)
+            ax1.set_ylabel(rf"$|\Gamma_{{{plotSignature}}}|$ {yUnit}")
+            # ax1.set_ylabel(
+            #     rf"{gammaLabelsCallbacks[nNeighborhood](sublat, symmetry, spin1, spin2)}" + yUnit,
+            #     labelpad=20,
+            # )
+            ax1.yaxis.set_major_locator(ticker.LinearLocator(4))
+            ax1.xaxis.set_major_locator(ticker.MultipleLocator(1))
 
-                    for i in range(len(self.params)):
-                        if int(self.params[i][1]) == secondParam:
-                            gammaYPlot.append(np.abs(gammaDict[key][i]) * yMultiplier)
-                            firstXPlot.append(self.params[i][0] - firstXShift)
-                            secondXPlot.append(secondXCallback(self.fillingTotal[i]))
-                            #secondXPlot.append(secondXCallback(self.fillingTotal[i] * 100))
+            #for mu in (31, 79, 141):
+                #ax1.scatter(mu, 0.02, marker='v', s=75, color='deeppink', zorder=10, edgecolors='k', linewidth=1)
 
-                    if continuousColor:
-                        color = cmap(norm(secondParam))
-                        ax1.plot(firstXPlot, gammaYPlot, label=secondParam, color=color, linewidth=2)
-                    else:
-                        ax1.plot(firstXPlot, gammaYPlot, label=secondParam)
+            ax1.grid(True, linestyle=':')
+            if continuousColor:
+                sm = ScalarMappable(cmap=cmap, norm=norm)
+                sm.set_array([])  # Required for ScalarMappable
+                colorbar = fig.colorbar(sm, ax=ax1)
+                #colorbar.set_label(legendTitles[nNeighborhood])  # Update label as needed TODO: this should be variable
+                colorbar.set_ticks(np.linspace(min(secondParamValues), max(secondParamValues), 3))
+            else:
+                #ax1.legend(title=legendTitles[nNeighborhood], loc="best") #TODO: this should be variable
+                ax1.legend(title=legendTitle, loc="best") #TODO: this should be variable
 
-                band, spin1, spin2, sublat, symmetry = key
-
-                ax1.set_ylim(bottom=0, top=1.02 * self.maxval * yMultiplier if yMax == np.inf else yMax) # Guarantee a single scale for all plots
-                #ax1.set_xlim(right=firstXMax if firstXMax != np.inf else max(firstXPlot))
-                ax1.set_xlabel(firstXLabel)
-                ax1.set_ylabel(
-                    rf"{gammaLabelsCallbacks[nNeighborhood](sublat, symmetry, spin1, spin2)}" + yUnit,
-                    labelpad=20,
-                )
-                # ax1.xaxis.set_major_locator(ticker.LinearLocator(5))
-                ax1.yaxis.set_major_locator(ticker.LinearLocator(4))
-                ax1.xaxis.set_major_locator(ticker.MultipleLocator(50))
-
-                #for mu in (31, 79, 141):
-                    #ax1.scatter(mu, 0.02, marker='v', s=75, color='deeppink', zorder=10, edgecolors='k', linewidth=1)
-
-                ax1.grid(True, linestyle=':')
-                if continuousColor:
-                    sm = ScalarMappable(cmap=cmap, norm=norm)
-                    sm.set_array([])  # Required for ScalarMappable
-                    colorbar = fig.colorbar(sm, ax=ax1)
-                    colorbar.set_label(legendTitles[nNeighborhood])  # Update label as needed TODO: this should be variable
-                    colorbar.set_ticks(np.linspace(min(secondParamValues), max(secondParamValues), 3))
-                else:
-                    ax1.legend(title=legendTitles[nNeighborhood], loc="best") #TODO: this should be variable
-
-                # Do this as a last step and trigger plt.draw() so that the ticks are already set in their final form
-                if plotSecondX:
-                    plt.draw()
-                    ax1_ticks = ax1.get_xticks()
-                    # Plot secondary axis for occupation
-                    tick_labels = np.interp(
-                        ax1_ticks, firstXPlot, secondXPlot
-                    )  # Interpolate the mapping
-                    ax2 = ax1.secondary_xaxis("top")
-                    ax2.set_xticks(ax1_ticks)  # Use the same positions as `ef_plot`
-                    ax2.set_xticklabels(
-                        [f"{val:.1f}" for val in tick_labels]
-                    )  # Map `n_total_plot` as tick labels
-                    ax2.set_xlabel(fr"{secondXLabel}", labelpad=16)
-                    #ax2.set_xlabel(fr"{secondXLabel} (10 \textsuperscript{{-2}})", labelpad=16)
-                plt.savefig(
-                    f"../Plots/Gamma2d_{gammaNeighorhoodLabels[nNeighborhood]}_band{band}_spin{spin1}{spin2}_lat{sublat}_{symmetry}.png"
-                )
-                plt.close()
+            # Do this as a last step and trigger plt.draw() so that the ticks are already set in their final form
+            if plotSecondX:
+                plt.draw()
+                ax1_ticks = ax1.get_xticks()
+                # Plot secondary axis for occupation
+                tick_labels = np.interp(
+                    ax1_ticks, firstXPlot, secondXPlot
+                )  # Interpolate the mapping
+                ax2 = ax1.secondary_xaxis("top")
+                ax2.set_xticks(ax1_ticks)  # Use the same positions as `ef_plot`
+                ax2.set_xticklabels(
+                    [f"{val:.1f}" for val in tick_labels]
+                )  # Map `n_total_plot` as tick labels
+                ax2.set_xlabel(fr"{secondXLabel}", labelpad=16)
+                #ax2.set_xlabel(fr"{secondXLabel} (10 \textsuperscript{{-2}})", labelpad=16)
+            plt.savefig(
+                f"{self.plotOutputPath}/Gamma2d_{plotSignature}.png"
+            )
+            plt.close()
 
     def plotGammasThreeParamCmap(self,
                                  firstXLabel: str = r"$\mu$ (meV)",
@@ -689,35 +665,37 @@ class GammaAndFillingPlotter(SymmetryResolver):
     """ ---------------------------------------------------------------------------------- """
 
     def __initializeSymmetryKeys(self):
-        # Nearest neighbors
-        for band in range(1, max(1, self.subbands) + 1):
-            for spin1 in range(1, 3):
-                for spin2 in range(1, 3):
-                    for sublat in range(1, self.layerCouplings + 1):
-                        for symmetry in self.projector.getSymmetryNames():
-                            self.symmetryKeys["nearest"].append(
-                                (band, spin1, spin2, sublat, symmetry)
-                            )
+        pass
+        # # Nearest neighbors
+        # for band in range(1, max(1, self.subbands) + 1):
+        #     for spin1 in range(1, 3):
+        #         for spin2 in range(1, 3):
+        #             for sublat in range(1, self.layerCouplings + 1):
+        #                 for symmetry in self.projector.getSymmetryNames():
+        #                     self.symmetryKeys["nearest"].append(
+        #                         (band, spin1, spin2, sublat, symmetry)
+        #                     )
 
-        # Next-to-nearest neighbors
-        for band in range(1, max(1, self.subbands) + 1):
-            for spin1 in range(1, 3):
-                for spin2 in range(1, 3):
-                    for sublat in range(1, self.sublattices + 1):
-                        for symmetry in self.projector.getSymmetryNames():
-                            self.symmetryKeys["next"].append(
-                                (band, spin1, spin2, sublat, symmetry)
-                            )
+        # # Next-to-nearest neighbors
+        # for band in range(1, max(1, self.subbands) + 1):
+        #     for spin1 in range(1, 3):
+        #         for spin2 in range(1, 3):
+        #             for sublat in range(1, self.sublattices + 1):
+        #                 for symmetry in self.projector.getSymmetryNames():
+        #                     self.symmetryKeys["next"].append(
+        #                         (band, spin1, spin2, sublat, symmetry)
+        #                     )
 
     def __initializeMapping(self):
-        self.orbitalNameMapping = ["yz", "zx", "xy"]
-        self.spinSymbolsMapping = [r"\uparrow", r"\downarrow"]
-        self.spinSymbolSingletTripletNameMapping = [
-            r"S",
-            r"T",
-        ]
-        self.latticeNameMapping = [rf"Ti_{i}" for i in range(1, self.sublattices + 1)]
-        self.subbandNameMapping = [rf"n_{i}" for i in range(1, self.subbands + 1)]
+        pass
+        # self.orbitalNameMapping = ["yz", "zx", "xy"]
+        # self.spinSymbolsMapping = [r"\uparrow", r"\downarrow"]
+        # self.spinSymbolSingletTripletNameMapping = [
+        #     r"S",
+        #     r"T",
+        # ]
+        # self.latticeNameMapping = [rf"Ti_{i}" for i in range(1, self.sublattices + 1)]
+        # self.subbandNameMapping = [rf"n_{i}" for i in range(1, self.subbands + 1)]
 
     def __initializePlotParams(self):
         plt.rcParams["text.usetex"] = True

@@ -56,13 +56,28 @@ class DataReader:
 
         # Those names are the same for k-space and real space calculations.
         self.colnamesGamma: list[str] = (
-            ["band", "i_band", "j_band", "gammaR", "gammaIm"]
-            #["band", "i_band", "j_band", "neighbor", "gammaR", "gammaIm"]
+            #["band", "i_band", "j_band", "gammaR", "gammaIm"]
+            ["band", "i_band", "j_band", "neighbor", "gammaRe", "gammaIm"]
         )
+
+        self.coltypesGamma: dict[str, type[np.generic]] = {
+            "band": np.int8,
+            "i_band": np.int8,
+            "j_band": np.int8,
+            "neighbor": np.int8,
+            "gammaRe": np.float64,
+            "gammaIm": np.float64,
+        }
 
         self.colnamesCharge: list[str] = (
             ["band", "i_band", "filling"]
         )
+        self.coltypesCharge: dict[str, type[np.generic]] = {
+            "band": np.int8,
+            "i_band": np.int8,
+            "filling": np.float64,
+        }
+
         self.colnamesDispersion = [
             "N",
             "kx",
@@ -87,7 +102,7 @@ class DataReader:
     """ ---------------------------- Interface methods ----------------------------------- """
     """ ---------------------------------------------------------------------------------- """
 
-    def LoadFilling(self, xKeywords: tuple, loadUnfinished: bool) -> pd.DataFrame:
+    def LoadFilling(self, xKeywords: tuple, loadUnfinished: bool = True) -> pd.DataFrame:
         """
         Loads filling data from simulations base on specified in __init__() runsPath and matchPattern.
         If simulation had not converged, takse values from _iter.dat file - the last iteration before program timeout.
@@ -116,7 +131,7 @@ class DataReader:
                     comment='#',
                     sep='\s+',
                     names=self.colnamesCharge,
-                    dtype=np.float64,
+                    dtype=self.coltypesCharge,
                 )
             elif os.path.exists(filePathIter):
                 logger.info(f"No convergence in {dir}")
@@ -127,7 +142,7 @@ class DataReader:
                         comment='#',
                         sep='\s+',
                         names=self.colnamesCharge,
-                        dtype=np.float64,
+                        dtype=self.coltypesCharge,
                     )
             else:
                 logger.info(f"No Charge dens file in {dir}")
@@ -140,7 +155,7 @@ class DataReader:
         chargesDf = pd.concat(dataframes, ignore_index=True)
         return chargesDf
 
-    def LoadGamma(self, xKeywords: tuple, loadUnfinished: bool) -> pd.DataFrame:
+    def LoadGamma(self, xKeywords: tuple[str, ...], loadUnfinished: bool = True) -> pd.DataFrame:
         """
         Loads gamma data from simulations base on specified in __init__() runsPath and matchPattern.
         If simulation had not converged, takse values from _iter.dat file - the last iteration before program timeout.
@@ -174,7 +189,7 @@ class DataReader:
                     comment='#',
                     sep='\s+',
                     names=self.colnamesGamma,
-                    dtype=np.float64,
+                    dtype=self.coltypesGamma,
                 )
 
             # If simulation did NOT converge, iteration file should exists
@@ -187,7 +202,7 @@ class DataReader:
                         comment='#',
                         sep='\s+',
                         names=self.colnamesGamma,
-                        dtype=np.float64,
+                        dtype=self.coltypesGamma,
                     )
             else:
                 logger.warning(f"No Gamma file in {dir}")
@@ -287,7 +302,7 @@ class DataReader:
                 if type(param) is list:
                     ind = [i for i, x in enumerate(param) if x != 0]
                     param = param[ind[0]]
-                dataframe[xKey] = param
+                dataframe[xKey] = round(param, 5)
 
     """ ---------------------------------------------------------------------------------- """
     """ ---------------------------- Special methods ------------------------------------- """
