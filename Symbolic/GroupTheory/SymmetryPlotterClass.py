@@ -92,9 +92,9 @@ class SymmetryPlotterClass:
     nCols = 1 #Real and imaginary part plotted on separate figures
     nRows: dict[str, int] = {}
     if neighbor == "nearest":
-      maxRows = 2
+      maxRows = 1
     elif neighbor == "next":
-      maxRows = 2
+      maxRows = 1
     else:
       raise ValueError(f"Neighbor {neighbor} not supported")
 
@@ -103,7 +103,7 @@ class SymmetryPlotterClass:
       for v in irrepsEigenvectors[irrep]:
         if np.abs(v[0]) == 1:
           for i in range(v[1]):
-            rowCount += 2
+            rowCount += 1 #2
       nRows[irrep] = rowCount
 
     with initPrinting(enablePrinting):
@@ -147,13 +147,14 @@ class SymmetryPlotterClass:
             for i in range(v[1]):
               lastInRow = col == nCols - 1
               print(lastInRow)
-              self.__getSingleBasisFunction(v[2][i], [axes[row + 1, col], axes[row, col]], neighbor, fig, lastInRow, scGapPath)
+              #self.__getSingleBasisFunction(v[2][i], [axes[row + 1, col], axes[row, col]], neighbor, fig, lastInRow, scGapPath)
+              self.__getSingleBasisFunction(v[2][i], [axes[row, col], None], neighbor, fig, lastInRow, scGapPath)
 
-              row += 2
+              row += 1 #2
               col += row // maxRows
               row = row % maxRows
 
-        fig.subplots_adjust(wspace=0, hspace=0.1, left=0, right=1, top=1, bottom=0)
+        fig.subplots_adjust(wspace=0.1, hspace=0.1, left=0, right=1, top=1, bottom=0)
         plt.show()
 
   def plotOrbitalWeights(self):
@@ -336,49 +337,59 @@ class SymmetryPlotterClass:
     for part in ("real", "imag"):
       zPlot = np.zeros(Z.shape)
       if part == "real":
-        zPlot = np.abs(Z) / np.max(np.abs(Z))
+        zPlot = np.real(Z / np.max(np.abs(Z)))
         self.__plotFirstBrillouinZoneBoundary(axModule)
         colormesh = axModule.pcolormesh(X,
                                         Y,
                                         zPlot,
-                                        cmap="Greys",
-                                        norm=PowerNorm(gamma=0.5, vmin=0, vmax=1))
+                                        cmap="RdBu_r",
+                                        norm=PowerNorm(gamma=1, vmin=-1, vmax=1))
         axModule.contour(X, Y, zPlot, levels=[-zeroThreshold, zeroThreshold], colors='magenta', linestyles='dotted', linewidths=0.5)
         self.__loadAndPlotScGapData(scGapPath, axModule)
         axModule.set_aspect("equal")
         if lastInRow:
           # Manual colorbar axis (left, bottom, width, height) in figure coords
-          cax = fig.add_axes([1.02, 0.03, 0.015, 0.42])  # adjust as needed
-          cbar = fig.colorbar(colormesh, cax=cax)
-          cbar.set_ticks([0, 0.25, 0.5, 1])
-          cbar.set_label(r"$|\Gamma|$")
-
-      elif part == "imag":
-        zPlot = np.angle(Z) / np.pi
-        self.__plotFirstBrillouinZoneBoundary(axPhase)
-        colormesh = axPhase.pcolormesh(X,
-                                       Y,
-                                       zPlot,
-                                       cmap=self.__shiftCmap(cc.cm.cyclic_tritanopic_cwrk_40_100_c20, -0.75),
-                                       norm=PowerNorm(gamma=1., vmin = -1, vmax = 1))
-        axPhase.contour(X, Y, zPlot, levels=[-zeroThreshold, zeroThreshold], colors='magenta', linestyles='dotted', linewidths=0.5)
-        self.__loadAndPlotScGapData(scGapPath, axPhase)
-        axPhase.set_aspect("equal")
-        if lastInRow:
-          # Manual colorbar axis (left, bottom, width, height) in figure coords
-          cax = fig.add_axes([1.02, 0.55, 0.015, 0.42])  # adjust as needed
+          cax = fig.add_axes([1.02, 0.03, 0.015, 0.95])  # adjust as needed
           cbar = fig.colorbar(colormesh, cax=cax)
           cbar.set_ticks([-1, -0.5, 0, 0.5, 1])
-          cbar.set_label(r"$\arg \left( \Gamma \right)$ ($\pi$)")
+          cbar.set_label(r"$\Gamma$")
+
+      # elif part == "imag":
+      #   zPlot = np.angle(Z) / np.pi
+      #   self.__plotFirstBrillouinZoneBoundary(axPhase)
+      #   colormesh = axPhase.pcolormesh(X,
+      #                                  Y,
+      #                                  zPlot,
+      #                                  cmap=self.__shiftCmap(cc.cm.cyclic_tritanopic_cwrk_40_100_c20, -0.75),
+      #                                  norm=PowerNorm(gamma=1., vmin = -1, vmax = 1))
+      #   axPhase.contour(X, Y, zPlot, levels=[-zeroThreshold, zeroThreshold], colors='magenta', linestyles='dotted', linewidths=0.5)
+      #   self.__loadAndPlotScGapData(scGapPath, axPhase)
+      #   axPhase.set_aspect("equal")
+      #   if lastInRow:
+      #     # Manual colorbar axis (left, bottom, width, height) in figure coords
+      #     cax = fig.add_axes([1.02, 0.55, 0.015, 0.42])  # adjust as needed
+      #     cbar = fig.colorbar(colormesh, cax=cax)
+      #     cbar.set_ticks([-1, -0.5, 0, 0.5, 1])
+      #     cbar.set_label(r"$\arg \left( \Gamma \right)$ ($\pi$)")
 
 
   def __loadAndPlotScGapData(self, scGapPath, ax):
+    from matplotlib.collections import LineCollection
+    def sortByPhase(group):
+        # Sort values with repect to the center of Fermi surface to be able to connect with lines
+        xCenter, yCenter = group["kx"].mean(), group["ky"].mean()
+        phase = np.arctan2(group["ky"] - yCenter, group["kx"] - xCenter)
+
+        group["k_phase"] = phase
+        group.sort_values(by="k_phase", inplace=True, ignore_index=True)
+        return pd.concat([group, group.iloc[[0]]], ignore_index=True)
+
 
     if not os.path.exists(scGapPath):
       print(f"Superconducting gap file {scGapPath} does not exist")
       return
 
-    colorsMapping = {1: "#1f77b4", 2:"#ff7f0e", 3: "#2ca02c", 4: "#d62728"}
+    colorsMapping = {1: '#000000', 2: '#2ca02c', 3: '#000000', 4: '#2ca02c'}
 
     superconductingGapDataframe = pd.read_fwf(
       scGapPath,
@@ -389,16 +400,21 @@ class SymmetryPlotterClass:
       dtype=np.float64,
     )
     superconductingGapDataframe["stateColor"] = superconductingGapDataframe["state"].map(colorsMapping)
+    superconductingGapDataframe = superconductingGapDataframe.groupby("state", group_keys=False).apply(sortByPhase)
+    groups = superconductingGapDataframe.groupby("state")
 
+    state = 1
+    for _, group in groups:
+      kx = group["kx"].values
+      ky = group["ky"].values
 
-    norm = PowerNorm(gamma=1.2, vmin=0, vmax=superconductingGapDataframe.gap.max()*1e3)
-    scat = ax.scatter(
-        superconductingGapDataframe.kx,
-        superconductingGapDataframe.ky,
-        c=superconductingGapDataframe.stateColor,
-        s=0.5,
-        alpha=0.3,
-    )
+      points = np.array([kx, ky]).T.reshape(-1, 1, 2)
+      segments = np.concatenate([points[:-1], points[1:]], axis=1)
+
+      lc = LineCollection(segments, color=colorsMapping[state], linewidths=2)
+      ax.add_collection(lc)
+      state += 1
+
     print("Minimal value of gap is ", superconductingGapDataframe.gap.min())
 
 

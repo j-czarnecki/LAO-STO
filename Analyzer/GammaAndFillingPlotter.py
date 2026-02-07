@@ -202,7 +202,7 @@ class GammaAndFillingPlotter(SymmetryResolver):
                 if continuousColor:
                     gs = gridspec.GridSpec(1, 1, figure=fig, left=0.25, right=0.95, top=0.75, bottom=0.2)
                 else:
-                    gs = gridspec.GridSpec(1, 1, figure=fig, left=0.25, right=0.95, top=0.75, bottom=0.2)
+                    gs = gridspec.GridSpec(1, 1, figure=fig, left=0.3, right=0.95, top=0.75, bottom=0.2)
                 ax1 = fig.add_subplot(gs[0,0])
 
                 for secondParam in secondParamValues:
@@ -213,29 +213,32 @@ class GammaAndFillingPlotter(SymmetryResolver):
                     for i in range(len(self.params)):
                         if int(self.params[i][1]) == secondParam:
                             gammaYPlot.append(np.abs(gammaDict[key][i]) * yMultiplier)
-                            firstXPlot.append(self.params[i][0] - firstXShift)
-                            secondXPlot.append(secondXCallback(self.fillingTotal[i]))
+                            # firstXPlot.append(self.params[i][0] - firstXShift)
+                            # secondXPlot.append(secondXCallback(self.fillingTotal[i]))
+                            firstXPlot.append(secondXCallback(self.fillingTotal[i]))
+                            secondXPlot.append(self.params[i][0] - firstXShift)
+
                             #secondXPlot.append(secondXCallback(self.fillingTotal[i] * 100))
 
                     if continuousColor:
                         color = cmap(norm(secondParam))
                         ax1.plot(firstXPlot, gammaYPlot, label=secondParam, color=color, linewidth=2)
                     else:
-                        ax1.plot(firstXPlot, gammaYPlot, label=secondParam)
+                        ax1.plot(firstXPlot, gammaYPlot, label=secondParam, linewidth=3)
 
                 band, spin, sublat, symmetry = key
 
                 ax1.set_ylim(bottom=0, top=1.02 * self.maxval * yMultiplier if yMax == np.inf else yMax) # Guarantee a single scale for all plots
                 ax1.set_xlim(right=firstXMax if firstXMax != np.inf else max(firstXPlot))
-                ax1.set_xlabel(firstXLabel)
+                ax1.set_xlabel(secondXLabel)
                 ax1.set_ylabel(
                     rf"{gammaLabelsCallbacks[nNeighborhood](sublat, symmetry, spin)}" + yUnit,
                     labelpad=20,
                 )
                 # ax1.xaxis.set_major_locator(ticker.LinearLocator(5))
                 ax1.yaxis.set_major_locator(ticker.LinearLocator(4))
-                ax1.xaxis.set_major_locator(ticker.MultipleLocator(60))
-
+                ax1.xaxis.set_major_locator(ticker.MultipleLocator(0.5))
+                ax1.tick_params(axis="y", pad=12)
                 #for mu in (31, 79, 141):
                     #ax1.scatter(mu, 0.02, marker='v', s=75, color='deeppink', zorder=10, edgecolors='k', linewidth=1)
 
@@ -247,8 +250,8 @@ class GammaAndFillingPlotter(SymmetryResolver):
                     colorbar.set_label(legendTitles[nNeighborhood])  # Update label as needed TODO: this should be variable
                     colorbar.set_ticks([30, 40])
                 else:
-                    ax1.legend(title=legendTitles[nNeighborhood], loc="best") #TODO: this should be variable
-
+                    #ax1.legend(title=legendTitles[nNeighborhood], loc="best") #TODO: this should be variable
+                    pass
                 # Do this as a last step and trigger plt.draw() so that the ticks are already set in their final form
                 if plotSecondX:
                     plt.draw()
@@ -260,9 +263,9 @@ class GammaAndFillingPlotter(SymmetryResolver):
                     ax2 = ax1.secondary_xaxis("top")
                     ax2.set_xticks(ax1_ticks)  # Use the same positions as `ef_plot`
                     ax2.set_xticklabels(
-                        [f"{val:.1f}" for val in tick_labels]
+                        [f"{val:.0f}" for val in tick_labels]
                     )  # Map `n_total_plot` as tick labels
-                    ax2.set_xlabel(fr"{secondXLabel}", labelpad=16)
+                    ax2.set_xlabel(fr"{firstXLabel}", labelpad=16)
                     #ax2.set_xlabel(fr"{secondXLabel} (10 \textsuperscript{{-2}})", labelpad=16)
                 plt.savefig(
                     f"../Plots/Gamma2d_{gammaNeighorhoodLabels[nNeighborhood]}_band{band}_spin{spin}_lat{sublat}_{symmetry}.png"

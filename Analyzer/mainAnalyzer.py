@@ -43,7 +43,7 @@ def plotGammas():
     #eMin = -1480
     eMin = 0
     gammaAndFillingPlotter = GammaAndFillingPlotter(
-        runsPath=os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-B_planar_J_SC_NNN"),
+        runsPath=os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-E_Fermi_J_SC_J_SC_NNN"),
         # runsPath=os.path.join(
         #     "/home", "jczarnecki", "LAO-STO-results", "LAO-STO-E_Fermi_J_SC_J_SC_NNN"
         # ),
@@ -57,15 +57,15 @@ def plotGammas():
     )
 
     gammaAndFillingPlotter.LoadFilling(loadUnfinished=True)
-    gammaAndFillingPlotter.LoadGamma(xKeywords=("b_phi", "b_magnitude"), loadUnfinished=True)
+    gammaAndFillingPlotter.LoadGamma(xKeywords=("e_fermi", "j_sc"), loadUnfinished=True)
     gammaAndFillingPlotter.sortData()
     gammaAndFillingPlotter.CalculateSymmetryGamma()
     gammaAndFillingPlotter.getMaxvalSymmetrizedGamma()
-    gammaAndFillingPlotter.plotGammasTwoParam2d(firstXLabel=r"$\varphi$",
-                                                neighborsToPlot=("next", ),
-                                                plotSecondX=False,
+    gammaAndFillingPlotter.plotGammasTwoParam2d(firstXLabel=r"$\mu$ (meV)",
+                                                neighborsToPlot=("next", "nearest"),
+                                                plotSecondX=True,
                                                 secondXLabel=r"$n$ (10\textsuperscript{14} cm\textsuperscript{-2})",
-                                                legendTitles=(r"$|B|$ (T)",),
+                                                legendTitles=(r"$J_{nnn}$ (meV)", r""),
                                                 continuousColor=False,
                                                 yUnit=r"($\mu$eV)")
     #gammaAndFillingPlotter.plotFillingFermi()
@@ -77,7 +77,9 @@ def plotDispersions():
     eMin = -1053
     dispersionPlotter = DispersionPlotter(sublattices=3, subbands=1)
 
-    dispersionPlotter.LoadDispersion("../OutputData/Energies.dat")
+    # dispersionPlotter.LoadDispersion("../OutputData/Energies.dat")
+    # dispersionPlotter.LoadDos("../OutputData/DOS.dat")
+    # dispersionPlotter.plotDos(100, "../Plots/DOS.png", False, 0)
     # dispersionPlotter.GetStatistics()
     #dispersionPlotter.shiftEnergies()
 
@@ -106,15 +108,15 @@ def plotDispersions():
     # dispersionPlotter.plotFermiCrossection(150, 2.0, "../Plots/FermiSlice150.png")
     # dispersionPlotter.plotFermiCrossection(200, 2.0, "../Plots/FermiSlice200.png")
     # dispersionPlotter.plotFermiCrossection(500, 1.0, "../Plots/FermiSlice500.png")
-    for ef in (-60,):
-        # dispersionPlotter.LoadSuperconductingGap(
-        #             os.path.join(
-        #                 os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-E_Fermi_J_SC_NNN", f"RUN_E_Fermi_{ef}.0_J_SC_NNN_350.0"),
-        #                 "OutputData",
-        #                 f"SuperconductingGap.dat",
-        #             )
-        #         )
-        #dispersionPlotter.plotSuperconductingGapAngular(postfix=f"", title=rf"")
+    for ef in (-60, -20):
+        dispersionPlotter.LoadSuperconductingGap(
+                    os.path.join(
+                        os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-E_Fermi_J_SC", f"RUN_E_Fermi_{ef}.0_J_SC_375.0"),
+                        "OutputData",
+                        f"SuperconductingGap.dat",
+                    )
+                )
+        dispersionPlotter.plotSuperconductingGapAngular(postfix=f"{ef}", title=rf"")
         #dispersionPlotter.plotSuperconductingGap(postfix=f"{ef}", title=rf"")
         # dispersionPlotter.LoadDos(
         #                 os.path.join(
@@ -125,14 +127,14 @@ def plotDispersions():
         #             )
         # dispersionPlotter.plotDos(0.65, f"../Plots/DOS_{ef}.png", False, 1e-2)
 
-        dispersionPlotter.plotGammaKMap(
-            inputPath=os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-E_Fermi_J_SC_NNN", f"RUN_E_Fermi_{ef}.0_J_SC_NNN_350.0"),
-            postfix=f"{ef}",
-            neighborsToPlot=("next",),
-            plotFermiCrossection=True,
-            eFermi = -60,
-            dE=2
-        )
+        # dispersionPlotter.plotGammaKMap(
+        #     inputPath=os.path.join(SCRATCH_PATH, "KTO-SC", "KTO-E_Fermi_J_SC_NNN", f"RUN_E_Fermi_{ef}.0_J_SC_NNN_350.0"),
+        #     postfix=f"{ef}",
+        #     neighborsToPlot=("next",),
+        #     plotFermiCrossection=True,
+        #     eFermi = -60,
+        #     dE=2
+        # )
 
 
 def addMissingBandNumber():
@@ -177,8 +179,8 @@ def addMissingBandNumber():
 
 def main():
     logger.info("Starting Analyzer")
-    plotGammas()
-    #plotDispersions()
+    #plotGammas()
+    plotDispersions()
     #addMissingBandNumber()
 
 

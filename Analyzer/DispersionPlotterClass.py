@@ -268,9 +268,9 @@ class DispersionPlotter(DataReader):
             )
 
         if isSingle:
-            fig = plt.figure(figsize=(7, 5), dpi=400)
+            fig = plt.figure(figsize=(9, 5), dpi=400)
             # Set up GridSpec (1 row, 1 column, with some spacing)
-            gs = gridspec.GridSpec(1, 1, figure=fig, left=0.23, right=0.95, top=0.95, bottom=0.23)
+            gs = gridspec.GridSpec(1, 1, figure=fig, left=0.15, right=0.95, top=0.95, bottom=0.2)
             ax = fig.add_subplot(gs[0,0])
 
         if addSmearing:
@@ -282,11 +282,16 @@ class DispersionPlotter(DataReader):
 
         if isSingle:
             ax.yaxis.set_major_locator(ticker.MultipleLocator(0.25))
-            ax.xaxis.set_major_locator(ticker.MultipleLocator(0.25))
+            ax.xaxis.set_major_locator(ticker.MultipleLocator(50))
 
-            plt.xlim(left=-eMax, right=eMax)
-            plt.xlabel(r"E (meV)")
-            plt.ylabel(r"DOS")
+            ax.vlines(-100,-2,2, color="red", linewidth=1, linestyle="--")
+            ax.vlines(100,-2,2, color="red", linewidth=1, linestyle="--")
+            ax.tick_params(axis='both', which='major', labelsize=26)
+            plt.grid(True, linestyle=':')
+            plt.xlim(left=-120, right=200)
+            plt.ylim(bottom=0, top=1.05)
+            plt.xlabel(r"E (meV)", fontsize=26)
+            plt.ylabel(r"DOS (a.u.)", fontsize=26)
             plt.savefig(plotOutputPath)
             plt.close()
 
@@ -350,39 +355,89 @@ class DispersionPlotter(DataReader):
         plt.close()
 
     def plotSuperconductingGap(self, postfix: str, title: str):
+        from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+        from matplotlib.collections import PatchCollection
+        from matplotlib.patches import Circle, Polygon, Wedge
+        def sortByPhase(group):
+            # Sort values with repect to the center of Fermi surface to be able to connect with lines
+            xCenter, yCenter = group["kx"].mean(), group["ky"].mean()
+            phase = np.arctan2(group["ky"] - yCenter, group["kx"] - xCenter)
+
+            group["k_phase"] = phase
+            group.sort_values(by="k_phase", inplace=True, ignore_index=True)
+            return pd.concat([group, group.iloc[[0]]], ignore_index=True)
+        
         fig = plt.figure(figsize=(7, 5), dpi=400)
         # Set up GridSpec (1 row, 1 column, with some spacing)
-        gs = gridspec.GridSpec(1, 1, figure=fig, left=0.25, right=0.65, top=1, bottom=0.15)
+        gs = gridspec.GridSpec(1, 1, figure=fig, left=0.15, right=0.8, top=0.95, bottom=0.2)
         ax = fig.add_subplot(gs[0,0])
-        self.plotFirstBrillouinZoneBoundary()
-        norm = PowerNorm(gamma=1.5, vmin=0, vmax=self.superconductingGapDataframe.gap.max()*1e3)
-        scat = ax.scatter(
-            self.superconductingGapDataframe.kx,
-            self.superconductingGapDataframe.ky,
-            c=self.superconductingGapDataframe.gap*1e3,
-            s=0.5,
-            cmap="cool",
-            norm=norm,
-        )
-        print("Minimal value of gap is ", self.superconductingGapDataframe.gap.min())
+        #self.plotFirstBrillouinZoneBoundary()
 
-        cax = fig.add_axes([0.67, 0.3, 0.05, 0.55])  # [left, bottom, width 5% of figure width, height 75% of figure height]
+        self.superconductingGapDataframe = self.superconductingGapDataframe.groupby("state", group_keys=False).apply(sortByPhase)
+        groups = self.superconductingGapDataframe.groupby("state")
+        norm = PowerNorm(gamma=1.,
+                         vmin=self.superconductingGapDataframe.gap.min()*1e3,
+                         vmax=self.superconductingGapDataframe.gap.max()*1e3)
+
+        for  _, group in groups:
+            group = sortByPhase(group)
+            kx = group["kx"].values
+            ky = group["ky"].values
+            colors = group["gap"].values * 1e3 #transform to micro eV
+
+            points = np.array([kx, ky]).T.reshape(-1, 1, 2)
+            segments = np.concatenate([points[:-1], points[1:]], axis=1)
+            segmentColors = 0.5 * (colors[:-1] + colors[1:])
+            lc = LineCollection(segments, linewidth=1.5, cmap="cool", norm=norm)
+            lc.set_array(segmentColors)
+            ax.add_collection(lc)
+        
+        # scat = ax.scatter(
+        #     self.superconductingGapDataframe.kx,
+        #     self.superconductingGapDataframe.ky,
+        #     c=self.superconductingGapDataframe.gap*1e3,
+        #     s=0.5,
+        #     cmap="cool",
+        #     norm=norm,
+        # )
+        # print("Minimal value of gap is ", self.superconductingGapDataframe.gap.min())
+
+        cax = fig.add_axes([0.75, 0.2, 0.05, 0.75])  # [left, bottom, width 5% of figure width, height 75% of figure height]
         cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap='cool'), cax=cax, orientation='vertical')
-        cbar.set_label(r"$\tilde{\Delta}$ ($\mu$eV)")
-        cbar.set_ticks(ticker.MultipleLocator(150))
+        cbar.set_label(r"$\tilde{\Delta}$ ($\mu$eV)", fontsize=32)
+        cbar.set_ticks(ticker.MultipleLocator(4))
+        cbar.ax.tick_params(labelsize=30)
 
 
-        ax.set_xlim(-2.5, 2.5)
-        ax.set_ylim(-2.5, 2.5)
-        ax.yaxis.set_major_locator(ticker.MultipleLocator(2))
-        ax.xaxis.set_major_locator(ticker.MultipleLocator(2))
+        #Brillouin zone inset
+        plotXBound = 0.8
+        plotYBound = 0.8
+        axins = inset_axes(ax, width="25%", height="25%", loc='upper right', borderpad=0)
+        self.plotFirstBrillouinZoneBoundary(axins)
+        patch = Polygon([[-plotXBound, plotYBound],
+                         [plotXBound, plotYBound],
+                         [plotXBound, -plotYBound],
+                         [-plotXBound, -plotYBound]],
+                         fill=True,
+                         linewidth=1,
+                         color="pink",
+                         alpha = 0.6)
+        axins.add_patch(patch)
+        axins.axis('off')
+        axins.set_aspect("equal")
+
+        ax.set_xlim(-0.8, 0.8)
+        ax.set_ylim(-0.8, 0.8)
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(0.4))
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(0.4))
 
         ax.set_title(title)
-        ax.set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
-        ax.set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
+        ax.set_xlabel(r"$k_x~(\tilde{a}^{-1})$", fontsize=32)
+        ax.set_ylabel(r"$k_y~(\tilde{a}^{-1})$", fontsize=32)
+        ax.tick_params(axis='both', which='major', labelsize=30)
         ax.set_aspect("equal")
 
-        # plt.grid()
+        ax.grid(True, linestyle=':')
         plt.savefig("../Plots/SuperconductingGap" + postfix + ".png")
         plt.close()
 
@@ -400,10 +455,10 @@ class DispersionPlotter(DataReader):
 
 
         yMin = np.inf
-        threshold = 0.005
+        threshold = 0.01
 
         for state, group in self.superconductingGapDataframe.groupby("state"):
-            dPhi = 0.05                                   # the maximum allowed x–gap
+            dPhi = 0.0005                                   # the maximum allowed x–gap
 
             # --- sort by polar angle ----------------------------------------------------
             angles = np.arctan2(group.ky, group.kx) / np.pi
@@ -443,7 +498,7 @@ class DispersionPlotter(DataReader):
 
 
 
-        axAngular.yaxis.set_major_locator(ticker.MultipleLocator(10))
+        axAngular.yaxis.set_major_locator(ticker.MultipleLocator(20))
         axAngular.xaxis.set_major_locator(ticker.MultipleLocator(0.5))
         axAngular.set_title(title)
         #axAngular.legend(title="n", loc="upper right")
@@ -506,7 +561,7 @@ class DispersionPlotter(DataReader):
         columnOffsetsDict = {"nearest": 0, "next": 2}
 
         cmapPhase = self.__shiftCmap(cc.cm.cyclic_tritanopic_cwrk_40_100_c20, -0.75)
-        cmapModule = "Greys"
+        cmapModule = "RdBu_r"
 
         for band in range(1, max(1, self.subbands) + 1):
             for spin in range(1, 3):
@@ -577,8 +632,7 @@ class DispersionPlotter(DataReader):
                             ax = axes[1, orbital - 1]
 
                             grid = griddata(kPoints, np.float64(
-                                    np.sqrt(self.gammaKDataFrame.iloc[:, columnRe] ** 2
-                                    + self.gammaKDataFrame.iloc[:, columnIm] ** 2)
+                                    self.gammaKDataFrame.iloc[:, columnRe]
                                 ), (kxGrid, kyGrid), method="linear", fill_value=0)
                             colormesh = ax.pcolormesh(kxGrid, kyGrid, grid, cmap=cmapModule, norm=PowerNorm(gamma=1.5))
                             ax.set_aspect("equal")
@@ -597,6 +651,7 @@ class DispersionPlotter(DataReader):
                                 # Manual colorbar axis (left, bottom, width, height) in figure coords
                                 cax = fig.add_axes([1.02, 0.03, 0.015, 0.42])  # adjust as needed
                                 cbar = fig.colorbar(colormesh, cax=cax)
+                                cbar.set_ticks([-1, -0.5, 0, 0.5, 1])
                                 cbar.set_label(rowNames[1])
 
                         fig.subplots_adjust(wspace=0, hspace=0.1, left=0, right=1, top=1, bottom=0)

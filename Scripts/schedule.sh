@@ -4,7 +4,7 @@
 ##### Partition name
 #SBATCH -p cpu
 ##### Name of job in queuing system
-#SBATCH --job-name=KTO-DOS
+#SBATCH --job-name=KTO-GAP
 
 #bash /home/czarnecki/LAO-STO/Scripts/runDoses.sh
 srun /home/czarnecki/LAO-STO/bin/POST_LAO_STO.x
