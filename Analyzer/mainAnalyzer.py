@@ -73,11 +73,11 @@ def plotDispersions():
     dispersionPlotter = DispersionPlotter(plotOutputPath="../Plots")
 
     #Dispersion plots
-    dispersionDf = reader.LoadDispersion("../OutputData/Energies.dat")
-    dispersionPlotter.GetStatistics(dispersionDf)
-    dispersionPlotter.plotCrossection(dispersionDf, 500, "ky", 0.0, 2, False)
-    dispersionPlotter.plotCrossection(dispersionDf, 500, "kx", 0.0, 2, False)
-    dispersionPlotter.plotFermiCrossection(dispersionDf, 30, 1.5, False)
+    # dispersionDf = reader.LoadDispersion("../OutputData/Energies.dat")
+    # dispersionPlotter.GetStatistics(dispersionDf)
+    # dispersionPlotter.plotCrossection(dispersionDf, 500, "ky", 0.0, 2, False)
+    # dispersionPlotter.plotCrossection(dispersionDf, 500, "kx", 0.0, 2, False)
+    # dispersionPlotter.plotFermiCrossection(dispersionDf, 30, 1.5, False)
 
     # #DOS plots
     # dosDf = reader.LoadDos("../OutputData/DOS.dat")
@@ -139,8 +139,8 @@ def analyzeLogs():
 
 def main():
     logger.info("Starting Analyzer")
-    plotGammas()
-    #plotDispersions()
+    #plotGammas()
+    plotDispersions()
     #addMissingBandNumber()
     #analyzeLogs()
 
