@@ -1,0 +1,123 @@
+MODULE test_interaction_factory
+USE funit
+USE interaction_factory
+USE parameters
+USE types
+use, intrinsic :: iso_fortran_env, only: real64, int32
+IMPLICIT NONE
+
+CONTAINS
+
+@before
+SUBROUTINE setup()
+END SUBROUTINE setup
+
+! ========================
+! ==== IDs assignment ====
+! ========================
+@test
+SUBROUTINE test_assign_cooper_pair_hopping_ids()
+  IMPLICIT NONE
+  INTEGER(INT32), PARAMETER :: n_hoppings = 1
+  CHARACTER(LEN=100) :: names(n_hoppings)
+  REAL(REAL64) :: multipliers(n_hoppings)
+  TYPE(cooper_pair_hopping_t) :: hoppings(n_hoppings)
+
+#ifndef BAND_BASIS
+  names(1) = "interorbital"
+#else
+  names(1) = "intraband"
+#endif
+  multipliers(1) = 0.25_real64
+
+  CALL ASSIGN_COOPER_PAIR_HOPPING_IDS(names, multipliers, hoppings, n_hoppings)
+
+#ifndef BAND_BASIS
+  @assertEqual(COOPER_PAIR_HOP_INTERORBITAL_ID, hoppings(1) % hopping_id)
+#else
+  @assertEqual(COOPER_PAIR_HOP_INTRABAND_ID, hoppings(1) % hopping_id)
+#endif
+  @assertEqual(0.25_real64, hoppings(1) % multiplier, tolerance=1.0e-12)
+END SUBROUTINE test_assign_cooper_pair_hopping_ids
+
+@test
+SUBROUTINE test_assign_interaction_ids()
+  IMPLICIT NONE
+  INTEGER(INT32), PARAMETER :: n_interactions = 2
+  CHARACTER(LEN=100) :: names(n_interactions)
+  REAL(REAL64) :: energies(n_interactions)
+  TYPE(interaction_t) :: interactions(n_interactions)
+
+  names(1) = "nearest_intra-orb_opposite-spin"
+  names(2) = "next_intra-orb_opposite-spin"
+  energies = [1.0_real64, 2.0_real64]
+
+  CALL ASSIGN_INTERACTION_IDS(names, energies, interactions, n_interactions)
+
+  @assertEqual(INT_NEAREST_NEIGHBOURS_INTRAORBITAL_OPPOSITE_SPIN_ID, interactions(1) % interaction_id)
+  @assertEqual(INT_NEXT_NEIGHBOURS_INTRAORBITAL_OPPOSITE_SPIN_ID, interactions(2) % interaction_id)
+  @assertEqual(1.0_real64, interactions(1) % energy, tolerance=1.0e-12)
+  @assertEqual(2.0_real64, interactions(2) % energy, tolerance=1.0e-12)
+END SUBROUTINE test_assign_interaction_ids
+
+! ===================================================
+! ==== Cooper pair hoppings callbacks assignment ====
+! ===================================================
+@test
+SUBROUTINE test_compute_intraband_cooper_pair_hopping()
+  IMPLICIT NONE
+  INTEGER(INT32), PARAMETER :: n = 3
+  REAL(REAL64), PARAMETER :: multiplier = 0.1_real64
+  COMPLEX(REAL64) :: gamma_before(n, n)
+  COMPLEX(REAL64) :: gamma_after(n, n)
+  INTEGER(INT32) :: i, j
+
+  gamma_before = CMPLX(0.0_real64, 0.0_real64, KIND=REAL64)
+  gamma_before(1, 1) = CMPLX(1.0_real64, 0.0_real64, KIND=REAL64)
+  gamma_before(2, 2) = CMPLX(2.0_real64, 0.0_real64, KIND=REAL64)
+  gamma_before(3, 3) = CMPLX(3.0_real64, 0.0_real64, KIND=REAL64)
+  gamma_after = gamma_before
+
+  CALL COMPUTE_INTRABAND_COOPER_PAIR_HOPPING(multiplier, gamma_before, gamma_after, n)
+
+  @assertEqual(CMPLX(1.5_real64, 0.0_real64, KIND=REAL64), gamma_after(1, 1), tolerance=1.0e-12)
+  @assertEqual(CMPLX(2.4_real64, 0.0_real64, KIND=REAL64), gamma_after(2, 2), tolerance=1.0e-12)
+  @assertEqual(CMPLX(3.3_real64, 0.0_real64, KIND=REAL64), gamma_after(3, 3), tolerance=1.0e-12)
+  DO i = 1, n
+    DO j = 1, n
+      IF (i == j) CYCLE
+      @assertEqual(CMPLX(0.0_real64, 0.0_real64, KIND=REAL64), gamma_after(i, j), tolerance=1.0e-12)
+    END DO
+  END DO
+END SUBROUTINE test_compute_intraband_cooper_pair_hopping
+
+! ==========================================
+! ==== Interaction callbacks assignment ====
+! ==========================================
+@test
+SUBROUTINE test_compute_intraband_interaction()
+  IMPLICIT NONE
+  INTEGER(INT32), PARAMETER :: n = 4
+  REAL(REAL64), PARAMETER :: energy = 0.5_real64
+  REAL(REAL64) :: J_tensor(n, n, n, n)
+  INTEGER(INT32) :: i, j, k, l
+
+  J_tensor = 0.0_real64
+  CALL COMPUTE_INTRABAND_INTERACTION(energy, J_tensor, n)
+
+  DO i = 1, n
+    DO j = 1, n
+      DO k = 1, n
+        DO l = 1, n
+          IF (i == j .AND. i == k .AND. i == l) THEN
+            @assertEqual(energy, J_tensor(i, j, k, l), tolerance=1.0e-12)
+          ELSE
+            @assertEqual(0.0_real64, J_tensor(i, j, k, l), tolerance=1.0e-12)
+          END IF
+        END DO
+      END DO
+    END DO
+  END DO
+END SUBROUTINE test_compute_intraband_interaction
+
+END MODULE test_interaction_factory

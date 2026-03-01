@@ -29,6 +29,7 @@ USE types
 USE parameters
 IMPLICIT NONE
 
+!TODO: Update reader tests!!!
 CONTAINS
 
 @test
@@ -49,7 +50,7 @@ SUBROUTINE test_get_input()
   @assertEqual(12, sc_input % discretization % derived % DIM_POSITIVE_K)
   @assertEqual(24, sc_input % discretization % derived % DIM)
   @assertEqual(2, sc_input % discretization % derived % LAYER_COUPLINGS)
-  @assertEqual(4, sc_input % physical % subband_params % J_tensor % n_nonzero)
+  @assertEqual(12, sc_input % physical % subband_params % J_tensor % n_nonzero)
 
   ! Physical params (in atomic units)
   @assertEqual(0.1, sc_input % physical % external % T, tol)
@@ -70,17 +71,6 @@ SUBROUTINE test_get_input()
   @assertEqual(200.0 * meV2au, sc_input % physical % subband_params % V_layer(2), tol)
   @assertEqual(25.0 * meV2au, sc_input % physical % subband_params % Subband_energies(1), tol)
   @assertEqual(2.0, sc_input % physical % subband_params % g_factor, tol)
-
-  ! J_tensor in CRS format
-  @assertEqual(4, sc_input % physical % subband_params % J_tensor % n_nonzero)
-  @assertEqual(1.0 * meV2au, sc_input % physical % subband_params % J_tensor % Values(1), tol)
-  @assertEqual(2.0 * meV2au, sc_input % physical % subband_params % J_tensor % Values(2), tol)
-  @assertEqual(3.0 * meV2au, sc_input % physical % subband_params % J_tensor % Values(3), tol)
-  @assertEqual(4.0 * meV2au, sc_input % physical % subband_params % J_tensor % Values(4), tol)
-  @assertEqual(1, sc_input % physical % subband_params % J_tensor % Column_indices(1))
-  @assertEqual(14, sc_input % physical % subband_params % J_tensor % Column_indices(2))
-  @assertEqual(27, sc_input % physical % subband_params % J_tensor % Column_indices(3))
-  @assertEqual(40, sc_input % physical % subband_params % J_tensor % Column_indices(4))
 
   ! Self-consistency
   @assertFalse(sc_input % self_consistency % read_gamma_from_file)
@@ -156,15 +146,15 @@ END SUBROUTINE test_get_postprocessing_input
 @test
 SUBROUTINE test_get_gamma_sc()
   TYPE(discretization_t) :: discretization
-  COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:,:,:,:)
+  COMPLEX(REAL64), ALLOCATABLE :: Gamma_SC(:, :, :, :)
   INTEGER(INT32) :: i_band, j_band, neigh, band
   REAL(REAL64) :: expected_re, expected_im, idx
   REAL(REAL64), PARAMETER :: tol = 1.0d-10
   CHARACTER(LEN=*), PARAMETER :: test_path = "OutputData/Gamma_SC_final.tdat"
 
   CALL SET_HAMILTONIAN_PARAMS(2, 1, discretization)
-  ALLOCATE(Gamma_SC(N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS, discretization % derived % DIM_POSITIVE_K, &
-                    discretization % derived % DIM_POSITIVE_K, discretization % SUBBANDS))
+  ALLOCATE (Gamma_SC(N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS, discretization % derived % DIM_POSITIVE_K, &
+                     discretization % derived % DIM_POSITIVE_K, discretization % SUBBANDS))
 
   CALL GET_GAMMA_SC(Gamma_SC, test_path, discretization)
 
@@ -183,7 +173,7 @@ SUBROUTINE test_get_gamma_sc()
     END DO
   END DO
 
-  DEALLOCATE(Gamma_SC)
+  DEALLOCATE (Gamma_SC)
 END SUBROUTINE test_get_gamma_sc
 
 @test

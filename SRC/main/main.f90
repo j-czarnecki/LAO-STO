@@ -72,7 +72,13 @@ max_num_threads = omp_get_max_threads()
 CALL INIT_LOGGER()
 WRITE (log_string, *) "Max num threads", max_num_threads
 LOG_INFO(log_string)
-
+#ifndef BAND_BASIS
+WRITE (log_string, *) "RUNNING REAL-SPACE COUPLING MODE"
+LOG_INFO(log_string)
+#else
+WRITE (log_string, *) "RUNNING K-SPACE COUPLING MODE"
+LOG_INFO(log_string)
+#endif
 CALL GET_INPUT("./input.nml", sc_input)
 ASSOCIATE (SUBLATTICES => sc_input % discretization % SUBLATTICES, &
          & SUBBANDS => sc_input % discretization % SUBBANDS, &
@@ -193,7 +199,8 @@ DO sc_iter = 1, sc_input % self_consistency % max_sc_iter
   CALL COMPUTE_COOPER_PAIR_HOPPINGS(sc_input % physical % subband_params % cooper_pair_hoppings, &
     & sc_input % discretization % n_cooper_pair_hoppings, &
     & Gamma_SC_new, &
-    & sc_input % discretization % derived % DIM_POSITIVE_K)
+    & sc_input % discretization % derived % DIM_POSITIVE_K, &
+    & sc_input % discretization)
 
   CALL PRINT_GAMMA(Gamma_SC_new, "Gamma_SC_new", sc_input % discretization)
 

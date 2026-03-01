@@ -85,9 +85,9 @@ SUBROUTINE test_save_sparse_matrix_in_crs()
   IMPLICIT NONE
   INTEGER(INT32), PARAMETER :: N = 5
   REAL(REAL64) :: Matrix(N, N)
-  REAL(REAL64) :: Values(13)
-  INTEGER(INT32) :: Column_indeces(13)
-  INTEGER(INT32) :: Row_indeces(N + 1)
+  REAL(REAL64), ALLOCATABLE :: Values(:)
+  INTEGER(INT32), ALLOCATABLE :: Column_indeces(:)
+  INTEGER(INT32), ALLOCATABLE :: Row_indeces(:)
   INTEGER(INT32) :: Column_indeces_check(13)
   INTEGER(INT32) :: Row_indeces_check(N + 1)
   INTEGER(INT32) :: i, j

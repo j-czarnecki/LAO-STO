@@ -5,14 +5,15 @@ BUILD_DIR := build
 
 .PHONY: all run clean tidy
 
-all: hamiltonians_test_suite utilities_test_suite tidy
+all: hamiltonians_test_suite utilities_test_suite interaction_factory_test_suite tidy
 
 run:
 	./hamiltonians_test_suite
 	./utilities_test_suite
+	./interaction_factory_test_suite
 
 clean:
-	$(RM) -rf $(BUILD_DIR) hamiltonians_test_suite utilities_test_suite OutputData/*.dat
+	$(RM) -rf $(BUILD_DIR) hamiltonians_test_suite utilities_test_suite interaction_factory_test_suite OutputData/*.dat
 
 tidy:
 	@echo "Tidying up build artifacts..."
@@ -61,5 +62,11 @@ utilities_test_suite_OTHER_LIBRARIES := -L$(SUT_LIB_DIR) -lsut $(LIBS)
 utilities_test_suite_OTHER_INCS := $(INC_DIRS)
 $(eval $(call make_pfunit_test,utilities_test_suite))
 
+interaction_factory_test_suite_TESTS := test_interaction_factory.pf
+interaction_factory_test_suite_REGISTRY :=
+interaction_factory_test_suite_OTHER_SOURCES :=
+interaction_factory_test_suite_OTHER_LIBRARIES := -L$(SUT_LIB_DIR) -lsut $(LIBS)
+interaction_factory_test_suite_OTHER_INCS := $(INC_DIRS)
+$(eval $(call make_pfunit_test,interaction_factory_test_suite))
 
 

@@ -38,6 +38,12 @@
     Nk_points_gamma_k = 16
 /
 
+&transformation_calculation
+    enable_transformation_calc = .TRUE.,
+    path_to_run_dir_transformation = "/home/czarnecki/LAO-STO/"
+    Nr_points_transformation = 100,
+    Nphi_points_transformation = 100 /
+
 &projections_calculation
     enable_projections_calc = .true.
     path_to_run_dir_projections = '/test/path/projections/'

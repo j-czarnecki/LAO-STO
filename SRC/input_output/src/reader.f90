@@ -391,11 +391,16 @@ SUBROUTINE GET_INPUT(nmlfile, sc_input)
     & n_cooper_pair_hoppings)
 
   CALL ASSIGN_INTERACTION_IDS(Interaction_names, Interaction_energies, Interactions, n_interactions)
-  CALL CONSTRUCT_INTERACTION_TENSOR(Interactions, n_interactions, J_tensor, sc_input % discretization % derived % DIM_POSITIVE_K)
+  CALL CONSTRUCT_INTERACTION_TENSOR(Interactions, &
+                                  & n_interactions, &
+                                  & J_tensor, &
+                                  & sc_input % discretization % derived % DIM_POSITIVE_K, &
+                                  & sc_input % discretization)
 
   WRITE (log_string, *) "Constructing J_tensor in matricized form"
   CALL MATRICIZE_INTERACTION_TENSOR(J_tensor, sc_input % discretization % derived % DIM_POSITIVE_K, Matricized_j_tensor)
   n_tensor_nonzero = calculate_number_of_nonzero_elements(Matricized_j_tensor)
+  sc_input % physical % subband_params % J_tensor % n_nonzero = n_tensor_nonzero
   WRITE (log_string, *) "Number of nonzero elements in J_tensor: ", n_tensor_nonzero
   LOG_INFO(log_string)
   CALL SAVE_SPARSE_MATRIX_IN_CRS(Matricized_j_tensor, sc_input % physical % subband_params % J_tensor % Values, &

@@ -88,11 +88,18 @@ COMPLEX(REAL64), PARAMETER :: Sigma_z(2, 2) = TRANSPOSE(RESHAPE([c_one, c_zero, 
                                                                  c_zero, -c_one], &
                                                                 [2, 2]))
 
-!Interaction types "enumeration"
-INTEGER(INT32), PARAMETER :: INT_INTRABAND_ID = 1
-INTEGER(INT32), PARAMETER :: INT_INTERBAND_ID = 2
+! Interaction types "enumeration"
+! Real-space pairing (spin-orbital basis)
+INTEGER(INT32), PARAMETER :: INT_NEAREST_NEIGHBOURS_INTRAORBITAL_OPPOSITE_SPIN_ID = 1
+INTEGER(INT32), PARAMETER :: INT_NEXT_NEIGHBOURS_INTRAORBITAL_OPPOSITE_SPIN_ID = 2
+! K-space pairing (band basis)
+INTEGER(INT32), PARAMETER :: INT_INTRABAND_ID = 3
+INTEGER(INT32), PARAMETER :: INT_INTERBAND_ID = 4
 
-!Cooper pair hoppings "enumeration"
-INTEGER(INT32), PARAMETER :: COOPER_PAIR_HOP_INTRABAND_ID = 1
+! Cooper pair hoppings "enumeration"
+! Real-space pairing (spin-orbital basis)
+INTEGER(INT32), PARAMETER :: COOPER_PAIR_HOP_INTERORBITAL_ID = 1
+! K-space pairing (band basis)
+INTEGER(INT32), PARAMETER :: COOPER_PAIR_HOP_INTRABAND_ID = 2
 
 END MODULE parameters

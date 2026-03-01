@@ -62,6 +62,7 @@ SUBROUTINE SET_GAMMA_INITIAL(Gamma_SC, J_tensor_crs, gamma_start_nearest, gamma_
   INTEGER(INT32) :: i
   INTEGER(INT32) :: Dematricized_indices(2)
   INTEGER(INT32) :: last_crs_row_index
+  INTEGER(INT32) :: Degrees_of_freedom_row(4)
   Gamma_SC = CMPLX(0.0, 0.0, KIND=REAL64)
 
   DO i = 1, discretization % derived % DIM_POSITIVE_K**2
@@ -69,8 +70,10 @@ SUBROUTINE SET_GAMMA_INITIAL(Gamma_SC, J_tensor_crs, gamma_start_nearest, gamma_
     IF (J_tensor_crs % Row_indices(i + 1) .NE. J_tensor_crs % Row_indices(i)) THEN
       Dematricized_indices = get_dematricized_indeces(i, discretization % derived % DIM_POSITIVE_K)
 #ifndef BAND_BASIS
-      Gamma_SC(:N_NEAREST_NEIGHBOURS, Dematricized_indices(1), Dematricized_indices(2), :) = gamma_start_nearest
-      Gamma_SC(N_NEAREST_NEIGHBOURS + 1:N_ALL_NEIGHBOURS, Dematricized_indices(1), Dematricized_indices(2), :) = gamma_start_next
+      Degrees_of_freedom_row = get_degress_of_freedom_from_index(Dematricized_indices(1), discretization)
+      spin_sign = (-1)**(Degrees_of_freedom_row(3))
+      Gamma_SC(:N_NEAREST_NEIGHBOURS, Dematricized_indices(1), Dematricized_indices(2), :) = gamma_start_nearest * spin_sign
+      Gamma_SC(N_NEAREST_NEIGHBOURS + 1:N_ALL_NEIGHBOURS + N_NEIGHBOURS, Dematricized_indices(1), Dematricized_indices(2), :) = gamma_start_next * spin_sign
 #else
       Gamma_SC(Dematricized_indices(1), Dematricized_indices(2), :) = gamma_start_nearest * (-1.0)**(Dematricized_indices(1))
 #endif

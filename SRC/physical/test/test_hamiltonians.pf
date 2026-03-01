@@ -2,6 +2,7 @@ MODULE test_hamiltonians
 USE funit
 USE types
 USE hamiltonians
+USE reader
 use, intrinsic :: iso_fortran_env, only: real64, int8, int16, int32, int64
 IMPLICIT NONE
 
@@ -1470,7 +1471,6 @@ SUBROUTINE test_compute_sc()
       END DO
     END DO
 
-
     DO ir = 0, nr_points
       DO jphi = -nphi_points, nphi_points
         kx = ir * dr * COS(jphi * dphi)
@@ -1602,20 +1602,20 @@ SUBROUTINE test_compute_sc_band()
     END DO
     !Checks
     Checks = [ &
-              !Nearest neighbours
-              ! ==== up - down ====
-              entry_check_t(1, DIM_POSITIVE_K + 1, gamma_nearest), &
-              entry_check_t(2, DIM_POSITIVE_K + 2, gamma_nearest), &
-              entry_check_t(3, DIM_POSITIVE_K + 3, gamma_nearest), &
-              entry_check_t(4, DIM_POSITIVE_K + 4, gamma_nearest), &
-              entry_check_t(5, DIM_POSITIVE_K + 5, gamma_nearest), &
-              entry_check_t(6, DIM_POSITIVE_K + 6, gamma_nearest), &
-              entry_check_t(7, DIM_POSITIVE_K + 7, gamma_nearest), &
-              entry_check_t(8, DIM_POSITIVE_K + 8, gamma_nearest), &
-              entry_check_t(9, DIM_POSITIVE_K + 9, gamma_nearest), &
-              entry_check_t(10, DIM_POSITIVE_K + 10, gamma_nearest), &
-              entry_check_t(11, DIM_POSITIVE_K + 11, gamma_nearest), &
-              entry_check_t(12, DIM_POSITIVE_K + 12, gamma_nearest)]
+             !Nearest neighbours
+             ! ==== up - down ====
+             entry_check_t(1, DIM_POSITIVE_K + 1, gamma_nearest), &
+             entry_check_t(2, DIM_POSITIVE_K + 2, gamma_nearest), &
+             entry_check_t(3, DIM_POSITIVE_K + 3, gamma_nearest), &
+             entry_check_t(4, DIM_POSITIVE_K + 4, gamma_nearest), &
+             entry_check_t(5, DIM_POSITIVE_K + 5, gamma_nearest), &
+             entry_check_t(6, DIM_POSITIVE_K + 6, gamma_nearest), &
+             entry_check_t(7, DIM_POSITIVE_K + 7, gamma_nearest), &
+             entry_check_t(8, DIM_POSITIVE_K + 8, gamma_nearest), &
+             entry_check_t(9, DIM_POSITIVE_K + 9, gamma_nearest), &
+             entry_check_t(10, DIM_POSITIVE_K + 10, gamma_nearest), &
+             entry_check_t(11, DIM_POSITIVE_K + 11, gamma_nearest), &
+             entry_check_t(12, DIM_POSITIVE_K + 12, gamma_nearest)]
 
     DO ir = 0, nr_points
       DO jphi = -nphi_points, nphi_points

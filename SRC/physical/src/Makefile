@@ -8,12 +8,13 @@ OBJ_DIR := OBJ
 MOD_DIR := MOD
 
 SRCS := $(SRC_DIR)/physical/src/hamiltonians.f90 \
-				$(SRC_DIR)/physical/src/utilities.f90 \
-				$(SRC_DIR)/physical/src/parameters.f90 \
-				$(SRC_DIR)/input_output/src/reader.f90 \
-				$(SRC_DIR)/input_output/src/writers.f90 \
-				$(SRC_DIR)/input_output/src/logger.f90 \
-				$(SRC_DIR)/types/types.f90
+					$(SRC_DIR)/physical/src/utilities.f90 \
+					$(SRC_DIR)/physical/src/parameters.f90 \
+					$(SRC_DIR)/physical/src/interaction_factory.f90 \
+					$(SRC_DIR)/input_output/src/reader.f90 \
+					$(SRC_DIR)/input_output/src/writers.f90 \
+					$(SRC_DIR)/input_output/src/logger.f90 \
+					$(SRC_DIR)/types/types.f90
 
 OBJS:= $(patsubst $(SRC_DIR)/%.f90,$(OBJ_DIR)/%.o,$(SRCS))
 
