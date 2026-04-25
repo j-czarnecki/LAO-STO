@@ -76,17 +76,28 @@ LIBS_MKL = -I${MKLROOT}/include \
            -Wl,--end-group \
            -lpthread -lm -ldl #-lgomp
 
+# Building f2py Python module
+F2PY_MODULE = fort_sc
+F2PY_SRC = Symbolic/Hamiltonians_sympy.f90
+F2PY_BUILD_DIR = Symbolic/f2py_build
+F2PY_FC = $(F90)
+F2PY_CC = icx
+F2PY_IFX_FLAGS = -O3 -fpp -I$(abspath Symbolic) -qopenmp -qmkl -fvisibility=default
+F2PY_CFLAGS = -fvisibility=default
+F2PY_LDFLAGS = -qopenmp -qmkl
+F2PY_SETVARS = /home/czarnecki/intel/oneapi/setvars.sh
+
 # --- Automatically find all source files recursively ---
 SRC_FILES_ALL := $(shell find $(SRC_DIR) -name '*.f90')
 
 # --- Exclude the two main programs from the common source set ---
-SRC_COMMON := $(filter-out $(SRC_DIR)/main/main.f90 $(SRC_DIR)/main_post/main_postprocessing.f90 $(SRC_DIR)/postprocessing/%.f90 $(SRC_DIR)/%/test/test_profiling.f90, $(SRC_FILES_ALL))
+SRC_COMMON := $(filter-out $(SRC_DIR)/main/main.f90 $(SRC_DIR)/main_post/main_postprocessing.f90 $(SRC_DIR)/postprocessing/src/%.f90 $(SRC_DIR)/%/test/test_profiling.f90, $(SRC_FILES_ALL))
 
 # --- Define two build sets ---
 SRC_FILES_MAIN := $(SRC_COMMON) $(SRC_DIR)/main/main.f90
 
 SRC_FILES_POST := $(SRC_COMMON)
-SRC_FILES_POST += $(shell find $(SRC_DIR)/postprocessing -name '*.f90')
+SRC_FILES_POST += $(shell find $(SRC_DIR)/postprocessing/src -name '*.f90')
 SRC_FILES_POST += $(SRC_DIR)/main_post/main_postprocessing.f90
 
 # --- Define corresponding object files ---
@@ -171,6 +182,21 @@ post_tsan: F90FLAGS = $(F90_TSAN_FLAGS)
 post_tsan: LIBS = $(LIBS_TSAN)
 post_tsan: $(POSTPROCESSING_TARGET)
 
+f2pybind:
+	rm -rf $(F2PY_BUILD_DIR)
+	mkdir -p $(F2PY_BUILD_DIR)
+	source $(F2PY_SETVARS) --force >/dev/null 2>&1 && \
+	FC=$(F2PY_FC) \
+	CC=$(F2PY_CC) \
+	FFLAGS="$(F2PY_IFX_FLAGS)" \
+	CFLAGS="$(F2PY_CFLAGS)" \
+	LDFLAGS="$(F2PY_LDFLAGS)" \
+	f2py -c -m $(F2PY_MODULE) \
+	$(F2PY_SRC) \
+	--backend meson \
+	--f2cmap types.f2py_f2cmap \
+	--build-dir $(F2PY_BUILD_DIR)
+	mv $(F2PY_MODULE)*.so $(F2PY_BUILD_DIR)
 
 # --- Unit tests ---
 test:
@@ -227,13 +253,15 @@ $(OBJ_DIR)/main/main.o: $(OBJ_DIR)/physical/src/hamiltonians.o \
 									 $(OBJ_DIR)/input_output/src/logger.o \
 									 $(OBJ_DIR)/types/types.o
 
-$(OBJ_DIR)/main_postprocessing/main_postprocessing.o: $(OBJ_DIR)/physical/src/hamiltonians.o \
+$(OBJ_DIR)/main_post/main_postprocessing.o: $(OBJ_DIR)/physical/src/hamiltonians.o \
 																  $(OBJ_DIR)/physical/src/parameters.o \
 																  $(OBJ_DIR)/physical/src/utilities.o \
 																  $(OBJ_DIR)/input_output/src/writers.o \
 																  $(OBJ_DIR)/input_output/src/reader.o \
 																  $(OBJ_DIR)/integrate/src/local_integrand.o \
-																  $(OBJ_DIR)/postprocessing/postprocessing.o \
+																  $(OBJ_DIR)/postprocessing/src/energy.o \
+																  $(OBJ_DIR)/postprocessing/src/symmetry.o \
+																  $(OBJ_DIR)/postprocessing/src/topology.o \
 																  $(OBJ_DIR)/input_output/src/logger.o
 
 $(OBJ_DIR)/chern.o: $(OBJ_DIR)/physical/src/hamiltonians.o \
@@ -277,7 +305,27 @@ $(OBJ_DIR)/integrate/src/integrate.o: $(OBJ_DIR)/physical/src/parameters.o \
 							          $(OBJ_DIR)/input_output/src/logger.o \
 							          $(OBJ_DIR)/types/types.o
 
-$(OBJ_DIR)/postprocessing/postprocessing.o: 	$(OBJ_DIR)/physical/src/hamiltonians.o \
+$(OBJ_DIR)/postprocessing/src/energy.o: $(OBJ_DIR)/physical/src/hamiltonians.o \
+									            $(OBJ_DIR)/physical/src/parameters.o \
+									            $(OBJ_DIR)/physical/src/utilities.o \
+									            $(OBJ_DIR)/input_output/src/writers.o \
+									            $(OBJ_DIR)/input_output/src/reader.o \
+									            $(OBJ_DIR)/integrate/src/local_integrand.o \
+									            $(OBJ_DIR)/self_consistency/self_consistency.o \
+									            $(OBJ_DIR)/input_output/src/logger.o \
+									            $(OBJ_DIR)/types/types.o
+
+$(OBJ_DIR)/postprocessing/src/symmetry.o: $(OBJ_DIR)/physical/src/hamiltonians.o \
+									            $(OBJ_DIR)/physical/src/parameters.o \
+									            $(OBJ_DIR)/physical/src/utilities.o \
+									            $(OBJ_DIR)/input_output/src/writers.o \
+									            $(OBJ_DIR)/input_output/src/reader.o \
+									            $(OBJ_DIR)/integrate/src/local_integrand.o \
+									            $(OBJ_DIR)/self_consistency/self_consistency.o \
+									            $(OBJ_DIR)/input_output/src/logger.o \
+									            $(OBJ_DIR)/types/types.o
+
+$(OBJ_DIR)/postprocessing/src/topology.o: $(OBJ_DIR)/physical/src/hamiltonians.o \
 									            $(OBJ_DIR)/physical/src/parameters.o \
 									            $(OBJ_DIR)/physical/src/utilities.o \
 									            $(OBJ_DIR)/input_output/src/writers.o \

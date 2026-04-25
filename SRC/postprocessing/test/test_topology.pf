@@ -1,0 +1,11 @@
+!! This file is part of LAO-STO.
+!!
+!! Copyright (C) 2025 Julian Czarnecki
+!!
+!! Unit tests for topology module
+
+@test
+subroutine test_placeholder()
+  use funit
+  @assertTrue(.true.)
+end subroutine test_placeholder

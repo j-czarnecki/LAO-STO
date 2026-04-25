@@ -108,6 +108,8 @@ SUBROUTINE check_time_reversal_symmetry(Hamiltonian, Hamiltonian_minus_k, N)
 
   COMPLEX(REAL64), ALLOCATABLE :: U(:, :) !!Transormation matrix
   COMPLEX(REAL64), ALLOCATABLE :: Hamiltonian_time_reversed(:, :)
+  COMPLEX(REAL64), ALLOCATABLE :: H_elec(:, :)
+  COMPLEX(REAL64), ALLOCATABLE :: U_tau(:, :)
   INTEGER(INT32) :: DIM_HALF
   INTEGER(INT32) :: DIM_SPIN
   INTEGER(INT32) :: i, j, row, col
@@ -117,25 +119,31 @@ SUBROUTINE check_time_reversal_symmetry(Hamiltonian, Hamiltonian_minus_k, N)
 
   ALLOCATE (U(N, N))
   ALLOCATE (Hamiltonian_time_reversed(N, N))
+  ALLOCATE (H_elec(N / 2, N / 2))
 
   !Assuming that matrix is in the Nambu space
   !And that the spin "outermost" index i.e.
   ! |spin> \otimes |d1> ... \otimes |dN>
   U = CMPLX(0, 0, KIND=REAL64)
 
+  U_tau = get_trs_operator_unitary_part()
+
   !Constructed according to Appendix A in https://arxiv.org/html/2507.06586v1 (Eq. 48)
-  DO i = 1, DIM_HALF / 2
-    !Electron part
-    row = i
-    col = DIM_SPIN + i
-    U(row, col) = CMPLX(-1, 0, KIND=REAL64)
-    U(col, row) = CMPLX(1, 0, KIND=REAL64)
-    !Hole part
-    row = DIM_HALF + i
-    col = DIM_HALF + DIM_SPIN + i
-    U(row, col) = CMPLX(-1, 0, KIND=REAL64)
-    U(col, row) = CMPLX(1, 0, KIND=REAL64)
-  END DO
+  ! DO i = 1, DIM_HALF / 2
+  !   !Electron part
+  !   row = i
+  !   col = DIM_SPIN + i
+  !   U(row, col) = CMPLX(-1, 0, KIND=REAL64)
+  !   U(col, row) = CMPLX(1, 0, KIND=REAL64)
+  !   !Hole part
+  !   row = DIM_HALF + i
+  !   col = DIM_HALF + DIM_SPIN + i
+  !   U(row, col) = CMPLX(-1, 0, KIND=REAL64)
+  !   U(col, row) = CMPLX(1, 0, KIND=REAL64)
+  ! END DO
+
+  U(:DIM_HALF, :DIM_HALF) = U_tau
+  U(DIM_HALF + 1:N, DIM_HALF + 1:N) = U_tau
 
   Hamiltonian_time_reversed = MATMUL(U, MATMUL(CONJG(Hamiltonian), CONJG(TRANSPOSE(U))))
 
@@ -147,7 +155,7 @@ SUBROUTINE check_time_reversal_symmetry(Hamiltonian, Hamiltonian_minus_k, N)
 
   DEALLOCATE (U)
   DEALLOCATE (Hamiltonian_time_reversed)
-
+  DEALLOCATE (H_elec)
 END SUBROUTINE check_time_reversal_symmetry
 
 SUBROUTINE check_zero_elems(Hamiltonian, Was_checked, N)

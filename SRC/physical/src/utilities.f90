@@ -342,6 +342,147 @@ PURE RECURSIVE SUBROUTINE COMPUTE_NEXT_PAIRINGS(Pairings, kx, ky, n)
 
 END SUBROUTINE COMPUTE_NEXT_PAIRINGS
 
+!dir$ attributes forceinline :: compute_third_pairings
+PURE RECURSIVE SUBROUTINE COMPUTE_THIRD_PAIRINGS(Pairings, kx, ky, n)
+  REAL(REAL64), INTENT(IN) :: kx, ky
+  INTEGER(INT32), INTENT(IN) :: n
+  COMPLEX(REAL64), INTENT(OUT) :: Pairings(n)
+
+  REAL(REAL64) :: kx_sqrt3
+  REAL(REAL64) :: c1, c2, c3, s1, s2, s3
+
+  kx_sqrt3 = SQRT(3.) * kx
+
+  c1 = COS(2.*ky)
+  s1 = SIN(2.*ky)
+
+  c2 = COS(kx_sqrt3 + ky)
+  s2 = -SIN(kx_sqrt3 + ky)
+
+  c3 = COS(-kx_sqrt3 + ky)
+  s3 = -SIN(-kx_sqrt3 + ky)
+
+  ! A -> B
+  Pairings(1) = CMPLX(c1, s1, REAL64)
+  Pairings(2) = CMPLX(c2, s2, REAL64)
+  Pairings(3) = CMPLX(c3, s3, REAL64)
+
+  ! B -> A
+  Pairings(4) = CMPLX(c1, -s1, REAL64)
+  Pairings(5) = CMPLX(c2, -s2, REAL64)
+  Pairings(6) = CMPLX(c3, -s3, REAL64)
+
+END SUBROUTINE COMPUTE_THIRD_PAIRINGS
+
+!dir$ attributes forceinline :: compute_fourth_pairings
+PURE RECURSIVE SUBROUTINE COMPUTE_FOURTH_PAIRINGS(Pairings, kx, ky, n)
+  REAL(REAL64), INTENT(IN) :: kx, ky
+  INTEGER(INT32), INTENT(IN) :: n
+  COMPLEX(REAL64), INTENT(OUT) :: Pairings(n)
+
+  REAL(REAL64) :: kx_sqrt3
+  REAL(REAL64) :: c1, c2, c3, s1, s2, s3
+
+  kx_sqrt3 = SQRT(3.) * kx
+
+  c1 = COS(2.*ky)
+  s1 = SIN(2.*ky)
+
+  c2 = COS(kx_sqrt3 + ky)
+  s2 = SIN(kx_sqrt3 + ky)
+
+  c3 = COS(-kx_sqrt3 + ky)
+  s3 = SIN(-kx_sqrt3 + ky)
+
+  Pairings(1) = CMPLX(c1, s1, REAL64)
+  Pairings(2) = CMPLX(c2, s2, REAL64)
+  Pairings(3) = CMPLX(c3, s3, REAL64)
+  Pairings(4) = CMPLX(c1, -s1, REAL64)
+  Pairings(5) = CMPLX(c2, -s2, REAL64)
+  Pairings(6) = CMPLX(c3, -s3, REAL64)
+
+END SUBROUTINE COMPUTE_FOURTH_PAIRINGS
+
+!dir$ attributes forceinline :: compute_fifth_pairings
+PURE RECURSIVE SUBROUTINE COMPUTE_FIFTH_PAIRINGS(Pairings, kx, ky, n)
+
+  REAL(REAL64), INTENT(IN) :: kx, ky
+  INTEGER(INT32), INTENT(IN) :: n
+  COMPLEX(REAL64), INTENT(OUT) :: Pairings(n)
+
+  REAL(REAL64) :: kx_sqrt3, kx_sqrt3_2
+  REAL(REAL64) :: ky_3_2
+  REAL(REAL64) :: c(6), s(6)
+
+  kx_sqrt3 = SQRT(3.) * kx
+  kx_sqrt3_2 = 0.5 * SQRT(3.) * kx
+  ky_3_2 = 1.5 * ky
+
+  c(1) = COS(kx_sqrt3)
+  s(1) = SIN(kx_sqrt3)
+
+  c(2) = COS(-kx_sqrt3)
+  s(2) = SIN(-kx_sqrt3)
+
+  c(3) = COS(kx_sqrt3_2 + ky_3_2)
+  s(3) = SIN(kx_sqrt3_2 + ky_3_2)
+
+  c(4) = COS(-kx_sqrt3_2 + ky_3_2)
+  s(4) = SIN(-kx_sqrt3_2 + ky_3_2)
+
+  c(5) = COS(kx_sqrt3_2 - ky_3_2)
+  s(5) = SIN(kx_sqrt3_2 - ky_3_2)
+
+  c(6) = COS(-kx_sqrt3_2 - ky_3_2)
+  s(6) = SIN(-kx_sqrt3_2 - ky_3_2)
+
+  Pairings(1) = CMPLX(c(1), s(1), REAL64)
+  Pairings(2) = CMPLX(c(2), s(2), REAL64)
+  Pairings(3) = CMPLX(c(3), s(3), REAL64)
+  Pairings(4) = CMPLX(c(4), s(4), REAL64)
+  Pairings(5) = CMPLX(c(5), s(5), REAL64)
+  Pairings(6) = CMPLX(c(6), s(6), REAL64)
+
+  Pairings(7) = CMPLX(c(1), -s(1), REAL64)
+  Pairings(8) = CMPLX(c(2), -s(2), REAL64)
+  Pairings(9) = CMPLX(c(3), -s(3), REAL64)
+  Pairings(10) = CMPLX(c(4), -s(4), REAL64)
+  Pairings(11) = CMPLX(c(5), -s(5), REAL64)
+  Pairings(12) = CMPLX(c(6), -s(6), REAL64)
+
+END SUBROUTINE COMPUTE_FIFTH_PAIRINGS
+
+!dir$ attributes forceinline :: compute_sixth_pairings
+PURE RECURSIVE SUBROUTINE COMPUTE_SIXTH_PAIRINGS(Pairings, kx, ky, n)
+
+  REAL(REAL64), INTENT(IN) :: kx, ky
+  INTEGER(INT32), INTENT(IN) :: n
+  COMPLEX(REAL64), INTENT(OUT) :: Pairings(n)
+
+  REAL(REAL64) :: kx_sqrt3
+  REAL(REAL64) :: c1, c2, c3
+  REAL(REAL64) :: s1, s2, s3
+
+  kx_sqrt3 = SQRT(3.) * kx
+
+  c1 = COS(3.*ky)
+  s1 = SIN(3.*ky)
+
+  c2 = COS(kx_sqrt3 + ky)
+  s2 = SIN(kx_sqrt3 + ky)
+
+  c3 = COS(-kx_sqrt3 + ky)
+  s3 = SIN(-kx_sqrt3 + ky)
+
+  Pairings(1) = CMPLX(c1, s1, REAL64)
+  Pairings(2) = CMPLX(c2, s2, REAL64)
+  Pairings(3) = CMPLX(c3, s3, REAL64)
+  Pairings(4) = CMPLX(c1, -s1, REAL64)
+  Pairings(5) = CMPLX(c2, -s2, REAL64)
+  Pairings(6) = CMPLX(c3, -s3, REAL64)
+
+END SUBROUTINE COMPUTE_SIXTH_PAIRINGS
+
 !dir$ attributes forceinline :: pairing_1
 PURE FUNCTION pairing_1(ky) RESULT(pairing)
   COMPLEX(REAL64) :: pairing
@@ -678,6 +819,35 @@ PURE RECURSIVE FUNCTION get_degress_of_freedom_from_index(index, discretization)
   Degrees_of_freedom(3) = MOD((index - 1) / discretization % derived % TBA_DIM, SPINS) + 1 ! spin
   Degrees_of_freedom(4) = (index - 1) / discretization % derived % DIM_POSITIVE_K + 1 ! nambu
 END FUNCTION get_degress_of_freedom_from_index
+
+FUNCTION get_trs_operator_unitary_part() RESULT(U_tau)
+  !! Return unitary part fo the time-reversal operator for spinful system of t_2g orbitals.
+  IMPLICIT NONE
+  COMPLEX(REAL64) :: U_tau(12, 12)
+  COMPLEX(REAL64) :: Identity_orb_lat(6, 6)
+  INTEGER(INT32) :: i
+  Identity_orb_lat = 0.0d0
+  DO i = 1, 6
+    Identity_orb_lat(i, i) = 1.0d0
+  END DO
+  U_tau = kronecker_product(-imag * Sigma_y, Identity_orb_lat)
+END FUNCTION get_trs_operator_unitary_part
+
+FUNCTION apply_trs_to_states(U) RESULT(U_time_reversed)
+  !! Given a unitary matrix U, being a set of eigenvectors, apply time-reversal symmetry operator
+  !! in the spin-orbital-lattice space, namely U' = \Tau U, where
+  !! \Tau = -i \sigma_y \otimes I_{3x3}^{orb} \otimes I_{2x2}^{lat} K
+  !! and K is complex conjugation
+  IMPLICIT NONE
+  COMPLEX(REAL64) :: U(:, :)
+  COMPLEX(REAL64) :: U_time_reversed(SIZE(U, 1), SIZE(U, 2))
+  COMPLEX(REAL64), ALLOCATABLE :: Trs_unitary(:, :)
+
+  Trs_unitary = get_trs_operator_unitary_part()
+
+  U_time_reversed = MATMUL(Trs_unitary, CONJG(U))
+
+END FUNCTION apply_trs_to_states
 
 ! Testing functions
 SUBROUTINE ROTATE_HAMILTONIAN_60_DEG(Hamiltonian, DIM)

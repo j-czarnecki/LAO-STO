@@ -87,7 +87,7 @@ SUBROUTINE GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge_dens, 
 #endif
   Hamiltonian = 0.5 * Hamiltonian
   CALL COMPUTE_CONJUGATE_ELEMENTS(Hamiltonian, discretization % derived % DIM) !This is not needed, since ZHEEV takes only upper triangle
-  CALL DIAGONALIZE_HERMITIAN(Hamiltonian, Energies, discretization % derived % DIM)
+  CALL DIAGONALIZE_GENERALIZED(Hamiltonian, Energies, U_transformation, discretization % derived % DIM)
   !After DIAGONALIZE HERMITIAN, U contains eigenvectors, so it corresponds to transformation matrix U
 
   !Here it has to be set to zero, to avoid artifacts from previous iteration / chunk
@@ -97,19 +97,19 @@ SUBROUTINE GET_LOCAL_CHARGE_AND_DELTA(Hamiltonian_const, Gamma_SC, Charge_dens, 
   CALL ACCUMULATE_DELTA_REAL_SPACE(Delta_local, physical_params % subband_params % J_tensor % Values, &
     & physical_params % subband_params % J_tensor % Column_indices, &
     & physical_params % subband_params % J_tensor % Row_indices, &
-    & Hamiltonian, Energies, kx, ky, discretization, &
+    & U_transformation, Energies, kx, ky, discretization, &
     & physical_params % subband_params % J_tensor % n_nonzero, physical_params % external % T)
 #else
   CALL ACCUMULATE_DELTA_K_SPACE(Delta_local, physical_params % subband_params % J_tensor % Values, &
     & physical_params % subband_params % J_tensor % Column_indices, &
     & physical_params % subband_params % J_tensor % Row_indices, &
-    & Hamiltonian, Energies, kx, ky, discretization, &
+    & U_transformation, Energies, kx, ky, discretization, &
     & physical_params % subband_params % J_tensor % n_nonzero, physical_params % external % T)
 #endif
   !Here it has to be set to zero, to avoid artifacts from previous iteration / chunk
   Charge_dens_local = 0.
   !Charge density calculation
-  CALL ACCUMULATE_CHARGE_DENSITY(Charge_dens_local, Hamiltonian, Energies, discretization, physical_params % external % T)
+  CALL ACCUMULATE_CHARGE_DENSITY(Charge_dens_local, U_transformation, Energies, discretization, physical_params % external % T)
   !Multiplication by the Jacobian
   Delta_local = Delta_local * k1
   Charge_dens_local = Charge_dens_local * k1

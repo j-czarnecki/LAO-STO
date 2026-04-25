@@ -113,6 +113,9 @@ SUBROUTINE PRINT_GAMMA(Gamma_SC, filename, discretization)
       Do j_band = 1, discretization % derived % DIM_POSITIVE_K
         Degrees_of_freedom_row = get_degress_of_freedom_from_index(i_band, discretization)
         Degrees_of_freedom_col = get_degress_of_freedom_from_index(j_band, discretization)
+        ! Currently on-site pairing in real-space is not supported.
+        ! Nevertheless, the output should be unified between bases, thus adding a dummy entry.
+        WRITE (9, output_format) band, i_band, j_band, 0, 0.0d0, 0.0d0
         DO neigh = 1, N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS
           WRITE (9, output_format) band, &
           & i_band, j_band, neigh, &
@@ -143,7 +146,7 @@ END SUBROUTINE PRINT_GAMMA
 
 SUBROUTINE PRINT_GAMMA_REAL_SPACE(Gamma_SC, filename, discretization)
   TYPE(discretization_t), INTENT(IN) :: discretization
-  COMPLEX(REAL64), INTENT(IN) :: Gamma_SC(0:N_ALL_NEIGHBOURS + N_NEIGHBOURS, &
+  COMPLEX(REAL64), INTENT(IN) :: Gamma_SC(0:3 * (N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS) + N_NEXT_NEIGHBOURS, &
                                         & discretization % derived % DIM_POSITIVE_K, &
                                         & discretization % derived % DIM_POSITIVE_K, &
                                         & discretization % SUBBANDS)
@@ -163,7 +166,7 @@ SUBROUTINE PRINT_GAMMA_REAL_SPACE(Gamma_SC, filename, discretization)
       Do j_band = 1, discretization % derived % DIM_POSITIVE_K
         Degrees_of_freedom_row = get_degress_of_freedom_from_index(i_band, discretization)
         Degrees_of_freedom_col = get_degress_of_freedom_from_index(j_band, discretization)
-        DO neigh = 0, N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS
+        DO neigh = 0, 3 * (N_NEAREST_NEIGHBOURS + N_NEXT_NEIGHBOURS) + N_NEXT_NEIGHBOURS
           WRITE (9, output_format) band, &
           & i_band, j_band, neigh, &
           & REAL(Gamma_SC(neigh, i_band, j_band, band)) / meV2au, &
