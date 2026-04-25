@@ -21,253 +21,254 @@
 # arXiv:2508.05075 (2025).
 # https://arxiv.org/abs/2508.05075
 
-import multiprocessing
-import subprocess
 import os
+import subprocess
 import sys
 
 if os.path.exists("/net/home/pwojcik/.local/lib/python2.7/site-packages"):
-    sys.path.insert(0, "/net/home/pwojcik/.local/lib/python2.7/site-packages")
-import time
-from RunnerConfigClass import *
-from OutputMocker import *
+  sys.path.insert(0, "/net/home/pwojcik/.local/lib/python2.7/site-packages")
 import yaml
+from OutputMocker import *
+from RunnerConfigClass import *
 
-SCRATCH_PATH = os.getenv('SCRATCH')
-HOME_PATH = os.getenv('HOME')
+SCRATCH_PATH = os.getenv("SCRATCH")
+HOME_PATH = os.getenv("HOME")
+
 
 class Runner(RunnerConfig):
-    def __init__(self):
-        RunnerConfig.__init__(self)
+  def __init__(self):
+    RunnerConfig.__init__(self)
 
-    def runSlurmParamValue(
-        self, paramValuePairs: list[tuple[str, str, float|list[float]]], runsDir: str, material: str, machine: str = "default"
-    ):
-        """
-        Sets all parameters given in key-value pairs.
-        No need to specify J_SC_PRIME, since it is always set
-        to be J_SC / 10.
-        Also starting values of gamma parameters are automatically set to 0 if corresponding J is 0.
-        """
-        newRunPath = self.__createRunDirStructure(runsDir, paramValuePairs)
-        runnerCwd = os.getcwd()
-        os.chdir(newRunPath)
+  def runSlurmParamValue(
+    self,
+    paramValuePairs: list[tuple[str, str, float | list[float]]],
+    runsDir: str,
+    material: str,
+    machine: str = "default",
+  ):
+    """
+    Sets all parameters given in key-value pairs.
+    No need to specify J_SC_PRIME, since it is always set
+    to be J_SC / 10.
+    Also starting values of gamma parameters are automatically set to 0 if corresponding J is 0.
+    """
+    newRunPath = self.__createRunDirStructure(runsDir, paramValuePairs)
+    runnerCwd = os.getcwd()
+    os.chdir(newRunPath)
 
-        # Getting namelist with parameters
-        nml = self.__getMaterialNml(material)
+    # Getting namelist with parameters
+    nml = self.__getMaterialNml(material)
 
-        for pair in paramValuePairs:
-            nml[pair[0]][pair[1]] = pair[2]  # editing all key-value pairs
+    for pair in paramValuePairs:
+      nml[pair[0]][pair[1]] = pair[2]  # editing all key-value pairs
 
+    with open("input.nml", "w") as nmlFile:
+      f90nml.write(nml, nmlFile, sort=False)
+    # setting up slurm script
+    with open("job.sh", "w") as jobFile:
+      print(self.jobHeader[machine], file=jobFile)
+      print("cd " + newRunPath, file=jobFile)
+      print(os.path.join(runnerCwd, "..", "bin", "LAO_STO.x"), file=jobFile)
 
-        with open("input.nml", "w") as nmlFile:
-            f90nml.write(nml, nmlFile, sort=False)
-        # setting up slurm script
-        with open("job.sh", "w") as jobFile:
-            print(self.jobHeader[machine], file=jobFile)
-            print("cd " + newRunPath, file=jobFile)
-            print(os.path.join(runnerCwd, "..", "bin", "LAO_STO.x"), file=jobFile)
+    # queue slurm job
+    simulate = subprocess.run(["sbatch", "job.sh"])
+    os.chdir(runnerCwd)
+    return newRunPath  # for sequential runner
 
-        # queue slurm job
-        simulate = subprocess.run(["sbatch", "job.sh"])
-        os.chdir(runnerCwd)
-        return newRunPath  # for sequential runner
+  def runSlurmPostprocessing(self, runDir, paramValuePairs, machine: str = "default"):
+    runnerCwd = os.getcwd()
+    os.chdir(runDir)
 
-    def runSlurmPostprocessing(self, runDir, paramValuePairs, machine: str = "default"):
+    nml = self.getPostprocessingDefaultNml()
 
-        runnerCwd = os.getcwd()
-        os.chdir(runDir)
+    for pair in paramValuePairs:
+      nml[pair[0]][pair[1]] = pair[2]  # editing all key-value pairs
 
-        nml = self.getPostprocessingDefaultNml()
+    with open("postprocessing_input.nml", "w") as nmlFile:
+      f90nml.write(nml, nmlFile, sort=False)
 
-        for pair in paramValuePairs:
-            nml[pair[0]][pair[1]] = pair[2]  # editing all key-value pairs
+    # setting up slurm script
+    os.chdir(runDir)
+    with open("job.sh", "w") as jobFile:
+      print(self.jobHeader[machine], file=jobFile)
 
-        with open("postprocessing_input.nml", "w") as nmlFile:
-            f90nml.write(nml, nmlFile, sort=False)
+      print("cd " + runDir, file=jobFile)
+      print(
+        os.path.join(runnerCwd, "..", "bin", "POST_LAO_STO.x"),
+        file=jobFile,
+      )
 
-        # setting up slurm script
-        os.chdir(runDir)
-        with open("job.sh", "w") as jobFile:
-            print(self.jobHeader[machine], file=jobFile)
+    # queue slurm job
+    simulate = subprocess.run(["sbatch", "job.sh"])
+    os.chdir(runnerCwd)
 
-            print("cd " + runDir, file=jobFile)
-            print(
-                os.path.join(runnerCwd, "..", "bin", "POST_LAO_STO.x"),
-                file=jobFile,
-            )
+  def runSlurmDosFitter(self, fitConfig: dict, paramValuePairs: list, material: str, machine: str = "default"):
+    print(fitConfig)
 
-        # queue slurm job
-        simulate = subprocess.run(["sbatch", "job.sh"])
-        os.chdir(runnerCwd)
+    # Prepare directory structure
+    os.makedirs(os.path.join(SCRATCH_PATH, fitConfig["runsDir"]), exist_ok=True)
+    os.makedirs(os.path.join(SCRATCH_PATH, fitConfig["runsDir"], "OutputData"), exist_ok=True)
+    os.makedirs(os.path.join(SCRATCH_PATH, fitConfig["runsDir"], "Plots"), exist_ok=True)
+    os.makedirs(os.path.join(SCRATCH_PATH, fitConfig["runsDir"], "DOS_train"), exist_ok=True)
+    # A dummy charge dens file has to exists for postprocessing
+    subprocess.run(
+      f"cp {os.path.join(HOME_PATH, 'LAO-STO', 'OutputData', 'Charge_dens_final.dat')} {os.path.join(SCRATCH_PATH, fitConfig['runsDir'], 'OutputData')}",
+      shell=True,
+      check=True,
+    )
 
-    def runSlurmDosFitter(self,
-                          fitConfig: dict,
-                          paramValuePairs: list,
-                          material: str,
-                          machine: str = "default"):
+    runnerCwd = os.getcwd()
+    os.chdir(fitConfig["runsDir"])
 
-        print(fitConfig)
+    self.__createAndWriteInputNml(paramValuePairs, material)
 
-        # Prepare directory structure
-        os.makedirs(os.path.join(SCRATCH_PATH, fitConfig['runsDir']), exist_ok=True)
-        os.makedirs(os.path.join(SCRATCH_PATH, fitConfig['runsDir'], "OutputData"), exist_ok=True)
-        os.makedirs(os.path.join(SCRATCH_PATH, fitConfig['runsDir'], "Plots"), exist_ok=True)
-        os.makedirs(os.path.join(SCRATCH_PATH, fitConfig['runsDir'], "DOS_train"), exist_ok=True)
-        #A dummy charge dens file has to exists for postprocessing
-        subprocess.run(f"cp {os.path.join(HOME_PATH,'LAO-STO', 'OutputData', 'Charge_dens_final.dat')} {os.path.join(SCRATCH_PATH, fitConfig['runsDir'], 'OutputData')}", shell=True, check=True)
+    # Setup postprocessing_input
+    nml = self.getPostprocessingDefaultNml()
+    nml["dos_calculation"]["enable_dos_calc"] = True
+    nml["dos_calculation"]["path_to_run_dir_dos"] = f"{fitConfig['runsDir']}/"
+    with open("postprocessing_input.nml", "w") as nmlFile:
+      f90nml.write(nml, nmlFile, sort=False)
 
-        runnerCwd = os.getcwd()
-        os.chdir(fitConfig["runsDir"])
+    # Save fitConfig.yaml
+    defaultFitConfig = self.getDosFitterYamlDict()
+    for key in fitConfig:
+      defaultFitConfig[key] = fitConfig[key]
+    with open(os.path.join(SCRATCH_PATH, fitConfig["runsDir"], "fitConfig.yaml"), "w") as f:
+      yaml.dump(defaultFitConfig, f, sort_keys=True)
 
+    # setting up slurm script
+    os.chdir(fitConfig["runsDir"])
+    with open("job.sh", "w") as jobFile:
+      print(self.jobHeader[machine], file=jobFile)
 
+      print(f"cd {os.path.join(HOME_PATH, 'LAO-STO')}", file=jobFile)
+      print(
+        f"python3 -m Fitter.mainFitter --config {os.path.join(fitConfig['runsDir'], 'fitConfig.yaml')}", file=jobFile
+      )
 
-        self.__createAndWriteInputNml(paramValuePairs, material)
+    # queue slurm job
+    subprocess.run(["sbatch", "job.sh"], check=True)
+    os.chdir(runnerCwd)
 
-        # Setup postprocessing_input
-        nml = self.getPostprocessingDefaultNml()
-        nml['dos_calculation']['enable_dos_calc'] = True
-        nml['dos_calculation']['path_to_run_dir_dos'] = f"{fitConfig['runsDir']}/"
-        with open("postprocessing_input.nml", "w") as nmlFile:
-            f90nml.write(nml, nmlFile, sort=False)
+  def runSlurmMockedOutputPostprocessing(
+    self,
+    paramValuePairs: list[tuple[str, str, float]],
+    paramValuePairsPost: list[tuple[str, str, float]],
+    gammaAmplitudesDict: dict[str, np.complex128],
+    symmetriesWeightsDict: dict[str, dict[str, float]],
+    runsDir: str,
+    material: str,
+    machine: str = "default",
+  ):
+    """
+    This method generates an artificial output - Gamma_SC_final.dat and Charge_dens_final.dat - in a given directory,
+    along with desired input.nml and postrocessing_input.nml files. Eventually it runs postprocessing with given data.
+    """
+    # Creating new directory and input.nml
+    newRunPath = self.__createRunDirStructure(runsDir, paramValuePairs)
+    runnerCwd = os.getcwd()
+    os.chdir(newRunPath)
 
-        # Save fitConfig.yaml
-        defaultFitConfig = self.getDosFitterYamlDict()
-        for key in fitConfig:
-            defaultFitConfig[key] = fitConfig[key]
-        with open(os.path.join(SCRATCH_PATH, fitConfig["runsDir"], "fitConfig.yaml"), "w") as f:
-            yaml.dump(defaultFitConfig, f, sort_keys=True)
+    # Getting namelist with parameters
+    nml = self.__getMaterialNml(material)
 
+    for pair in paramValuePairs:
+      nml[pair[0]][pair[1]] = pair[2]  # editing all key-value pairs
 
-        # setting up slurm script
-        os.chdir(fitConfig["runsDir"])
-        with open("job.sh", "w") as jobFile:
-            print(self.jobHeader[machine], file=jobFile)
+    # Save input.nml
+    with open("input.nml", "w") as nmlFile:
+      f90nml.write(nml, nmlFile, sort=False)
 
-            print(f"cd {os.path.join(HOME_PATH, 'LAO-STO')}", file=jobFile)
-            print(f"python3 -m Fitter.mainFitter --config {os.path.join(fitConfig['runsDir'], 'fitConfig.yaml')}", file=jobFile)
+    # Creating postprocessing_input.nml
+    nmlPost = self.getPostprocessingDefaultNml()
+    paramValuePairsPost.append(("sc_gap_calculation", "enable_sc_gap_calc", True))
+    paramValuePairsPost.append(("sc_gap_calculation", "path_to_run_dir_sc_gap", f"{newRunPath}/"))
+    for pair in paramValuePairsPost:
+      nmlPost[pair[0]][pair[1]] = pair[2]  # editing all key-value pairs
 
-        # queue slurm job
-        subprocess.run(["sbatch", "job.sh"], check=True)
-        os.chdir(runnerCwd)
+    with open("postprocessing_input.nml", "w") as nmlFile:
+      f90nml.write(nmlPost, nmlFile, sort=False)
 
-    def runSlurmMockedOutputPostprocessing(self,
-                                           paramValuePairs: list[tuple[str, str, float]],
-                                           paramValuePairsPost: list[tuple[str, str, float]],
-                                           gammaAmplitudesDict: dict[str, np.complex128],
-                                           symmetriesWeightsDict: dict[str, dict[str, float]],
-                                           runsDir: str,
-                                           material: str,
-                                           machine: str = "default"):
-        """
-        This method generates an artificial output - Gamma_SC_final.dat and Charge_dens_final.dat - in a given directory,
-        along with desired input.nml and postrocessing_input.nml files. Eventually it runs postprocessing with given data.
-        """
-        # Creating new directory and input.nml
-        newRunPath = self.__createRunDirStructure(runsDir, paramValuePairs)
-        runnerCwd = os.getcwd()
-        os.chdir(newRunPath)
+    # Setting up slurm script
+    with open("job.sh", "w") as jobFile:
+      print(self.jobHeader[machine], file=jobFile)
 
-        # Getting namelist with parameters
-        nml = self.__getMaterialNml(material)
+      print("cd " + newRunPath, file=jobFile)
+      print(
+        os.path.join(runnerCwd, "..", "bin", "POST_LAO_STO.x"),
+        file=jobFile,
+      )
 
-        for pair in paramValuePairs:
-            nml[pair[0]][pair[1]] = pair[2]  # editing all key-value pairs
+    # Creating mocked output to be able to run postprocessing
+    outputMocker = OutputMocker(
+      newRunPath, nOrbs=3, nBands=nml["discretization"]["subbands"], nSublats=nml["discretization"]["sublattices"]
+    )
+    outputMocker.mockChargeOutput()
+    outputMocker.mockGammaOutput(gammaAmplitudesDict, symmetriesWeightsDict)
 
-        # Save input.nml
-        with open("input.nml", "w") as nmlFile:
-            f90nml.write(nml, nmlFile, sort=False)
+    # Queue slurm job
+    subprocess.run(["sbatch", "job.sh"])
+    os.chdir(runnerCwd)
 
-        # Creating postprocessing_input.nml
-        nmlPost = self.getPostprocessingDefaultNml()
-        paramValuePairsPost.append(("sc_gap_calculation", "enable_sc_gap_calc", True))
-        paramValuePairsPost.append(("sc_gap_calculation", "path_to_run_dir_sc_gap", f"{newRunPath}/"))
-        for pair in paramValuePairsPost:
-            nmlPost[pair[0]][pair[1]] = pair[2]  # editing all key-value pairs
+  def createPairingInteractionCrs(
+    self, pairingIntraband: float, nBands: int
+  ) -> tuple[list[int], list[int], list[int], list[int], list[float]]:
+    i_idx = []
+    j_idx = []
+    k_idx = []
+    l_idx = []
+    Values = []
+    for i in range(nBands):
+      i_idx.append(i + 1)
+      j_idx.append(i + 1)
+      k_idx.append(i + 1)
+      l_idx.append(i + 1)
+      Values.append(pairingIntraband)
+    return i_idx, j_idx, k_idx, l_idx, Values
 
-        with open("postprocessing_input.nml", "w") as nmlFile:
-            f90nml.write(nmlPost, nmlFile, sort=False)
+  def __createRunDirStructure(self, runsDir: str, paramValuePairs: list[tuple[str, str, float | list[float]]]) -> str:
+    pathToAppend = os.path.join(SCRATCH_PATH, runsDir)
+    os.makedirs(pathToAppend, exist_ok=True)
+    pathToAppend = os.path.join(pathToAppend, "RUN")
 
-        # Setting up slurm script
-        with open("job.sh", "w") as jobFile:
-            print(self.jobHeader[machine], file=jobFile)
+    for pair in paramValuePairs:
+      if pair[0] != "self_consistency" and not isinstance(pair[2], list):
+        pathToAppend = pathToAppend + f"_{pair[1]}_{pair[2]}"
+      if isinstance(pair[2], list):
+        pathToAppend = pathToAppend + f"_{pair[1]}"
+        for i in range(len(pair[2])):
+          pathToAppend = pathToAppend + f"_{pair[2][i]}"
 
-            print("cd " + newRunPath, file=jobFile)
-            print(
-                os.path.join(runnerCwd, "..", "bin", "POST_LAO_STO.x"),
-                file=jobFile,
-            )
+    path = pathToAppend
 
-        # Creating mocked output to be able to run postprocessing
-        outputMocker = OutputMocker(newRunPath,
-                                    nOrbs=3,
-                                    nBands=nml['discretization']['subbands'],
-                                    nSublats=nml['discretization']['sublattices'])
-        outputMocker.mockChargeOutput()
-        outputMocker.mockGammaOutput(gammaAmplitudesDict, symmetriesWeightsDict)
+    outputDir = "OutputData"
+    if not os.path.exists(path):
+      os.mkdir(path)
+      os.mkdir(os.path.join(path, outputDir))
 
-        # Queue slurm job
-        subprocess.run(["sbatch", "job.sh"])
-        os.chdir(runnerCwd)
+    return path
 
+  def __getMaterialNml(self, material: str) -> f90nml.Namelist:
+    """
+    Returns a namelist for self-consistent calculation that appropriate for a given material
+    """
+    if material == "STO":
+      return self.getLaoStoDefaultNml()
+    elif material == "KTO":
+      return self.getLaoKtoDefaultNml()
+    else:
+      raise ValueError("Unknown material")
 
-    def createPairingInteractionCrs(self, pairingIntraband: float, nBands: int) -> tuple[list[int], list[int], list[int], list[int], list[float]]:
-        i_idx = []
-        j_idx = []
-        k_idx = []
-        l_idx = []
-        Values = []
-        for i in range(nBands):
-            i_idx.append(i + 1)
-            j_idx.append(i + 1)
-            k_idx.append(i + 1)
-            l_idx.append(i + 1)
-            Values.append(pairingIntraband)
-        return i_idx, j_idx, k_idx, l_idx, Values
+  def __createAndWriteInputNml(self, paramValuePairs: list, material: str) -> None:
+    # Getting namelist with parameters
+    nml = f90nml.Namelist()
+    if material == "STO":
+      nml = self.getLaoStoDefaultNml()
+    elif material == "KTO":
+      nml = self.getLaoKtoDefaultNml()
 
-    def __createRunDirStructure(self, runsDir: str, paramValuePairs: list[tuple[str, str, float | list[float]]]) -> str:
-        pathToAppend = os.path.join(SCRATCH_PATH, runsDir)
-        os.makedirs(pathToAppend, exist_ok=True)
-        pathToAppend = os.path.join(pathToAppend, "RUN")
+    for pair in paramValuePairs:
+      nml[pair[0]][pair[1]] = pair[2]  # editing all key-value pairs
 
-        for pair in paramValuePairs:
-            if pair[0] != "self_consistency" and not isinstance(pair[2], list):
-                pathToAppend = pathToAppend + f"_{pair[1]}_{pair[2]}"
-            if isinstance(pair[2], list):
-                pathToAppend = pathToAppend + f"_{pair[1]}"
-                for i in range(len(pair[2])):
-                    pathToAppend = pathToAppend + f"_{pair[2][i]}"
-
-        path = pathToAppend
-
-        outputDir = f"OutputData"
-        if not os.path.exists(path):
-            os.mkdir(path)
-            os.mkdir(os.path.join(path, outputDir))
-
-        return path
-
-    def __getMaterialNml(self, material: str) -> f90nml.Namelist:
-        """
-        Returns a namelist for self-consistent calculation that appropriate for a given material
-        """
-        if material == "STO":
-            return self.getLaoStoDefaultNml()
-        elif material == "KTO":
-            return self.getLaoKtoDefaultNml()
-        else:
-            raise ValueError("Unknown material")
-
-    def __createAndWriteInputNml(self, paramValuePairs: list, material: str) -> None:
-        # Getting namelist with parameters
-        nml = f90nml.Namelist()
-        if material == "STO":
-            nml = self.getLaoStoDefaultNml()
-        elif material == "KTO":
-            nml = self.getLaoKtoDefaultNml()
-
-        for pair in paramValuePairs:
-            nml[pair[0]][pair[1]] = pair[2]  # editing all key-value pairs
-
-        with open("input.nml", "w") as nmlFile:
-            f90nml.write(nml, nmlFile, sort=False)
+    with open("input.nml", "w") as nmlFile:
+      f90nml.write(nml, nmlFile, sort=False)

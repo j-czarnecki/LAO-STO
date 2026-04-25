@@ -15,7 +15,7 @@
   "fortran.fortls.disabled": false,
   "C_Cpp.intelliSenseEngine": "disabled",
   "files.associations": {
-    "*.f90": "fortran-modern",
-    "*.F90": "fortran-modern"
+    "*.f90": "fortran",
+    "*.F90": "fortran"
   }
 }

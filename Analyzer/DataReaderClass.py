@@ -21,293 +21,297 @@
 # arXiv:2508.05075 (2025).
 # https://arxiv.org/abs/2508.05075
 
-import pandas as pd
-import f90nml
+import logging
 import os
 import re
+
+import f90nml
 import numpy as np
-import shutil
-import logging
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+
 class DataReader:
+  def __init__(
+    self, runsPath: str, matchPattern: str, sublattices: int, subbands: int, nBands: int = 0, nAllNeighbours: int = 12
+  ):
+    """
+    Initializes DataReader object, which contains all data from a series of simulations.
+    Arguments:
+        runsPath - path which contains folders with single simulations
+        matchPattern - regex that tells the program which directories form runsPath should be loaded
+        sublattices - number of sublattices
+        subbands - number of subbands
+        nBands - dimension of full Hamiltonian
+    """
+    # TODO: improve annotations
+    self.matchPattern: str = matchPattern
+    self.runsPath: str = runsPath
+    self.sublattices: int = sublattices
+    self.layerCouplings: int = 2 * (self.sublattices - 1)
+    self.subbands: int = subbands
+    self.nBands: int = nBands
+    self.nAllNeighbours: int = nAllNeighbours
 
-    def __init__(
-        self, runsPath: str, matchPattern: str, sublattices: int, subbands: int, nBands: int = 0, nAllNeighbours: int = 12
-    ):
-        """
-        Initializes DataReader object, which contains all data from a series of simulations.
-        Arguments:
-            runsPath - path which contains folders with single simulations
-            matchPattern - regex that tells the program which directories form runsPath should be loaded
-            sublattices - number of sublattices
-            subbands - number of subbands
-            nBands - dimension of full Hamiltonian
-        """
-        # TODO: improve annotations
-        self.matchPattern: str = matchPattern
-        self.runsPath: str = runsPath
-        self.sublattices: int = sublattices
-        self.layerCouplings: int = 2 * (self.sublattices - 1)
-        self.subbands: int = subbands
-        self.nBands: int = nBands
-        self.nAllNeighbours: int = nAllNeighbours
+    # Those names are the same for k-space and real space calculations.
+    self.colnamesGamma: list[str] = (
+      # ["band", "i_band", "j_band", "gammaR", "gammaIm"]
+      ["band", "i_band", "j_band", "neighbor", "gammaRe", "gammaIm"]
+    )
 
-        # Those names are the same for k-space and real space calculations.
-        self.colnamesGamma: list[str] = (
-            #["band", "i_band", "j_band", "gammaR", "gammaIm"]
-            ["band", "i_band", "j_band", "neighbor", "gammaRe", "gammaIm"]
+    self.coltypesGamma: dict[str, type[np.generic]] = {
+      "band": np.int8,
+      "i_band": np.int8,
+      "j_band": np.int8,
+      "neighbor": np.int8,
+      "gammaRe": np.float64,
+      "gammaIm": np.float64,
+    }
+
+    self.colnamesCharge: list[str] = ["band", "i_band", "filling"]
+    self.coltypesCharge: dict[str, type[np.generic]] = {
+      "band": np.int8,
+      "i_band": np.int8,
+      "filling": np.float64,
+    }
+
+    self.colnamesDispersion = [
+      "N",
+      "kx",
+      "ky",
+      "E",
+      "P_yz",
+      "P_zx",
+      "P_xy",
+      *[f"P_lat{i}" for i in range(1, self.sublattices + 1)],
+      "P_sx",
+      "P_sy",
+      "P_sz",
+      "P_elec",
+      "P_hole",
+    ]
+
+    self.dosColnames = ["E", "DOS", *[f"DOS_{i}" for i in range(1, self.nBands + 1)]]
+    self.scGapColnames = ["kx", "ky", "gap", "state"]
+    self.gammaKColnames = [
+      "kx",
+      "ky",
+      "Gamma_Re",
+      "Gamma_Im",
+      *[f"Delta_{i}" for i in range(1, self.nAllNeighbours + 1)],
+    ]
+
+  """ ---------------------------------------------------------------------------------- """
+  """ ---------------------------- Interface methods ----------------------------------- """
+  """ ---------------------------------------------------------------------------------- """
+
+  def LoadFilling(self, xKeywords: tuple, loadUnfinished: bool = True) -> pd.DataFrame:
+    """
+    Loads filling data from simulations base on specified in __init__() runsPath and matchPattern.
+    If simulation had not converged, takse values from _iter.dat file - the last iteration before program timeout.
+    """
+    logger.info("Loading filling data")
+    directories = [dir for dir in os.listdir(self.runsPath) if re.match(self.matchPattern, dir)]
+
+    dataframes = []
+
+    for dir in directories:
+      # TODO: it was recently corrected that filling is in Charge_dens_XXX.dat files (not Chargen_XXX)
+      filePathConverged = os.path.join(self.runsPath, dir, "OutputData", "Charge_dens_final.dat")
+      filePathIter = os.path.join(self.runsPath, dir, "OutputData", "Charge_dens_iter.dat")
+      currentChargeDf = pd.DataFrame()
+
+      if os.path.exists(filePathConverged):
+        currentChargeDf = pd.read_csv(
+          filePathConverged,
+          skiprows=1,
+          comment="#",
+          sep="\s+",
+          names=self.colnamesCharge,
+          dtype=self.coltypesCharge,
         )
+      elif os.path.exists(filePathIter):
+        logger.info(f"No convergence in {dir}")
+        if loadUnfinished:
+          currentChargeDf = pd.read_csv(
+            filePathIter,
+            skiprows=1,
+            comment="#",
+            sep="\s+",
+            names=self.colnamesCharge,
+            dtype=self.coltypesCharge,
+          )
+      else:
+        logger.info(f"No Charge dens file in {dir}")
+        continue
 
-        self.coltypesGamma: dict[str, type[np.generic]] = {
-            "band": np.int8,
-            "i_band": np.int8,
-            "j_band": np.int8,
-            "neighbor": np.int8,
-            "gammaRe": np.float64,
-            "gammaIm": np.float64,
-        }
+      pathToNml = os.path.join(self.runsPath, dir)
+      self.__appendXParams(pathToNml, xKeywords, currentChargeDf)
+      dataframes.append(currentChargeDf)
 
-        self.colnamesCharge: list[str] = (
-            ["band", "i_band", "filling"]
+    chargesDf = pd.concat(dataframes, ignore_index=True)
+    return chargesDf
+
+  def LoadGammas(
+    self, xKeywords: tuple[str, ...], loadUnfinished: bool = True, realSpaceTransformed: bool = False
+  ) -> pd.DataFrame:
+    """
+    Loads gamma data from simulations base on specified in __init__() runsPath and matchPattern.
+    If simulation had not converged, takes values from _iter.dat file - the last iteration before program timeout.
+    Additionally, fills self.params list based on xKeywords - names of f90 .nml parameters from input.nml file
+    that were changed during simulation.
+    """
+
+    logger.info(f"Loading gamma data in {self.runsPath}")
+    directories = [dir for dir in os.listdir(self.runsPath) if re.match(self.matchPattern, dir)]
+
+    dataframes = []
+
+    for dir in directories:
+      runPath = os.path.join(self.runsPath, dir)
+      currentGammaDf = self.LoadGamma(runPath, realSpaceTransformed=realSpaceTransformed)
+
+      pathToNml = os.path.join(self.runsPath, dir)
+      self.__appendXParams(pathToNml, xKeywords, currentGammaDf)
+      dataframes.append(currentGammaDf)
+
+    gammasDf = pd.concat(dataframes, ignore_index=True)
+    return gammasDf
+
+  def LoadGamma(self, path: str, loadUnfinished: bool = True, realSpaceTransformed: bool = False) -> pd.DataFrame:
+    """Load a single gamma file"""
+    if not realSpaceTransformed:
+      filePathGammaConverged = os.path.join(path, "OutputData", "Gamma_SC_final.dat")
+      filePathGammaIter = os.path.join(path, "OutputData", "Gamma_SC_iter.dat")
+    else:
+      filePathGammaConverged = os.path.join(path, "OutputData", "Gamma_real_space_transformed.dat")
+
+    gammaDf = pd.DataFrame()
+    # print(nml['physical_params'][xKeyword])
+    # Gamma is printed in [meV]
+    # If simulation converged final file should exists
+    if os.path.exists(filePathGammaConverged):
+      gammaDf = pd.read_csv(
+        filePathGammaConverged,
+        skiprows=1,
+        comment="#",
+        sep="\s+",
+        names=self.colnamesGamma,
+        dtype=self.coltypesGamma,
+      )
+
+    # If simulation did NOT converge, iteration file should exists
+    elif os.path.exists(filePathGammaIter):
+      logger.info(f"No convergence in {dir}")
+      if loadUnfinished:
+        gammaDf = pd.read_csv(
+          filePathGammaIter,
+          skiprows=1,
+          comment="#",
+          sep="\s+",
+          names=self.colnamesGamma,
+          dtype=self.coltypesGamma,
         )
-        self.coltypesCharge: dict[str, type[np.generic]] = {
-            "band": np.int8,
-            "i_band": np.int8,
-            "filling": np.float64,
-        }
+    else:
+      logger.warning(f"No Gamma file in {dir}")
+      # shutil.rmtree(os.path.join(self.runsPath, dir))
+      # print('Directory removed')
 
-        self.colnamesDispersion = [
-            "N",
-            "kx",
-            "ky",
-            "E",
-            "P_yz",
-            "P_zx",
-            "P_xy",
-            *[f"P_lat{i}" for i in range(1, self.sublattices + 1)],
-            "P_sx",
-            "P_sy",
-            "P_sz",
-            "P_elec",
-            "P_hole",
-        ]
+    return gammaDf
 
-        self.dosColnames = ["E", "DOS", *[f"DOS_{i}" for i in range(1, self.nBands + 1)]]
-        self.scGapColnames = ["kx", "ky", "gap", "state"]
-        self.gammaKColnames = ["kx", "ky", "Gamma_Re", "Gamma_Im", *[f"Delta_{i}" for i in range(1, self.nAllNeighbours + 1)]]
+  def LoadDispersion(self, energiesPath: str) -> pd.DataFrame:
+    """
+    Loads dispersion relations data from energiesPath.
+    """
+    logger.info("Loading dispersion data")
+    dispersionDf = pd.DataFrame()
+    if os.path.exists(energiesPath):
+      dispersionDf = pd.read_csv(
+        energiesPath,
+        skiprows=1,
+        sep="\s+",
+        comment="#",
+        names=self.colnamesDispersion,
+        dtype=np.float64,
+      )
+    else:
+      logger.warning(f"No such file {energiesPath}")
+    return dispersionDf
 
-    """ ---------------------------------------------------------------------------------- """
-    """ ---------------------------- Interface methods ----------------------------------- """
-    """ ---------------------------------------------------------------------------------- """
+  def LoadDos(self, dosPath: str):
+    """
+    Loads DOS data from dosPath.
+    """
+    logger.info("Loading DOS data")
+    dosDf = pd.DataFrame()
+    if os.path.exists(dosPath):
+      dosDf = pd.read_csv(
+        dosPath,
+        skiprows=1,
+        comment="#",
+        sep="\s+",
+        names=self.dosColnames,
+        dtype=np.float64,
+      )
+    else:
+      logger.warning(f"No such file {dosPath}")
+    return dosDf
 
-    def LoadFilling(self, xKeywords: tuple, loadUnfinished: bool = True) -> pd.DataFrame:
-        """
-        Loads filling data from simulations base on specified in __init__() runsPath and matchPattern.
-        If simulation had not converged, takse values from _iter.dat file - the last iteration before program timeout.
-        """
-        logger.info("Loading filling data")
-        directories = [
-            dir for dir in os.listdir(self.runsPath) if re.match(self.matchPattern, dir)
-        ]
+  def LoadSuperconductingGap(self, gapPath: str):
+    """
+    Loads superconducting gap from gapPath.
+    """
+    logger.info("Loading superconducting gap data")
+    scGapDf = pd.DataFrame()
+    if os.path.exists(gapPath):
+      scGapDf = pd.read_csv(
+        gapPath,
+        skiprows=1,
+        comment="#",
+        sep="\s+",
+        names=self.scGapColnames,
+        dtype=np.float64,
+      )
+    else:
+      logger.warning(f"No such file {gapPath}")
+    return scGapDf
 
-        dataframes = []
+  def LoadGammaMap(self, gammaKPath: str):
+    gammaKDf = pd.DataFrame()
+    if os.path.exists(gammaKPath):
+      gammaKDf = pd.read_csv(
+        gammaKPath,
+        sep="\s+",
+        dtype=np.float64,
+        skiprows=1,
+        comment="#",
+        names=self.gammaKColnames,
+      )
+      logger.info(f"Loaded {gammaKPath}")
+    else:
+      logger.warning(f"No such file {gammaKPath}")
+    return gammaKDf
 
-        for dir in directories:
-            # TODO: it was recently corrected that filling is in Charge_dens_XXX.dat files (not Chargen_XXX)
-            filePathConverged = os.path.join(
-                self.runsPath, dir, "OutputData", "Charge_dens_final.dat"
-            )
-            filePathIter = os.path.join(
-                self.runsPath, dir, "OutputData", "Charge_dens_iter.dat"
-            )
-            currentChargeDf = pd.DataFrame()
+  """ ---------------------------------------------------------------------------------- """
+  """ ---------------------------- Private methods ------------------------------------- """
+  """ ---------------------------------------------------------------------------------- """
 
-            if os.path.exists(filePathConverged):
-                currentChargeDf = pd.read_csv(
-                    filePathConverged,
-                    skiprows=1,
-                    comment='#',
-                    sep='\s+',
-                    names=self.colnamesCharge,
-                    dtype=self.coltypesCharge,
-                )
-            elif os.path.exists(filePathIter):
-                logger.info(f"No convergence in {dir}")
-                if loadUnfinished:
-                    currentChargeDf = pd.read_csv(
-                        filePathIter,
-                        skiprows=1,
-                        comment='#',
-                        sep='\s+',
-                        names=self.colnamesCharge,
-                        dtype=self.coltypesCharge,
-                    )
-            else:
-                logger.info(f"No Charge dens file in {dir}")
-                continue
+  def __appendXParams(self, pathToNml: str, xKeywords: tuple[str], dataframe: pd.DataFrame) -> None:
+    namelistPath = os.path.join(pathToNml, "input.nml")
+    with open(namelistPath) as nmlFile:
+      nml = f90nml.read(nmlFile)
+      for xKey in xKeywords:
+        param = nml["physical_params"][xKey]
+        if type(param) is list:
+          ind = [i for i, x in enumerate(param) if x != 0]
+          param = param[ind[0]]
+        dataframe[xKey] = round(param, 5)
 
-            pathToNml = os.path.join(self.runsPath, dir)
-            self.__appendXParams(pathToNml, xKeywords, currentChargeDf)
-            dataframes.append(currentChargeDf)
+  """ ---------------------------------------------------------------------------------- """
+  """ ---------------------------- Special methods ------------------------------------- """
+  """ ---------------------------------------------------------------------------------- """
 
-        chargesDf = pd.concat(dataframes, ignore_index=True)
-        return chargesDf
-
-    def LoadGamma(self, xKeywords: tuple[str, ...], loadUnfinished: bool = True) -> pd.DataFrame:
-        """
-        Loads gamma data from simulations base on specified in __init__() runsPath and matchPattern.
-        If simulation had not converged, takse values from _iter.dat file - the last iteration before program timeout.
-        Additionally fills self.params list based on xKeywords - names of f90 .nml parameters from input.nml file
-        that were changed during simulation.
-        """
-
-        logger.info("Loading gamma data")
-        directories = [
-            dir for dir in os.listdir(self.runsPath) if re.match(self.matchPattern, dir)
-        ]
-
-        dataframes = []
-
-        for dir in directories:
-            filePathGammaConverged = os.path.join(
-                self.runsPath, dir, "OutputData", "Gamma_SC_final.dat"
-            )
-            filePathGammaIter = os.path.join(
-                self.runsPath, dir, "OutputData", "Gamma_SC_iter.dat"
-            )
-
-            currentGammaDf = pd.DataFrame()
-            # print(nml['physical_params'][xKeyword])
-            # Gamma is printed in [meV]
-            # If simulation converged final file should exists
-            if os.path.exists(filePathGammaConverged):
-                currentGammaDf = pd.read_csv(
-                    filePathGammaConverged,
-                    skiprows=1,
-                    comment='#',
-                    sep='\s+',
-                    names=self.colnamesGamma,
-                    dtype=self.coltypesGamma,
-                )
-
-            # If simulation did NOT converge, iteration file should exists
-            elif os.path.exists(filePathGammaIter):
-                logger.info(f"No convergence in {dir}")
-                if loadUnfinished:
-                    currentGammaDf = pd.read_csv(
-                        filePathGammaIter,
-                        skiprows=1,
-                        comment='#',
-                        sep='\s+',
-                        names=self.colnamesGamma,
-                        dtype=self.coltypesGamma,
-                    )
-            else:
-                logger.warning(f"No Gamma file in {dir}")
-                # shutil.rmtree(os.path.join(self.runsPath, dir))
-                # print('Directory removed')
-                continue
-
-            pathToNml = os.path.join(self.runsPath, dir)
-            self.__appendXParams(pathToNml, xKeywords, currentGammaDf)
-            dataframes.append(currentGammaDf)
-
-        gammasDf = pd.concat(dataframes, ignore_index=True)
-        return gammasDf
-
-    def LoadDispersion(self, energiesPath: str) -> pd.DataFrame:
-        """
-        Loads dispersion relations data from energiesPath.
-        """
-        logger.info("Loading dispersion data")
-        dispersionDf = pd.DataFrame()
-        if os.path.exists(energiesPath):
-            dispersionDf = pd.read_csv(
-                energiesPath,
-                skiprows=1,
-                sep='\s+',
-                comment = '#',
-                names=self.colnamesDispersion,
-                dtype=np.float64,
-            )
-        else:
-            logger.warning(f"No such file {energiesPath}")
-        return dispersionDf
-
-    def LoadDos(self, dosPath: str):
-        """
-        Loads DOS data from dosPath.
-        """
-        logger.info("Loading DOS data")
-        dosDf = pd.DataFrame()
-        if os.path.exists(dosPath):
-            dosDf = pd.read_csv(
-                dosPath,
-                skiprows=1,
-                comment='#',
-                sep = '\s+',
-                names=self.dosColnames,
-                dtype=np.float64,
-            )
-        else:
-            logger.warning(f"No such file {dosPath}")
-        return dosDf
-
-    def LoadSuperconductingGap(self, gapPath: str):
-        """
-        Loads superconducting gap from gapPath.
-        """
-        logger.info("Loading superconducting gap data")
-        scGapDf = pd.DataFrame()
-        if os.path.exists(gapPath):
-            scGapDf = pd.read_csv(
-                gapPath,
-                skiprows=1,
-                comment='#',
-                sep = '\s+',
-                names=self.scGapColnames,
-                dtype=np.float64,
-            )
-        else:
-            logger.warning(f"No such file {gapPath}")
-        return scGapDf
-
-    def LoadGammaMap(self, gammaKPath: str):
-        gammaKDf = pd.DataFrame()
-        if os.path.exists(gammaKPath):
-            gammaKDf = pd.read_csv(
-                gammaKPath,
-                sep='\s+',
-                dtype=np.float64,
-                skiprows=1,
-                comment='#',
-                names=self.gammaKColnames,
-            )
-        else:
-            logger.warning(f"No such file {gammaKPath}")
-        return gammaKDf
-
-    """ ---------------------------------------------------------------------------------- """
-    """ ---------------------------- Private methods ------------------------------------- """
-    """ ---------------------------------------------------------------------------------- """
-
-    def __appendXParams(self, pathToNml: str, xKeywords: tuple[str], dataframe: pd.DataFrame) -> None:
-        namelistPath = os.path.join(pathToNml, "input.nml")
-        with open(namelistPath) as nmlFile:
-            nml = f90nml.read(nmlFile)
-            for xKey in xKeywords:
-                param = nml["physical_params"][xKey]
-                if type(param) is list:
-                    ind = [i for i, x in enumerate(param) if x != 0]
-                    param = param[ind[0]]
-                dataframe[xKey] = round(param, 5)
-
-    """ ---------------------------------------------------------------------------------- """
-    """ ---------------------------- Special methods ------------------------------------- """
-    """ ---------------------------------------------------------------------------------- """
-
-    def __str__(self) -> str:
-        dataStr = {"matchPattern": self.matchPattern, "runsPath": self.runsPath}
-        return str(dataStr)
+  def __str__(self) -> str:
+    dataStr = {"matchPattern": self.matchPattern, "runsPath": self.runsPath}
+    return str(dataStr)

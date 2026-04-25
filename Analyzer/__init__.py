@@ -1,1 +1,1 @@
-""" Analyzer module """
+"""Analyzer module"""

@@ -1,1 +1,1 @@
-""" Experiment fitting module"""
+"""Experiment fitting module"""

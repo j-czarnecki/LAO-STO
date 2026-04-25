@@ -21,14 +21,17 @@
 # arXiv:2508.05075 (2025).
 # https://arxiv.org/abs/2508.05075
 
-from Fitter.DosFitter import *
 import argparse
+
 import yaml
-import logging
+
+from Fitter.DosFitter import *
+
 
 def loadConfig(configPath):
-  with open(configPath, 'r') as f:
+  with open(configPath, "r") as f:
     return yaml.safe_load(f)
+
 
 def main():
   parser = argparse.ArgumentParser()
@@ -40,11 +43,9 @@ def main():
   config = loadConfig(args.config)
   print("Config read", config, flush=True)
 
-
-  dosFit = DosFitter(runsDir=config["runsDir"],
-                     dosExpPath=config["dosExpPath"],
-                     eMax=config["eMax"])
+  dosFit = DosFitter(runsDir=config["runsDir"], dosExpPath=config["dosExpPath"], eMax=config["eMax"])
   dosFit.fit(paramBounds=config["bounds"])
+
 
 if __name__ == "__main__":
   main()

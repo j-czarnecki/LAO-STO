@@ -1,1 +1,1 @@
-""" Runner module """
+"""Runner module"""

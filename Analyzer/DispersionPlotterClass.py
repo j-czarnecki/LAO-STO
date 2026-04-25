@@ -21,754 +21,785 @@
 # arXiv:2508.05075 (2025).
 # https://arxiv.org/abs/2508.05075
 
-from DataReaderClass import *
+import colorcet as cc
+import matplotlib as mpl
+import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
-from matplotlib.patches import Polygon
+import matplotlib.ticker as ticker
 import numpy as np
 import seaborn as sns
-from scipy.signal import convolve
-from matplotlib.colors import PowerNorm, Normalize
+import pandas as pd
+import logging
+
+from DataReaderClass import DataReader
 from matplotlib.cm import ScalarMappable
-from matplotlib.colors import LinearSegmentedColormap
-from scipy.interpolate import griddata
-import matplotlib.gridspec as gridspec
-import matplotlib.ticker as ticker
-import colorcet as cc
 from matplotlib.collections import LineCollection
+from matplotlib.colors import ListedColormap, Normalize, PowerNorm
+from matplotlib.patches import Polygon
+import os
+
 # With inline inset creation:
-from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-from matplotlib.patches import Rectangle
-import matplotlib as mpl
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from matplotlib.colors import ListedColormap
-from matplotlib.patches import FancyArrowPatch
+from scipy.interpolate import griddata
+from scipy.signal import convolve
+
+logger = logging.getLogger(__name__)
+
 
 # TODO: self.lowestEnergy should not be used - all energies should be shown with respect to E_Fermi
 # Data reader is in fact not used here, rethink this architecture
-class DispersionPlotter():
+class DispersionPlotter:
+  def __init__(self, plotOutputPath: str = "./"):
+    self.dataLength: int = 0
+    self.kPoints1D: int = 0
+    self.maxBands: int = 0
+    self.plotOutputPath = plotOutputPath
 
-    def __init__(self, plotOutputPath: str = "./"):
-        self.dataLength: int = 0
-        self.kPoints1D: int = 0
-        self.maxBands: int = 0
-        self.plotOutputPath = plotOutputPath
+    self.__initializePlotParams()
 
-        self.__initializePlotParams()
+    print("Initialized DispersionPlotter object")
+    print(self.kPoints1D)
 
-        print("Initialized DispersionPlotter object")
-        print(self.kPoints1D)
+  def GetStatistics(self, dispersionDf: pd.DataFrame):
+    self.dataLength = len(dispersionDf["N"])
+    self.kPoints1D = len(set(dispersionDf["kx"]))
+    self.maxBands = np.max(dispersionDf["N"])
+    self.lowestEnergy = np.min(dispersionDf["E"])
+    print(f"Data length is {self.dataLength}")
+    print(f"Lowest energy is {self.lowestEnergy} (meV)")
+    print(f"Number of k-points is {self.kPoints1D}")
+    print(f"Number of bands is {self.maxBands}")
 
-    def GetStatistics(self, dispersionDf: pd.DataFrame):
-        self.dataLength = len(dispersionDf['N'])
-        self.kPoints1D = len(set(dispersionDf['kx']))
-        self.maxBands = np.max(dispersionDf['N'])
-        self.lowestEnergy = np.min(dispersionDf['E'])
-        print(f"Data length is {self.dataLength}")
-        print(f"Lowest energy is {self.lowestEnergy} (meV)")
-        print(f"Number of k-points is {self.kPoints1D}")
-        print(f"Number of bands is {self.maxBands}")
+  def shiftEnergies(self, dispersionDf: pd.DataFrame, dosDf: pd.DataFrame = pd.DataFrame()):
+    lowestEnergy = np.min(dispersionDf["E"])
+    dispersionDf["E"] -= lowestEnergy
+    if not dosDf.empty:
+      dosDf["E"] -= lowestEnergy
 
-    def shiftEnergies(self, dispersionDf: pd.DataFrame, dosDf: pd.DataFrame = pd.DataFrame()):
-        lowestEnergy = np.min(dispersionDf['E'])
-        dispersionDf['E'] -= lowestEnergy
-        if not dosDf.empty:
-            dosDf['E'] -= lowestEnergy
+  def plotFirstBrillouinZoneBoundary(self, ax=None):
+    brillouinZoneVertices = np.zeros((7, 2))  # One more to close the polygon
 
-    def plotFirstBrillouinZoneBoundary(self, ax = None):
-        brillouinZoneVertices = np.zeros((7, 2))  # One more to close the polygon
+    brillouinZoneVertices[:, 0] = np.array([
+      4.0 * np.pi / (3 * np.sqrt(3.0)),
+      2.0 * np.pi / (3 * np.sqrt(3.0)),
+      -2.0 * np.pi / (3 * np.sqrt(3.0)),
+      -4.0 * np.pi / (3 * np.sqrt(3.0)),
+      -2.0 * np.pi / (3 * np.sqrt(3.0)),
+      2.0 * np.pi / (3 * np.sqrt(3.0)),
+      4.0 * np.pi / (3 * np.sqrt(3.0)),
+    ])
 
-        brillouinZoneVertices[:, 0] = np.array(
-            [
-                4.0 * np.pi / (3 * np.sqrt(3.0)),
-                2.0 * np.pi / (3 * np.sqrt(3.0)),
-                -2.0 * np.pi / (3 * np.sqrt(3.0)),
-                -4.0 * np.pi / (3 * np.sqrt(3.0)),
-                -2.0 * np.pi / (3 * np.sqrt(3.0)),
-                2.0 * np.pi / (3 * np.sqrt(3.0)),
-                4.0 * np.pi / (3 * np.sqrt(3.0)),
-            ]
+    brillouinZoneVertices[:, 1] = np.array([
+      0.0,
+      -2.0 * np.pi / 3.0,
+      -2.0 * np.pi / 3.0,
+      0.0,
+      2.0 * np.pi / 3.0,
+      2.0 * np.pi / 3.0,
+      0.0,
+    ])
+    if ax == None:
+      ax = plt.gca()
+    ax.plot(
+      brillouinZoneVertices[:, 0],
+      brillouinZoneVertices[:, 1],
+      "--",
+      color="black",
+      linewidth=2,
+    )
+
+  def plotCrossection(
+    self,
+    dispersionDf: pd.DataFrame,
+    maxEnergy: float,
+    sliceAlong: str,
+    fixedKVal: float,
+    kMax: float,
+    isSuperconducting: bool = False,
+  ):
+    eps = 1e-3
+    fixedK = ""
+    xLabelOnPlot = ""
+    if sliceAlong == "kx":
+      xLabelOnPlot = r"$k_x~(\tilde{a}^{-1})$"
+      fixedK = "ky"
+    elif sliceAlong == "ky":
+      xLabelOnPlot = r"$k_y~(\tilde{a}^{-1})$"
+      fixedK = "kx"
+
+    filteredDispersion = dispersionDf[np.abs(dispersionDf[fixedK] - fixedKVal) < eps]
+    filteredDispersion["zeros"] = np.zeros(len(filteredDispersion))
+
+    minEnergy = filteredDispersion["E"].min() - 0.02 * maxEnergy
+    if isSuperconducting:
+      minEnergy = -maxEnergy
+
+    lat3 = "P_lat3" if "P_lat3" in dispersionDf else "zeros"
+    colorValuesDict = {
+      "orbital": ["P_yz", "P_zx", "P_xy"],
+      "spin": ["P_sx", "P_sy", "P_sz"],
+      "lattice": ["P_lat1", "P_lat2", lat3],
+      "quasiparticle": ["P_elec", "zeros", "P_hole"],
+    }
+
+    groups = filteredDispersion.groupby("N")
+
+    kZoomMax = 0.12
+    eZoomMin = 0.1 * minEnergy
+    eZoomMax = 3
+
+    for colorKey in colorValuesDict.keys():
+      fig = plt.figure(figsize=(7, 5), dpi=400)
+      # Set up GridSpec (1 row, 1 column, with some spacing)
+      gs = gridspec.GridSpec(1, 1, figure=fig, left=0.25, right=0.9, top=0.95, bottom=0.1)
+      ax = fig.add_subplot(gs[0, 0])
+
+      if colorKey == "spin":
+        for _, group in groups:
+          group.sort_values(by=sliceAlong, inplace=True, ignore_index=True)
+          x = group[sliceAlong].values
+          y = group["E"].values
+          P_sz = group["P_sz"].values
+          points = np.array([x, y]).T.reshape(-1, 1, 2)
+          segments = np.concatenate([points[:-1], points[1:]], axis=1)
+          segmentColors = 0.5 * (P_sz[:-1] + P_sz[1:])
+
+          lc = LineCollection(segments, linewidths=2, cmap="coolwarm")
+          lc.set_array(segmentColors)
+          ax.add_collection(lc)
+
+      else:
+        for _, group in groups:
+          group.sort_values(by=sliceAlong, inplace=True, ignore_index=True)
+          x = group[sliceAlong].values
+          y = group["E"].values
+          c = group[colorValuesDict[colorKey]].values
+          # Make line segments
+          points = np.array([x, y]).T.reshape(-1, 1, 2)
+          segments = np.concatenate([points[:-1], points[1:]], axis=1)
+
+          # For color per segment, average adjacent colors
+          segment_colors = 0.5 * (c[:-1] + c[1:])
+
+          lc = LineCollection(segments, colors=segment_colors, linewidths=2)
+          ax.add_collection(lc)
+
+      ax.grid(True, linestyle=":")
+      ax.xaxis.set_major_locator(ticker.LinearLocator(5))
+      ax.yaxis.set_major_locator(ticker.LinearLocator(5))
+      ax.set_xlim(-kMax, kMax)
+      ax.set_ylim(bottom=minEnergy, top=maxEnergy)
+      ax.set_xlabel(xLabelOnPlot)
+      ax.set_ylabel(r"$E$ (meV)")
+
+      # axin.xaxis.set_ticks_position('top')
+      # axin.yaxis.set_ticks_position('right')
+      # axin.set_xlim(-kZoomMax, kZoomMax)
+      # axin.set_ylim(bottom=eZoomMin, top=eZoomMax)
+      # axin.set_xticks([-0.1, 0.0, 0.1])
+      # axin.set_yticks([0, eZoomMax/2, eZoomMax])
+      # axin.patch.set_alpha(0.6)
+
+      filename = os.path.join(self.plotOutputPath, f"DispersionSlice_{sliceAlong}_{colorKey}.png")
+      plt.savefig(filename)
+      plt.close()
+
+  def plotFermiCrossection(self, dispersionDf: pd.DataFrame, eFermi: float, dE: float, plotSpinArrows: bool = True):
+    print(f"plotSpinArrows set to {plotSpinArrows}")
+
+    filteredDispersion = dispersionDf[np.abs(dispersionDf["E"] - eFermi) < dE]
+    filteredDispersion["zeros"] = np.zeros(len(filteredDispersion))
+
+    lat3 = "P_lat3" if "P_lat3" in dispersionDf else "zeros"
+    colorValuesDict = {
+      "orbital": ["P_yz", "P_zx", "P_xy"],
+      "spin": ["P_sx", "P_sy", "P_sz"],
+      "lattice": ["P_lat1", "P_lat2", lat3],
+      "quasiparticle": ["P_elec", "zeros", "P_hole"],
+    }
+
+    def sortByPhase(group):
+      # Sort values with repect to the center of Fermi surface to be able to connect with lines
+      xCenter, yCenter = group["kx"].mean(), group["ky"].mean()
+      phase = np.arctan2(group["ky"] - yCenter, group["kx"] - xCenter)
+
+      group["k_phase"] = phase
+      group.sort_values(by="k_phase", inplace=True, ignore_index=True)
+      return pd.concat([group, group.iloc[[0]]], ignore_index=True)
+
+    filteredDispersion = filteredDispersion.groupby("N", group_keys=False).apply(sortByPhase)
+    groups = filteredDispersion.groupby("N")
+
+    vectorProbing = 10
+
+    for colorKey in colorValuesDict.keys():
+      fig = plt.figure(figsize=(7, 5), dpi=400)
+      # Set up GridSpec (1 row, 1 column, with some spacing)
+      gs = gridspec.GridSpec(1, 1, figure=fig, left=0.05, right=0.93, top=0.95, bottom=0.22)
+      ax = fig.add_subplot(gs[0, 0])
+      self.plotFirstBrillouinZoneBoundary()
+      if colorKey == "orbital":
+        left, bottom, width, height = [0.7, 0.72, 0.2, 0.2]
+        axin = fig.add_axes([left, bottom, width, height])
+        self.__plotRGBLegend(axin)
+
+      if colorKey == "spin":
+        for _, group in groups:
+          kx = group["kx"].values
+          ky = group["ky"].values
+          P_sz = group["P_sz"].values
+          points = np.array([kx, ky]).T.reshape(-1, 1, 2)
+          segments = np.concatenate([points[:-1], points[1:]], axis=1)
+          segmentColors = 0.5 * (P_sz[:-1] + P_sz[1:])
+
+          # norm = Normalize(vmin=P_sz.min(), vmax=P_sz.max())
+          norm = Normalize(vmin=P_sz.min(), vmax=P_sz.max())
+          lc = LineCollection(segments, linewidths=1, cmap="coolwarm")
+          lc.set_array(segmentColors)
+          ax.add_collection(lc)
+
+          if plotSpinArrows:
+            vectorsGroup = group.iloc[::vectorProbing, :]
+            ax.quiver(
+              vectorsGroup["kx"],
+              vectorsGroup["ky"],
+              vectorsGroup["P_sx"],
+              vectorsGroup["P_sy"],
+              vectorsGroup["P_sz"],
+              cmap="coolwarm",
+              scale=4,
+              scale_units="xy",
+              width=0.004,
+              headwidth=5,
+              headlength=4,
+              headaxislength=3,
+              zorder=2,
+            )
+        # Colorbar on top of entire figure
+        cbar = fig.colorbar(lc, ax=ax, orientation="vertical", pad=0.05, shrink=0.8)
+        cbar.ax.set_title(r"$\langle \sigma_z \rangle$", loc="left", pad=10)
+
+        # Plot arrow indicating C3 symmetry
+        # begin = (1.1, 0.1)
+        # end = (-0.6, 0.9)
+        # arrow = FancyArrowPatch(
+        #     begin, end,
+        #     connectionstyle="arc3,rad=1.2",  # curvature; try rad=0.2 to 0.5
+        #     arrowstyle='->',
+        #     mutation_scale=20,   # size of the arrowhead
+        #     color="black"
+        # )
+        # ax.add_patch(arrow)
+        # ax.text(0.75, 1.5, r"$C_3$")
+      else:
+        for _, group in groups:
+          kx = group["kx"].values
+          ky = group["ky"].values
+          colors = group[colorValuesDict[colorKey]].values
+
+          points = np.array([kx, ky]).T.reshape(-1, 1, 2)
+          segments = np.concatenate([points[:-1], points[1:]], axis=1)
+          segmentColors = 0.5 * (colors[:-1] + colors[1:])
+
+          lc = LineCollection(segments, colors=segmentColors, linewidths=0.5)
+          ax.add_collection(lc)
+
+      ax.grid(which="major", linestyle=":")
+      # ax.grid(which="minor", linestyle=':', alpha=0.6)
+
+      ax.set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
+      ax.set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
+      ax.set_xlim(-2.5, 2.5)
+      ax.set_ylim(-2.5, 2.5)
+      # ax.set_xticks([-2, 0, 2])
+      # ax.set_yticks([-2, 0, 2])
+      # ax.set_xticks([-1, 1], minor = True)
+      # ax.set_yticks([-1, 1], minor = True)
+      ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
+      ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+      ax.set_aspect("equal", adjustable="box")
+      filename = os.path.join(self.plotOutputPath, f"FermiCrossection_{colorKey}_Ef_{eFermi}.png")
+      plt.savefig(filename)
+      plt.close()
+
+  def plotDos(
+    self,
+    dosDf: pd.DataFrame,
+    eMax: float,
+    addSmearing: bool,
+    zeta: float,
+    isSingle: bool = True,
+    ax=None,
+    color="black",
+  ):
+    if ax is None and isSingle == False:
+      ValueError("If isSingle is False, ax must be provided")
+
+    if addSmearing:
+      # Define the Lorentzian broadening
+      lorentzian = lambda E: (zeta / np.pi) / (E**2 + zeta**2)
+
+      # Create Lorentzian kernel
+      energy_range = 2 * eMax
+      step = dosDf["E"][1] - dosDf["E"][0]
+      kernel_size = len(dosDf["E"])
+      kernel = lorentzian(np.linspace(-energy_range, energy_range, kernel_size))
+      kernel /= np.trapz(kernel, dx=step)  # Normalize the kernel
+
+      # Perform convolution
+      dosSmoothed = convolve(dosDf["DOS"], kernel, mode="same", method="fft")
+
+    if isSingle:
+      fig = plt.figure(figsize=(7, 5), dpi=400)
+      # Set up GridSpec (1 row, 1 column, with some spacing)
+      gs = gridspec.GridSpec(1, 1, figure=fig, left=0.23, right=0.95, top=0.95, bottom=0.23)
+      ax = fig.add_subplot(gs[0, 0])
+
+    if addSmearing:
+      ax.plot(dosDf["E"], dosSmoothed, color=color, linewidth=1.5)
+    else:
+      ax.plot(dosDf["E"], dosDf["DOS"], color=color, linewidth=1.5)
+      dos_band_columns = [col for col in dosDf.columns if col.startswith("DOS_")]
+      for band_col in dos_band_columns:
+        ax.plot(dosDf["E"], dosDf[band_col], linewidth=1, alpha=0.8, linestyle="--")
+
+    if isSingle:
+      ax.yaxis.set_major_locator(ticker.MultipleLocator(0.25))
+      ax.xaxis.set_major_locator(ticker.LinearLocator(5))
+      plt.xlim(left=-100, right=eMax)
+
+      # plt.xlim(left=-eMax, right=eMax)
+      plt.xlabel(r"E (meV)")
+      plt.ylabel(r"DOS")
+      filename = os.path.join(self.plotOutputPath, "DOS.png")
+      plt.savefig(filename)
+      plt.close()
+
+  def plotStackedDos(
+    self,
+    dosDfList: list[pd.DataFrame],
+    eMax: float,
+    addSmearing: bool,
+    zeta: float,
+    colorParamList: list,
+  ):
+    """
+    Plots subsequent DOSes on top of each other. User should provide a new LoadDos call for each DOS.
+    Moreover list of parameters from which color should be deduced has to be provided.
+    """
+    # TODO: Update this method
+    gs = gridspec.GridSpec(
+      len(dosDfList), 1, hspace=-0.7, left=0.1, right=0.9, top=0.95, bottom=0.1
+    )  # negative hspace causes overlap
+    fig = plt.figure(figsize=(8, 10))
+    # fig, ax = plt.subplots(figsize=(7, 5), dpi=400, sharex=True)
+    cmap = plt.cm.viridis
+    norm = Normalize(-60, vmax=max(colorParamList))
+    axes = []
+    for i, dosDf in enumerate(dosDfList):
+      ax = fig.add_subplot(gs[i, 0])
+      axes.append(ax)
+      dosDf["E"] = dosDf["E"] * 1e3
+      color = cmap(norm(colorParamList[i]))
+      self.plotDos(
+        dosDf,
+        eMax,
+        addSmearing,
+        zeta,
+        isSingle=False,
+        ax=ax,
+        color=color,
+      )
+      ax.set_facecolor("none")
+      ax.set_yticks([])
+      ax.set_xlim(left=-eMax, right=eMax)
+
+      if i != 0:
+        ax.spines["top"].set_visible(False)
+        ax.tick_params(top=False)
+      if i != len(dosDfList) - 1:
+        ax.set_xticks([])
+        ax.spines["bottom"].set_visible(False)
+      else:
+        # ax.set_xticks([])
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(250))
+        ax.set_xlabel(r"E ($\mu$eV)")
+
+    sm = ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])  # Required for ScalarMappable
+    colorbar = fig.colorbar(sm, ax=axes)
+    colorbar.set_label(r"$\mu$ (meV)")  # Update label as needed
+
+    fig.text(0.01, 0.5, r"DOS (a.u.)", va="center", rotation="vertical")
+    filename = os.path.join(self.plotOutputPath, "DOS_stack.png")
+    plt.savefig(filename)
+    plt.close()
+
+  def plotSuperconductingGap(self, scGapDf: pd.DataFrame, postfix: str, title: str):
+    fig = plt.figure(figsize=(7, 5), dpi=400)
+    # Set up GridSpec (1 row, 1 column, with some spacing)
+    gs = gridspec.GridSpec(1, 1, figure=fig, left=0.25, right=0.65, top=1, bottom=0.15)
+    ax = fig.add_subplot(gs[0, 0])
+    self.plotFirstBrillouinZoneBoundary()
+    norm = PowerNorm(gamma=1.5, vmin=0, vmax=scGapDf["gap"].max() * 1e3)
+    scat = ax.scatter(
+      scGapDf["kx"],
+      scGapDf["ky"],
+      c=scGapDf["gap"] * 1e3,
+      s=0.5,
+      cmap="cool",
+      norm=norm,
+    )
+    print("Minimal value of gap is ", scGapDf["gap"].min())
+
+    cax = fig.add_axes([0.67, 0.3, 0.05, 0.55])  # [left, bottom, width 5% of figure width, height 75% of figure height]
+    cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap="cool"), cax=cax, orientation="vertical")
+    cbar.set_label(r"$\tilde{\Delta}$ ($\mu$eV)")
+    cbar.set_ticks(ticker.MultipleLocator(150))
+
+    ax.set_xlim(-2.5, 2.5)
+    ax.set_ylim(-2.5, 2.5)
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(2))
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(2))
+
+    ax.set_title(title)
+    ax.set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
+    ax.set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
+    ax.set_aspect("equal")
+
+    ax.grid(True, linestyle=":")
+    filename = os.path.join(self.plotOutputPath, f"SuperconductingGap_{postfix}.png")
+    plt.savefig(filename)
+    plt.close()
+
+  def plotSuperconductingGapAngular(self, scGapDf: pd.DataFrame, postfix: str = "", title: str = None):
+    # self.__setPalette(nColors=self.superconductingGapDataframe['state'].nunique(), palette="tab10")
+    colorsMapping = {1: "#1f77b4", 2: "#ff7f0e", 3: "#2ca02c", 4: "#d62728"}
+    figAngular = plt.figure(figsize=(7, 5), dpi=400)
+    # Set up GridSpec (1 row, 1 column, with some spacing)
+    gs = gridspec.GridSpec(1, 1, figure=figAngular, left=0.25, right=0.95, top=0.9, bottom=0.3)
+    axAngular = figAngular.add_subplot(gs[0, 0])
+    figFourier = plt.figure(figsize=(7, 5), dpi=400)
+    # Set up GridSpec (1 row, 1 column, with some spacing)
+    gs = gridspec.GridSpec(1, 1, figure=figFourier, left=0.25, right=0.95, top=0.9, bottom=0.3)
+    axFourier = figFourier.add_subplot(gs[0, 0])
+
+    yMin = np.inf
+    threshold = 0.005
+
+    for state, group in scGapDf.groupby("state"):
+      dPhi = 0.05  # the maximum allowed x–gap
+
+      # --- sort by polar angle ----------------------------------------------------
+      angles = np.arctan2(group.ky, group.kx) / np.pi
+      order = np.argsort(angles)  # pandas/Series works fine with np.argsort
+      x = angles.iloc[order].to_numpy()  # turn into contiguous NumPy arrays
+      y = group.gap.iloc[order].to_numpy()
+
+      # --- split data into “continuous” chunks ------------------------------------
+      break_pts = np.where(np.diff(x) > dPhi)[0] + 1  # index AFTER each large jump
+      segments = np.split(np.arange(x.size), break_pts)
+
+      # --- draw each chunk separately so Matplotlib never bridges the gap ---------
+      for seg in segments:
+        axAngular.plot(
+          x[seg],
+          y[seg] * 1e3,
+          label=f"{int(state)}" if seg is segments[0] else None,  # one legend entry
+          color=colorsMapping[(state - 1) % 4 + 1],
         )
+      angles = np.arctan2(group.ky, group.kx) / (np.pi)
+      sortedIndices = np.argsort(angles)
+      sortedAngles = angles.iloc[sortedIndices]
+      sortedGaps = group.gap.iloc[sortedIndices]
 
-        brillouinZoneVertices[:, 1] = np.array(
-            [
-                0.0,
-                -2.0 * np.pi / 3.0,
-                -2.0 * np.pi / 3.0,
-                0.0,
-                2.0 * np.pi / 3.0,
-                2.0 * np.pi / 3.0,
-                0.0,
-            ]
-        )
-        if ax == None:
-          ax = plt.gca()
-        ax.plot(
-            brillouinZoneVertices[:, 0],
-            brillouinZoneVertices[:, 1],
-            "--",
-            color="black",
-            linewidth=2,
-        )
+      if sortedGaps.min() < yMin and sortedGaps.min() > threshold:
+        yMin = sortedGaps.min()
 
-    def plotCrossection(
-        self,
-        dispersionDf: pd.DataFrame,
-        maxEnergy: float,
-        sliceAlong: str,
-        fixedKVal: float,
-        kMax: float,
-        isSuperconducting: bool = False,
-    ):
+      axAngular.plot(
+        sortedAngles,
+        sortedGaps,
+        label=f"{int(state)}",
+      )
 
-        eps = 1e-3
-        fixedK = ""
-        xLabelOnPlot = ""
-        if sliceAlong == "kx":
-            xLabelOnPlot = r"$k_x~(\tilde{a}^{-1})$"
-            fixedK = "ky"
-        elif sliceAlong == "ky":
-            xLabelOnPlot = r"$k_y~(\tilde{a}^{-1})$"
-            fixedK = "kx"
+      gapFft = np.fft.fft(sortedGaps) / len(sortedGaps)
+      freqs = np.fft.fftfreq(len(sortedGaps), d=np.mean(np.diff(sortedAngles))) / np.pi
+      axFourier.scatter(freqs, np.abs(gapFft), label=f"{int(state)}")
 
-        filteredDispersion = dispersionDf[
-            np.abs(dispersionDf[fixedK] - fixedKVal) < eps
-        ]
-        filteredDispersion["zeros"] = np.zeros(len(filteredDispersion))
+    # axAngular.yaxis.set_major_locator(ticker.MultipleLocator(10))
+    # axAngular.xaxis.set_major_locator(ticker.MultipleLocator(0.5))
+    axAngular.set_title(title)
+    # axAngular.legend(title="n", loc="upper right")
+    axAngular.set_xlabel(r"$\varphi$~($\pi$)")
+    axAngular.set_ylabel(r"$\tilde{\Delta}$~($\mu$eV)")
+    axAngular.set_ylim(bottom=0.98 * yMin * 1e3)
+    axAngular.grid(True, linestyle=":")
+    filename = os.path.join(self.plotOutputPath, f"SuperconductingGapAngular_{postfix}.png")
+    figAngular.savefig(filename)
+    plt.close(figAngular)
 
+    axFourier.set_title(title)
+    # axFourier.legend(title="n", loc="upper right")
+    axFourier.set_xlabel(r"f ($\pi^{-1}$)")
+    axFourier.set_ylabel(r"$\tilde{\Delta}$~(meV)")
+    axFourier.set_xlim(-2, 2)
+    axFourier.grid(True, linestyle=":")
+    filename = os.path.join(self.plotOutputPath, f"SuperconductingGapFourier_{postfix}.png")
+    figFourier.savefig(filename)
+    plt.close(figFourier)
 
-        minEnergy = filteredDispersion["E"].min() - 0.02 * maxEnergy
-        if isSuperconducting:
-            minEnergy = -maxEnergy
+  def plotGammaKMap(
+    self,
+    inputPath: str,
+    postfix: str = "",
+    plotFermiCrossection: bool = False,
+    eFermi: float = 0.0,
+    dE: float = 0.0,
+    nBands: int = 1,
+    nSubbands: int = 0,
+  ):
+    rowNames = [r"Re($\Gamma$) (meV)", r"Im($\Gamma$) (meV)", r"$|\Gamma|$ (meV)", r"$\arg(\Gamma)$ ($\pi$)"]
 
-        lat3 = "P_lat3" if "P_lat3" in dispersionDf else "zeros"
-        colorValuesDict = {"orbital": ["P_yz", "P_zx", "P_xy"],
-                     "spin": ["P_sx", "P_sy", "P_sz"],
-                     "lattice": ["P_lat1", "P_lat2", lat3],
-                     "quasiparticle": ["P_elec", "zeros", "P_hole"],
-        }
+    cmapPhase = self.__shiftCmap(cc.cm.cyclic_tritanopic_cwrk_40_100_c20, -0.75)
+    cmapModule = "Greys"
+    cmapReIm = "RdBu_r"
 
-        groups = filteredDispersion.groupby("N")
+    reader = DataReader("./", "RUN_.*", 2, nSubbands, nBands, 24)
 
-        kZoomMax = 0.12
-        eZoomMin = 0.1 * minEnergy
-        eZoomMax = 3
-
-        for colorKey in colorValuesDict.keys():
-            fig = plt.figure(figsize=(7, 5), dpi=400)
-            # Set up GridSpec (1 row, 1 column, with some spacing)
-            gs = gridspec.GridSpec(1, 1, figure=fig, left=0.25, right=0.9, top=0.95, bottom=0.1)
-            ax = fig.add_subplot(gs[0,0])
-
-            if colorKey == "spin":
-                for _, group in groups:
-                    group.sort_values(by=sliceAlong, inplace=True, ignore_index=True)
-                    x = group[sliceAlong].values
-                    y = group["E"].values
-                    P_sz = group["P_sz"].values
-                    points = np.array([x, y]).T.reshape(-1, 1, 2)
-                    segments = np.concatenate([points[:-1], points[1:]], axis=1)
-                    segmentColors = 0.5 * (P_sz[:-1] + P_sz[1:])
-
-                    lc = LineCollection(segments, linewidths=2, cmap="coolwarm")
-                    lc.set_array(segmentColors)
-                    ax.add_collection(lc)
-
-            else:
-                for _, group in groups:
-                    group.sort_values(by=sliceAlong, inplace=True, ignore_index=True)
-                    x = group[sliceAlong].values
-                    y = group["E"].values
-                    c = group[colorValuesDict[colorKey]].values
-                    # Make line segments
-                    points = np.array([x, y]).T.reshape(-1, 1, 2)
-                    segments = np.concatenate([points[:-1], points[1:]], axis=1)
-
-                    # For color per segment, average adjacent colors
-                    segment_colors = 0.5 * (c[:-1] + c[1:])
-
-                    lc = LineCollection(segments, colors=segment_colors, linewidths=2)
-                    ax.add_collection(lc)
-
-            ax.grid(True, linestyle=':')
-            ax.xaxis.set_major_locator(ticker.LinearLocator(5))
-            ax.yaxis.set_major_locator(ticker.LinearLocator(5))
-            ax.set_xlim(-kMax, kMax)
-            ax.set_ylim(bottom=minEnergy, top=maxEnergy)
-            ax.set_xlabel(xLabelOnPlot)
-            ax.set_ylabel(r"$E$ (meV)")
-
-            # axin.xaxis.set_ticks_position('top')
-            # axin.yaxis.set_ticks_position('right')
-            # axin.set_xlim(-kZoomMax, kZoomMax)
-            # axin.set_ylim(bottom=eZoomMin, top=eZoomMax)
-            # axin.set_xticks([-0.1, 0.0, 0.1])
-            # axin.set_yticks([0, eZoomMax/2, eZoomMax])
-            # axin.patch.set_alpha(0.6)
-
-            filename = os.path.join(self.plotOutputPath, f"DispersionSlice_{sliceAlong}_{colorKey}.png")
-            plt.savefig(filename)
-            plt.close()
-
-    def plotFermiCrossection(self, dispersionDf: pd.DataFrame, eFermi: float, dE: float, plotSpinArrows: bool = True):
-
-        print(f"plotSpinArrows set to {plotSpinArrows}")
-
-        filteredDispersion = dispersionDf[
-            np.abs(dispersionDf["E"] - eFermi) < dE
-        ]
-        filteredDispersion["zeros"] = np.zeros(len(filteredDispersion))
-
-        lat3 = "P_lat3" if "P_lat3" in dispersionDf else "zeros"
-        colorValuesDict = {"orbital": ["P_yz", "P_zx", "P_xy"],
-                     "spin": ["P_sx", "P_sy", "P_sz"],
-                     "lattice": ["P_lat1", "P_lat2", lat3],
-                     "quasiparticle": ["P_elec", "zeros", "P_hole"],
-        }
-
-        def sortByPhase(group):
-            # Sort values with repect to the center of Fermi surface to be able to connect with lines
-            xCenter, yCenter = group["kx"].mean(), group["ky"].mean()
-            phase = np.arctan2(group["ky"] - yCenter, group["kx"] - xCenter)
-
-            group["k_phase"] = phase
-            group.sort_values(by="k_phase", inplace=True, ignore_index=True)
-            return pd.concat([group, group.iloc[[0]]], ignore_index=True)
-
-        filteredDispersion = filteredDispersion.groupby("N", group_keys=False).apply(sortByPhase)
-        groups = filteredDispersion.groupby("N")
-
-        vectorProbing = 10
-
-        for colorKey in colorValuesDict.keys():
-            fig = plt.figure(figsize=(7, 5), dpi=400)
-            # Set up GridSpec (1 row, 1 column, with some spacing)
-            gs = gridspec.GridSpec(1, 1, figure=fig, left=0.05, right=0.93, top=0.95, bottom=0.22)
-            ax = fig.add_subplot(gs[0,0])
-            self.plotFirstBrillouinZoneBoundary()
-            if colorKey == "orbital":
-                left, bottom, width, height = [0.7, 0.72, 0.2, 0.2]
-                axin = fig.add_axes([left, bottom, width, height])
-                self.__plotRGBLegend(axin)
-
-            if colorKey == "spin":
-                for _, group in groups:
-                    kx = group["kx"].values
-                    ky = group["ky"].values
-                    P_sz = group["P_sz"].values
-                    points = np.array([kx, ky]).T.reshape(-1, 1, 2)
-                    segments = np.concatenate([points[:-1], points[1:]], axis=1)
-                    segmentColors = 0.5 * (P_sz[:-1] + P_sz[1:])
-
-                    #norm = Normalize(vmin=P_sz.min(), vmax=P_sz.max())
-                    norm = Normalize(vmin=P_sz.min(), vmax=P_sz.max())
-                    lc = LineCollection(segments, linewidths=1, cmap="coolwarm")
-                    lc.set_array(segmentColors)
-                    ax.add_collection(lc)
-
-                    if plotSpinArrows:
-                        vectorsGroup = group.iloc[::vectorProbing, :]
-                        ax.quiver(vectorsGroup["kx"], vectorsGroup["ky"],
-                                vectorsGroup["P_sx"], vectorsGroup["P_sy"],
-                                vectorsGroup["P_sz"],
-                                cmap="coolwarm",
-                                scale=4,
-                                scale_units="xy",
-                                width=0.004,
-                                headwidth=5,
-                                headlength=4,
-                                headaxislength=3,
-                                zorder=2)
-                # Colorbar on top of entire figure
-                cbar = fig.colorbar(lc, ax=ax, orientation='vertical', pad=0.05, shrink=0.8)
-                cbar.ax.set_title(r"$\langle \sigma_z \rangle$", loc="left", pad = 10)
-
-
-                #Plot arrow indicating C3 symmetry
-                # begin = (1.1, 0.1)
-                # end = (-0.6, 0.9)
-                # arrow = FancyArrowPatch(
-                #     begin, end,
-                #     connectionstyle="arc3,rad=1.2",  # curvature; try rad=0.2 to 0.5
-                #     arrowstyle='->',
-                #     mutation_scale=20,   # size of the arrowhead
-                #     color="black"
-                # )
-                # ax.add_patch(arrow)
-                # ax.text(0.75, 1.5, r"$C_3$")
-            else:
-                for _, group in groups:
-                    kx = group["kx"].values
-                    ky = group["ky"].values
-                    colors = group[colorValuesDict[colorKey]].values
-
-                    points = np.array([kx, ky]).T.reshape(-1, 1, 2)
-                    segments = np.concatenate([points[:-1], points[1:]], axis=1)
-                    segmentColors = 0.5 * (colors[:-1] + colors[1:])
-
-                    lc = LineCollection(segments, colors=segmentColors, linewidths=0.5)
-                    ax.add_collection(lc)
-
-            ax.grid(which="major", linestyle=':')
-            #ax.grid(which="minor", linestyle=':', alpha=0.6)
-
-            ax.set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
-            ax.set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
+    for band in range(1, nSubbands + 1):
+      for iBand in range(1, nBands + 1):
+        for jBand in range(1, nBands + 1):
+          fig, axes = plt.subplots(2, 2, figsize=(12, 10), sharex=True, sharey=True, constrained_layout=False)
+          for ax in axes.flatten():
             ax.set_xlim(-2.5, 2.5)
             ax.set_ylim(-2.5, 2.5)
-            # ax.set_xticks([-2, 0, 2])
-            # ax.set_yticks([-2, 0, 2])
-            # ax.set_xticks([-1, 1], minor = True)
-            # ax.set_yticks([-1, 1], minor = True)
-            ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
-            ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
-            ax.set_aspect("equal", adjustable="box")
-            filename = os.path.join(self.plotOutputPath, f"FermiCrossection_{colorKey}_Ef_{eFermi}.png")
-            plt.savefig(filename)
-            plt.close()
 
-    def plotDos(
-        self,
-        dosDf: pd.DataFrame,
-        eMax: float,
-        addSmearing: bool,
-        zeta: float,
-        isSingle: bool = True,
-        ax=None,
-        color="black",
-    ):
-        if ax is None and isSingle == False:
-            ValueError("If isSingle is False, ax must be provided")
+          # Y-axis labels only on leftmost column
+          axes[0, 0].set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
+          axes[1, 0].set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
 
-        if addSmearing:
-            # Define the Lorentzian broadening
-            lorentzian = lambda E: (zeta / np.pi) / (E**2 + zeta**2)
+          # X-axis labels only on bottom row
+          axes[1, 0].set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
+          axes[1, 1].set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
+          axes[1, 0].set_xticks([-2, 0, 2])
+          axes[1, 1].set_xticks([-2, 0, 2])
 
-            # Create Lorentzian kernel
-            energy_range = 2 * eMax
-            step = dosDf['E'][1] - dosDf['E'][0]
-            kernel_size = len(dosDf['E'])
-            kernel = lorentzian(np.linspace(-energy_range, energy_range, kernel_size))
-            kernel /= np.trapz(kernel, dx=step)  # Normalize the kernel
-
-            # Perform convolution
-            dosSmoothed = convolve(
-                dosDf['DOS'], kernel, mode="same", method="fft"
+          gammaKDf = reader.LoadGammaMap(
+            os.path.join(
+              inputPath,
+              "OutputData",
+              f"GammaK_i{iBand}_j{jBand}_band{band}.dat",
             )
+          )
 
-        if isSingle:
-            fig = plt.figure(figsize=(7, 5), dpi=400)
-            # Set up GridSpec (1 row, 1 column, with some spacing)
-            gs = gridspec.GridSpec(1, 1, figure=fig, left=0.23, right=0.95, top=0.95, bottom=0.23)
-            ax = fig.add_subplot(gs[0,0])
-
-        if addSmearing:
-            ax.plot(dosDf['E'], dosSmoothed, color=color, linewidth=1.5)
-        else:
-            ax.plot(
-                dosDf['E'], dosDf['DOS'], color=color, linewidth=1.5
+          dispersionGroupsDf = None
+          if plotFermiCrossection:
+            dispersionDf = reader.LoadDispersion(
+              os.path.join(
+                inputPath,
+                "OutputData",
+                "Energies.dat",
+              )
             )
-            dos_band_columns = [col for col in dosDf.columns if col.startswith('DOS_')]
-            for band_col in dos_band_columns:
-                ax.plot(
-                    dosDf['E'], dosDf[band_col], linewidth=1, alpha=0.8, linestyle='--'
-                )
-
-        if isSingle:
-            ax.yaxis.set_major_locator(ticker.MultipleLocator(0.25))
-            ax.xaxis.set_major_locator(ticker.LinearLocator(5))
-            plt.xlim(left=-100, right=eMax)
-
-            #plt.xlim(left=-eMax, right=eMax)
-            plt.xlabel(r"E (meV)")
-            plt.ylabel(r"DOS")
-            filename = os.path.join(self.plotOutputPath, "DOS.png")
-            plt.savefig(filename)
-            plt.close()
-
-    def plotStackedDos(
-        self,
-        dosDfList: list[pd.DataFrame],
-        eMax: float,
-        addSmearing: bool,
-        zeta: float,
-        colorParamList: list,
-    ):
-        """
-        Plots subsequent DOSes on top of each other. User should provide a new LoadDos call for each DOS.
-        Moreover list of parameters from which color should be deduced has to be provided.
-        """
-        #TODO: Update this method
-        gs = gridspec.GridSpec(len(dosDfList), 1, hspace=-0.7, left=0.1, right=0.9, top=0.95, bottom=0.1)  # negative hspace causes overlap
-        fig = plt.figure(figsize=(8,10))
-        #fig, ax = plt.subplots(figsize=(7, 5), dpi=400, sharex=True)
-        cmap = plt.cm.viridis
-        norm = Normalize(-60, vmax=max(colorParamList))
-        axes = []
-        for i, dosDf in enumerate(dosDfList):
-            ax = fig.add_subplot(gs[i, 0])
-            axes.append(ax)
-            dosDf["E"] = dosDf["E"] * 1e3
-            color = cmap(norm(colorParamList[i]))
-            self.plotDos(
-                dosDf,
-                eMax,
-                addSmearing,
-                zeta,
-                isSingle=False,
-                ax=ax,
-                color=color,
-            )
-            ax.set_facecolor("none")
-            ax.set_yticks([])
-            ax.set_xlim(left=-eMax, right=eMax)
-
-            if i != 0:
-                ax.spines['top'].set_visible(False)
-                ax.tick_params(top=False)
-            if i != len(dosDfList) - 1:
-                ax.set_xticks([])
-                ax.spines['bottom'].set_visible(False)
-            else:
-                #ax.set_xticks([])
-                ax.xaxis.set_major_locator(ticker.MultipleLocator(250))
-                ax.set_xlabel(r"E ($\mu$eV)")
-
-
-        sm = ScalarMappable(cmap=cmap, norm=norm)
-        sm.set_array([])  # Required for ScalarMappable
-        colorbar = fig.colorbar(sm, ax=axes)
-        colorbar.set_label(r"$\mu$ (meV)")  # Update label as needed
-
-        fig.text(0.01, 0.5, r"DOS (a.u.)", va='center', rotation='vertical')
-        filename = os.path.join(self.plotOutputPath, "DOS_stack.png")
-        plt.savefig(filename)
-        plt.close()
-
-    def plotSuperconductingGap(self, scGapDf: pd.DataFrame, postfix: str, title: str):
-        fig = plt.figure(figsize=(7, 5), dpi=400)
-        # Set up GridSpec (1 row, 1 column, with some spacing)
-        gs = gridspec.GridSpec(1, 1, figure=fig, left=0.25, right=0.65, top=1, bottom=0.15)
-        ax = fig.add_subplot(gs[0,0])
-        self.plotFirstBrillouinZoneBoundary()
-        norm = PowerNorm(gamma=1.5, vmin=0, vmax=scGapDf['gap'].max()*1e3)
-        scat = ax.scatter(
-            scGapDf['kx'],
-            scGapDf['ky'],
-            c=scGapDf['gap']*1e3,
-            s=0.5,
-            cmap="cool",
-            norm=norm,
-        )
-        print("Minimal value of gap is ", scGapDf['gap'].min())
-
-        cax = fig.add_axes([0.67, 0.3, 0.05, 0.55])  # [left, bottom, width 5% of figure width, height 75% of figure height]
-        cbar = fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap='cool'), cax=cax, orientation='vertical')
-        cbar.set_label(r"$\tilde{\Delta}$ ($\mu$eV)")
-        cbar.set_ticks(ticker.MultipleLocator(150))
-
-
-        ax.set_xlim(-2.5, 2.5)
-        ax.set_ylim(-2.5, 2.5)
-        ax.yaxis.set_major_locator(ticker.MultipleLocator(2))
-        ax.xaxis.set_major_locator(ticker.MultipleLocator(2))
-
-        ax.set_title(title)
-        ax.set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
-        ax.set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
-        ax.set_aspect("equal")
-
-        ax.grid(True, linestyle=':')
-        filename = os.path.join(self.plotOutputPath, f"SuperconductingGap_{postfix}.png")
-        plt.savefig(filename)
-        plt.close()
-
-    def plotSuperconductingGapAngular(self, scGapDf: pd.DataFrame, postfix: str = "", title: str = None):
-        #self.__setPalette(nColors=self.superconductingGapDataframe['state'].nunique(), palette="tab10")
-        colorsMapping = {1: "#1f77b4", 2:"#ff7f0e", 3: "#2ca02c", 4: "#d62728"}
-        figAngular = plt.figure(figsize=(7, 5), dpi=400)
-        # Set up GridSpec (1 row, 1 column, with some spacing)
-        gs = gridspec.GridSpec(1, 1, figure=figAngular, left=0.25, right=0.95, top=0.9, bottom=0.3)
-        axAngular = figAngular.add_subplot(gs[0,0])
-        figFourier = plt.figure(figsize=(7, 5), dpi=400)
-        # Set up GridSpec (1 row, 1 column, with some spacing)
-        gs = gridspec.GridSpec(1, 1, figure=figFourier, left=0.25, right=0.95, top=0.9, bottom=0.3)
-        axFourier = figFourier.add_subplot(gs[0,0])
-
-
-        yMin = np.inf
-        threshold = 0.005
-
-        for state, group in scGapDf.groupby("state"):
-            dPhi = 0.05                                   # the maximum allowed x–gap
-
-            # --- sort by polar angle ----------------------------------------------------
-            angles = np.arctan2(group.ky, group.kx) / np.pi
-            order   = np.argsort(angles)               # pandas/Series works fine with np.argsort
-            x = angles.iloc[order].to_numpy()          # turn into contiguous NumPy arrays
-            y = group.gap.iloc[order].to_numpy()
-
-            # --- split data into “continuous” chunks ------------------------------------
-            break_pts = np.where(np.diff(x) > dPhi)[0] + 1   # index AFTER each large jump
-            segments  = np.split(np.arange(x.size), break_pts)
-
-            # --- draw each chunk separately so Matplotlib never bridges the gap ---------
-            for seg in segments:
-                axAngular.plot(
-                    x[seg], y[seg]*1e3,
-                    label=f"{int(state)}" if seg is segments[0] else None,   # one legend entry
-                    color=colorsMapping[(state - 1) % 4 + 1],
-                )
-            angles = np.arctan2(group.ky, group.kx) / (np.pi)
-            sortedIndices = np.argsort(angles)
-            sortedAngles = angles.iloc[sortedIndices]
-            sortedGaps = group.gap.iloc[sortedIndices]
-
-
-            if sortedGaps.min() < yMin and sortedGaps.min() > threshold:
-                yMin = sortedGaps.min()
-
-            axAngular.plot(
-                sortedAngles,
-                sortedGaps,
-                label=f"{int(state)}",
-            )
-
-            gapFft = np.fft.fft(sortedGaps) / len(sortedGaps)
-            freqs = np.fft.fftfreq(len(sortedGaps), d=np.mean(np.diff(sortedAngles))) / np.pi
-            axFourier.scatter(freqs, np.abs(gapFft), label=f"{int(state)}")
-
-
-
-        #axAngular.yaxis.set_major_locator(ticker.MultipleLocator(10))
-        #axAngular.xaxis.set_major_locator(ticker.MultipleLocator(0.5))
-        axAngular.set_title(title)
-        #axAngular.legend(title="n", loc="upper right")
-        axAngular.set_xlabel(r"$\varphi$~($\pi$)")
-        axAngular.set_ylabel(r"$\tilde{\Delta}$~($\mu$eV)")
-        axAngular.set_ylim(bottom=0.98 * yMin * 1e3)
-        axAngular.grid(True, linestyle=':')
-        filename = os.path.join(self.plotOutputPath, f"SuperconductingGapAngular_{postfix}.png")
-        figAngular.savefig(filename)
-        plt.close(figAngular)
-
-        axFourier.set_title(title)
-        #axFourier.legend(title="n", loc="upper right")
-        axFourier.set_xlabel(r"f ($\pi^{-1}$)")
-        axFourier.set_ylabel(r"$\tilde{\Delta}$~(meV)")
-        axFourier.set_xlim(-2, 2)
-        axFourier.grid(True, linestyle=':')
-        filename = os.path.join(self.plotOutputPath, f"SuperconductingGapFourier_{postfix}.png")
-        figFourier.savefig(filename)
-        plt.close(figFourier)
-
-    def plotGammaKMap(self,
-                      inputPath: str,
-                      postfix: str = "",
-                      plotFermiCrossection: bool = False,
-                      eFermi: float = 0.0,
-                      dE: float = 0.0,
-                      nBands: int = 1,
-                      nSubbands: int = 0,):
-        rowNames = [r"$\arg(\Gamma)$ ($\pi$) ", r"$|\Gamma|$ (meV)"]
-        nRows = len(rowNames)
-
-        cmapPhase = self.__shiftCmap(cc.cm.cyclic_tritanopic_cwrk_40_100_c20, -0.75)
-        cmapModule = "Greys"
-
-        reader = DataReader('./', 'RUN_.*', 2, nSubbands, nBands, 12)
-
-        for band in range(1, nSubbands + 1):
-            for iBand in range(1, nBands + 1):
-                for jBand in range(1, nBands + 1):
-                    fig, axes = plt.subplots(2, 1,
-                                            figsize=(5, 9),
-                                            sharex=True,
-                                            sharey=True,
-                                            constrained_layout=False)
-                    for ax in axes.flatten():
-                        ax.set_xlim(-2.5, 2.5)
-                        ax.set_ylim(-2.5, 2.5)
-
-                    for i, name in enumerate(rowNames):
-                        axes[i].set_ylabel(r"$k_y~(\tilde{a}^{-1})$")
-
-                    axes[nRows - 1].set_xlabel(r"$k_x~(\tilde{a}^{-1})$")
-                    axes[nRows - 1].set_xticks([-2, 0 , 2])
-
-                    gammaKDf = reader.LoadGammaMap(
-                        os.path.join(
-                            inputPath,
-                            "OutputData",
-                            f"GammaK_i{iBand}_j{jBand}_band{band}.dat",
-                        )
-                    )
-
-                    dispersionGroupsDf = None
-                    if plotFermiCrossection:
-                        dispersionDf = reader.LoadDispersion(
-                            os.path.join(
-                                inputPath,
-                                "OutputData",
-                                "Energies.dat",
-                            )
-                        )
-                        filteredDispersion = dispersionDf[
-                            np.abs(dispersionDf["E"] - eFermi) < dE
-                        ]
-                        dispersionGroupsDf = filteredDispersion.groupby("N")
-
-
-                    kxGrid, kyGrid = np.meshgrid(np.unique(gammaKDf.iloc[:, 0]),
-                                                np.unique(gammaKDf.iloc[:, 1]))
-                    kPoints = np.array([gammaKDf.iloc[:, 0], gammaKDf.iloc[:, 1]]).T
-
-                    columnRe = 2
-                    columnIm = 3
-
-                    #Phase part
-                    ax = axes[0]
-                    grid = griddata(kPoints,
-                                        np.arctan2(gammaKDf.iloc[:, columnIm], gammaKDf.iloc[:, columnRe]) / np.pi,
-                                        (kxGrid, kyGrid),
-                                        method="linear",
-                                        fill_value=0)
-                    colormesh = ax.pcolormesh(kxGrid, kyGrid, grid, cmap=cmapPhase, norm=PowerNorm(gamma=1.))
-                    ax.set_aspect("equal")
-                    self.plotFirstBrillouinZoneBoundary(ax)
-
-                    if plotFermiCrossection and dispersionGroupsDf is not None:
-                        for _, group in dispersionGroupsDf:
-                            colors = group[["P_yz", "P_zx", "P_xy"]].values
-                            ax.scatter(group["kx"], group["ky"], marker="o", s=0.6, c=colors)
-
-                    # Manual colorbar axis (left, bottom, width, height) in figure coords
-                    cax = fig.add_axes([1.02, 0.55, 0.015, 0.42])  # adjust as needed
-                    cbar = fig.colorbar(colormesh, cax=cax)
-                    cbar.set_ticks([-1, -0.5, 0, 0.5, 1])
-                    cbar.set_label(rowNames[0])
-
-                    # Module squared
-                    ax = axes[1]
-
-                    grid = griddata(kPoints, np.float64(
-                            np.sqrt(gammaKDf.iloc[:, columnRe] ** 2
-                            + gammaKDf.iloc[:, columnIm] ** 2)
-                        ), (kxGrid, kyGrid), method="linear", fill_value=0)
-                    colormesh = ax.pcolormesh(kxGrid, kyGrid, grid, cmap=cmapModule, norm=PowerNorm(gamma=1.5))
-                    ax.set_aspect("equal")
-                    self.plotFirstBrillouinZoneBoundary(ax)
-
-                    if plotFermiCrossection and dispersionGroupsDf is not None:
-                        for _, group in dispersionGroupsDf:
-                            colors = group[["P_yz", "P_zx", "P_xy"]].values
-                            ax.scatter(group["kx"], group["ky"], marker="o", s=0.6, c=colors)
-
-                    # Manual colorbar axis (left, bottom, width, height) in figure coords
-                    cax = fig.add_axes([1.02, 0.03, 0.015, 0.42])  # adjust as needed
-                    cbar = fig.colorbar(colormesh, cax=cax)
-                    cbar.set_label(rowNames[1])
-
-                    fig.subplots_adjust(wspace=0, hspace=0.1, left=0, right=1, top=1, bottom=0)
-                    filename = os.path.join(self.plotOutputPath,
-                                            f"GammaKMap_i{iBand}_j{jBand}_band{band}_{postfix}.png")
-                    fig.savefig(filename, bbox_inches="tight")
-                    plt.close()
-
-    """ ---------------------------------------------------------------------------------- """
-    """ ---------------------------- Private methods ------------------------------------- """
-    """ ---------------------------------------------------------------------------------- """
-
-    def __initializePlotParams(self):
-        plt.rcParams["text.usetex"] = True
-        plt.rcParams["font.family"] = "serif"
-        plt.rcParams["font.serif"] = "Computer Modern Roman"
-        plt.rcParams["font.sans-serif"] = "Computer Modern Sans serif"
-        plt.rcParams["font.monospace"] = "Computer Modern Typewriter"
-        plt.rcParams["axes.titlesize"] = 36
-        plt.rcParams["axes.labelsize"] = 36
-        plt.rcParams["xtick.labelsize"] = 32
-        plt.rcParams["ytick.labelsize"] = 32
-        plt.rcParams["font.size"] = 32
-        plt.rcParams["legend.fontsize"] = 32
-        plt.rcParams["legend.title_fontsize"] = 32
-        # Optionally, add custom LaTeX preamble
-        plt.rcParams["text.latex.preamble"] = (
-            r"\usepackage{amsmath} \usepackage{amsfonts} \usepackage{amssymb}"
-        )
-
-        self.__setPalette()
-
-        # Set rcParams for tighter layout
-        plt.rcParams["figure.autolayout"] = True
-        plt.rcParams["figure.constrained_layout.use"] = False
-        plt.rcParams["axes.linewidth"] = 1.2
-
-        # Set rcParams to show ticks on both left and right sides
-        plt.rcParams["xtick.direction"] = "in"
-        plt.rcParams["ytick.direction"] = "in"
-        plt.rcParams["xtick.bottom"] = True
-        plt.rcParams["ytick.left"] = True
-        plt.rcParams["xtick.top"] = True
-        plt.rcParams["ytick.right"] = True
-
-        plt.rcParams["axes.xmargin"] = 0.01
-
-    def __setPalette(self, nColors: int = 3, palette: str = "hsv"):
-        # Choose a seaborn palette
-        # has to specify number of lines
-        self.palette = sns.color_palette(palette, nColors)
-        # Set the color cycle
-        plt.rcParams["axes.prop_cycle"] = plt.cycler(color=self.palette)
-
-
-    def __plotRGBLegend(self, ax):
-        size = 512
-        image = np.ones((size, size, 3))
-
-        # Triangle vertices for RGB channels
-        v1 = np.array([1.0, 0.0])  # Red corner
-        v2 = np.array([0.0, 0.0])  # Green corner
-        v3 = np.array([0.5, np.sqrt(3)/2])  # Blue corner (top)
-
-        # Coordinate grid
-        x = np.linspace(0, 1, size)
-        y = np.linspace(0, np.sqrt(3)/2, size)
-        X, Y = np.meshgrid(x, y)
-
-        # For each pixel, compute barycentric coordinates
-        def barycentric_coords(x, y):
-            # Transformation matrix for barycentric coordinates
-            detT = (v2[0] - v1[0]) * (v3[1] - v1[1]) - (v3[0] - v1[0]) * (v2[1] - v1[1])
-            l1 = ((v2[0] - x) * (v3[1] - y) - (v3[0] - x) * (v2[1] - y)) / detT
-            l2 = ((v3[0] - x) * (v1[1] - y) - (v1[0] - x) * (v3[1] - y)) / detT
-            l3 = 1.0 - l1 - l2
-            return l1, l2, l3
-
-        for i in range(size):
-            for j in range(size):
-                x_val, y_val = X[i, j], Y[i, j]
-                l1, l2, l3 = barycentric_coords(x_val, y_val)
-                if (l1 >= 0) and (l2 >= 0) and (l3 >= 0):  # Inside triangle
-                    image[i, j, :] = [l1, l2, l3]
-        # Create inset
-        ax.imshow(image, extent=(0, 1, 0, np.sqrt(3)/2), origin='lower', alpha = 0.7)
-
-        # Triangle border
-        triangle = Polygon([v1, v2, v3], closed=True, edgecolor='k', fill=False, lw=0.5)
-        ax.add_patch(triangle)
-
-        # Labels
-        ax.text(*(v1 + np.array([0.3, 0.5])), r'$yz$', color='black', ha='right', va='top', fontsize=28, rotation=-60)
-        ax.text(*(v2 + np.array([-0.3, 0.5])), r'$zx$', color='black', ha='left', va='top', fontsize=28, rotation=60)
-        ax.text(*(v3 + np.array([0., -0.1])), r'$xy$', color='black', ha='center', va='bottom', fontsize=28)
-
-        ax.axis('off')
-
-    def __shiftCmap(self, cmap, fraction_shift=0.0, name='shifted'):
-        """Shift a colormap cyclically by `fraction_shift` (0.0 to 1.0)."""
-        N = 256
-        colors = cmap(np.linspace(0, 1, N))
-        shift = int(N * fraction_shift)
-        colors = np.roll(colors, shift=shift, axis=0)
-        return ListedColormap(colors, name=name)
+            filteredDispersion = dispersionDf[np.abs(dispersionDf["E"] - eFermi) < dE]
+            dispersionGroupsDf = filteredDispersion.groupby("N")
+
+          kxGrid, kyGrid = np.meshgrid(np.unique(gammaKDf.iloc[:, 0]), np.unique(gammaKDf.iloc[:, 1]))
+          kPoints = np.array([gammaKDf.iloc[:, 0], gammaKDf.iloc[:, 1]]).T
+
+          columnRe = 2
+          columnIm = 3
+
+          # Real part (top-left)
+          ax = axes[0, 0]
+          gridRe = griddata(
+            kPoints,
+            gammaKDf.iloc[:, columnRe],
+            (kxGrid, kyGrid),
+            method="linear",
+            fill_value=0,
+          )
+          vmax_re = np.max(np.abs(gridRe))
+          colormesh = ax.pcolormesh(kxGrid, kyGrid, gridRe, cmap=cmapReIm, vmin=-vmax_re, vmax=vmax_re)
+          ax.set_aspect("equal")
+          self.plotFirstBrillouinZoneBoundary(ax)
+
+          if plotFermiCrossection and dispersionGroupsDf is not None:
+            for _, group in dispersionGroupsDf:
+              colors = group[["P_yz", "P_zx", "P_xy"]].values
+              ax.scatter(group["kx"], group["ky"], marker="o", s=0.6, c=colors)
+
+          cbar = fig.colorbar(colormesh, ax=ax, location="right", shrink=0.7)
+          cbar.set_label(rowNames[0])
+
+          # Imaginary part (top-right)
+          ax = axes[0, 1]
+          gridIm = griddata(
+            kPoints,
+            gammaKDf.iloc[:, columnIm],
+            (kxGrid, kyGrid),
+            method="linear",
+            fill_value=0,
+          )
+          vmax_im = np.max(np.abs(gridIm))
+          colormesh = ax.pcolormesh(kxGrid, kyGrid, gridIm, cmap=cmapReIm, vmin=-vmax_im, vmax=vmax_im)
+          ax.set_aspect("equal")
+          self.plotFirstBrillouinZoneBoundary(ax)
+
+          if plotFermiCrossection and dispersionGroupsDf is not None:
+            for _, group in dispersionGroupsDf:
+              colors = group[["P_yz", "P_zx", "P_xy"]].values
+              ax.scatter(group["kx"], group["ky"], marker="o", s=0.6, c=colors)
+
+          cbar = fig.colorbar(colormesh, ax=ax, location="right", shrink=0.7)
+          cbar.set_label(rowNames[1])
+
+          # Magnitude (bottom-left)
+          ax = axes[1, 0]
+          gridMag = griddata(
+            kPoints,
+            np.float64(np.sqrt(gammaKDf.iloc[:, columnRe] ** 2 + gammaKDf.iloc[:, columnIm] ** 2)),
+            (kxGrid, kyGrid),
+            method="linear",
+            fill_value=0,
+          )
+          vmax_mag = gridMag.max()
+          colormesh = ax.pcolormesh(
+            kxGrid, kyGrid, gridMag, cmap=cmapModule, norm=PowerNorm(gamma=1.5, vmin=0, vmax=vmax_mag)
+          )
+          ax.set_aspect("equal")
+          self.plotFirstBrillouinZoneBoundary(ax)
+
+          if plotFermiCrossection and dispersionGroupsDf is not None:
+            for _, group in dispersionGroupsDf:
+              colors = group[["P_yz", "P_zx", "P_xy"]].values
+              ax.scatter(group["kx"], group["ky"], marker="o", s=0.6, c=colors)
+
+          cbar = fig.colorbar(colormesh, ax=ax, location="right", shrink=0.7)
+          cbar.set_label(rowNames[2])
+
+          # Phase (bottom-right)
+          ax = axes[1, 1]
+          gridPhase = griddata(
+            kPoints,
+            np.arctan2(gammaKDf.iloc[:, columnIm], gammaKDf.iloc[:, columnRe]) / np.pi,
+            (kxGrid, kyGrid),
+            method="linear",
+            fill_value=0,
+          )
+          colormesh = ax.pcolormesh(kxGrid, kyGrid, gridPhase, cmap=cmapPhase, norm=PowerNorm(gamma=1.0))
+          ax.set_aspect("equal")
+          self.plotFirstBrillouinZoneBoundary(ax)
+
+          if plotFermiCrossection and dispersionGroupsDf is not None:
+            for _, group in dispersionGroupsDf:
+              colors = group[["P_yz", "P_zx", "P_xy"]].values
+              ax.scatter(group["kx"], group["ky"], marker="o", s=0.6, c=colors)
+
+          cbar = fig.colorbar(colormesh, ax=ax, location="right", shrink=0.7)
+          cbar.set_ticks([-1, -0.5, 0, 0.5, 1])
+          cbar.set_label(rowNames[3])
+
+          fig.subplots_adjust(wspace=0.35, hspace=0.05, left=0.1, right=0.88, top=0.98, bottom=0.08)
+          filename = os.path.join(self.plotOutputPath, f"GammaKMap_i{iBand}_j{jBand}_band{band}_{postfix}.png")
+          fig.savefig(filename, bbox_inches="tight")
+          plt.close()
+          logger.info(f"Plotted Gamma(k) map for i_band = {iBand}, j_band = {jBand} band = {band}")
+
+  def plotGammaRealSpaceCouplings(self, gammaDf: pd.DataFrame, postfix: str = "") -> None:
+    """Plot pairing amplitudes between consecutive neighbors on hexagonal lattice."""
+    pass
+
+  """ ---------------------------------------------------------------------------------- """
+  """ ---------------------------- Private methods ------------------------------------- """
+  """ ---------------------------------------------------------------------------------- """
+
+  def __initializePlotParams(self):
+    plt.rcParams["text.usetex"] = True
+    plt.rcParams["font.family"] = "serif"
+    plt.rcParams["font.serif"] = "Computer Modern Roman"
+    plt.rcParams["font.sans-serif"] = "Computer Modern Sans serif"
+    plt.rcParams["font.monospace"] = "Computer Modern Typewriter"
+    plt.rcParams["axes.titlesize"] = 36
+    plt.rcParams["axes.labelsize"] = 36
+    plt.rcParams["xtick.labelsize"] = 32
+    plt.rcParams["ytick.labelsize"] = 32
+    plt.rcParams["font.size"] = 32
+    plt.rcParams["legend.fontsize"] = 32
+    plt.rcParams["legend.title_fontsize"] = 32
+    # Optionally, add custom LaTeX preamble
+    plt.rcParams["text.latex.preamble"] = r"\usepackage{amsmath} \usepackage{amsfonts} \usepackage{amssymb}"
+
+    self.__setPalette()
+
+    # Set rcParams for tighter layout
+    plt.rcParams["figure.autolayout"] = True
+    plt.rcParams["figure.constrained_layout.use"] = False
+    plt.rcParams["axes.linewidth"] = 1.2
+
+    # Set rcParams to show ticks on both left and right sides
+    plt.rcParams["xtick.direction"] = "in"
+    plt.rcParams["ytick.direction"] = "in"
+    plt.rcParams["xtick.bottom"] = True
+    plt.rcParams["ytick.left"] = True
+    plt.rcParams["xtick.top"] = True
+    plt.rcParams["ytick.right"] = True
+
+    plt.rcParams["axes.xmargin"] = 0.01
+
+  def __setPalette(self, nColors: int = 3, palette: str = "hsv"):
+    # Choose a seaborn palette
+    # has to specify number of lines
+    self.palette = sns.color_palette(palette, nColors)
+    # Set the color cycle
+    plt.rcParams["axes.prop_cycle"] = plt.cycler(color=self.palette)
+
+  def __plotRGBLegend(self, ax):
+    size = 512
+    image = np.ones((size, size, 3))
+
+    # Triangle vertices for RGB channels
+    v1 = np.array([1.0, 0.0])  # Red corner
+    v2 = np.array([0.0, 0.0])  # Green corner
+    v3 = np.array([0.5, np.sqrt(3) / 2])  # Blue corner (top)
+
+    # Coordinate grid
+    x = np.linspace(0, 1, size)
+    y = np.linspace(0, np.sqrt(3) / 2, size)
+    X, Y = np.meshgrid(x, y)
+
+    # For each pixel, compute barycentric coordinates
+    def barycentric_coords(x, y):
+      # Transformation matrix for barycentric coordinates
+      detT = (v2[0] - v1[0]) * (v3[1] - v1[1]) - (v3[0] - v1[0]) * (v2[1] - v1[1])
+      l1 = ((v2[0] - x) * (v3[1] - y) - (v3[0] - x) * (v2[1] - y)) / detT
+      l2 = ((v3[0] - x) * (v1[1] - y) - (v1[0] - x) * (v3[1] - y)) / detT
+      l3 = 1.0 - l1 - l2
+      return l1, l2, l3
+
+    for i in range(size):
+      for j in range(size):
+        x_val, y_val = X[i, j], Y[i, j]
+        l1, l2, l3 = barycentric_coords(x_val, y_val)
+        if (l1 >= 0) and (l2 >= 0) and (l3 >= 0):  # Inside triangle
+          image[i, j, :] = [l1, l2, l3]
+    # Create inset
+    ax.imshow(image, extent=(0, 1, 0, np.sqrt(3) / 2), origin="lower", alpha=0.7)
+
+    # Triangle border
+    triangle = Polygon([v1, v2, v3], closed=True, edgecolor="k", fill=False, lw=0.5)
+    ax.add_patch(triangle)
+
+    # Labels
+    ax.text(*(v1 + np.array([0.3, 0.5])), r"$yz$", color="black", ha="right", va="top", fontsize=28, rotation=-60)
+    ax.text(*(v2 + np.array([-0.3, 0.5])), r"$zx$", color="black", ha="left", va="top", fontsize=28, rotation=60)
+    ax.text(*(v3 + np.array([0.0, -0.1])), r"$xy$", color="black", ha="center", va="bottom", fontsize=28)
+
+    ax.axis("off")
+
+  def __shiftCmap(self, cmap, fraction_shift=0.0, name="shifted"):
+    """Shift a colormap cyclically by `fraction_shift` (0.0 to 1.0)."""
+    N = 256
+    colors = cmap(np.linspace(0, 1, N))
+    shift = int(N * fraction_shift)
+    colors = np.roll(colors, shift=shift, axis=0)
+    return ListedColormap(colors, name=name)

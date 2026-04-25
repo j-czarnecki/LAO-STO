@@ -21,14 +21,19 @@
 # arXiv:2508.05075 (2025).
 # https://arxiv.org/abs/2508.05075
 
-import sympy as sp
 import numpy as np
+import sympy as sp
 from IPython.display import display
 
 
 class SymbolicSymmetryProjectorClass:
-
-  def __init__(self, irrepsTuple: tuple[str, ...], conjugacyClassesTuple: tuple[str, ...], characterTableDict: dict[str, dict[str, sp.Expr]], representationMatrixSize: int):
+  def __init__(
+    self,
+    irrepsTuple: tuple[str, ...],
+    conjugacyClassesTuple: tuple[str, ...],
+    characterTableDict: dict[str, dict[str, sp.Expr]],
+    representationMatrixSize: int,
+  ):
     """
     Initializes ScGapSymmetryProjector object to callculate supeconducting gap symmetries for different submodules.
     Arguments:
@@ -44,7 +49,7 @@ class SymbolicSymmetryProjectorClass:
     self.conjugacyClassesTuple: tuple[str, ...] = conjugacyClassesTuple
     self.characterTableDict: dict[str, dict[str, sp.Expr]] = characterTableDict
     self.representationMatrixSize: int = representationMatrixSize
-    self.g = sum(characterTableDict[irrep][conjugacyClassesTuple[0]]**2 for irrep in irrepsTuple)
+    self.g = sum(characterTableDict[irrep][conjugacyClassesTuple[0]] ** 2 for irrep in irrepsTuple)
 
   def getProjectionOperators(self, operationsDict: dict[str, list[sp.Matrix]]) -> dict[str, sp.Matrix]:
     """
@@ -76,7 +81,9 @@ class SymbolicSymmetryProjectorClass:
 
     return multiplicitiesDict
 
-  def getDiagonalizedProjections(self, projectionsDict: dict[str, sp.Matrix]) -> dict[str, list[tuple[int, int, list[sp.Matrix]]]]:
+  def getDiagonalizedProjections(
+    self, projectionsDict: dict[str, sp.Matrix]
+  ) -> dict[str, list[tuple[int, int, list[sp.Matrix]]]]:
     """
     Diagonalizes projection operators and return tuples of (eigenvalue, multiplicity, eigenvectors).
     Arguments:
@@ -93,7 +100,7 @@ class SymbolicSymmetryProjectorClass:
     for irrep in self.irrepsTuple:
       print(f"IR: {irrep}")
       degeneracyCount = 0
-      #Only interested in eigenvalues +-1
+      # Only interested in eigenvalues +-1
       for v in diagonalizedProjections[irrep]:
         if np.abs(v[0]) == 1:
           # Print indeces of +/- ones for easy python implementation
@@ -105,15 +112,19 @@ class SymbolicSymmetryProjectorClass:
                 oneIndeces.append(j)
               elif v[2][i][j] == -1:
                 minusOneIndeces.append(j)
-            #Weird notation to enable easy copying to projectionIndeces dict
-            totalOutputStr += f'r"{irrep[:-1]}^{{({i + 1})}}$" : {{"plus" : {oneIndeces}, "minus" : {minusOneIndeces} }},\n'
+            # Weird notation to enable easy copying to projectionIndeces dict
+            totalOutputStr += (
+              f'r"{irrep[:-1]}^{{({i + 1})}}$" : {{"plus" : {oneIndeces}, "minus" : {minusOneIndeces} }},\n'
+            )
         else:
           print("No matching eigenvalue")
       print("------------")
       print("\n")
     print(totalOutputStr)
 
-  def filterOutProjections(self, diagonalizedProjections: dict[str, list[tuple[int, int, list[sp.Matrix]]]]) -> dict[str, list[tuple[int, int, list[sp.Matrix]]]]:
+  def filterOutProjections(
+    self, diagonalizedProjections: dict[str, list[tuple[int, int, list[sp.Matrix]]]]
+  ) -> dict[str, list[tuple[int, int, list[sp.Matrix]]]]:
     for irrep in self.irrepsTuple:
       for projection in diagonalizedProjections[irrep]:
         if np.abs(projection[0]) != 1:
@@ -122,7 +133,7 @@ class SymbolicSymmetryProjectorClass:
     return diagonalizedProjections
 
   def __instantProjectionCheck(self, projection: sp.Matrix, irrep: str):
-    """ Checks corectness of single projection operator """
-    if ((projection**2 - projection) == np.zeros(projection.shape[0])):
+    """Checks corectness of single projection operator"""
+    if (projection**2 - projection) == np.zeros(projection.shape[0]):
       display(projection**2 - projection)
       raise Exception(f"Projection for irrep {irrep} operator is not indempotent")
