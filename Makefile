@@ -91,7 +91,7 @@ F2PY_SETVARS = /home/czarnecki/intel/oneapi/setvars.sh
 SRC_FILES_ALL := $(shell find $(SRC_DIR) -name '*.f90')
 
 # --- Exclude the two main programs from the common source set ---
-SRC_COMMON := $(filter-out $(SRC_DIR)/main/main.f90 $(SRC_DIR)/main_post/main_postprocessing.f90 $(SRC_DIR)/postprocessing/src/%.f90 $(SRC_DIR)/%/test/test_profiling.f90, $(SRC_FILES_ALL))
+SRC_COMMON := $(shell echo '$(SRC_FILES_ALL)' | tr ' ' '\n' | grep -v '/test/' | grep -v '$(SRC_DIR)/main/main\.f90' | grep -v '$(SRC_DIR)/main_post/main_postprocessing\.f90' | tr '\n' ' ')
 
 # --- Define two build sets ---
 SRC_FILES_MAIN := $(SRC_COMMON) $(SRC_DIR)/main/main.f90
